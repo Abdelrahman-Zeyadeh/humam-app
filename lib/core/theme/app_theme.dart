@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
 /// ثيم هُمَام: `light()` و`dark()` بنفس الهوية البصرية.
 ///
-/// TODO(أداء): يستخدم GoogleFonts.cairoTextTheme حالياً فيجلب الخط من الشبكة
-/// عند أول إقلاع. يجب استبداله بخط Cairo مضمّن كـ asset قبل النشر — هذا مطلوب
-/// صراحة في تصميم-النظام.md (فجوة #10) ولا يجوز تأجيله لآخر مرحلة.
+/// خط الواجهة Cairo مضمّن كـ asset (`assets/fonts/Cairo-Variable.ttf`،
+/// خط متغيّر الوزن SIL OFL 1.1 من `google/fonts`) — لا جلب شبكي عند
+/// الإقلاع بعد الآن (كان عبر حزمة `google_fonts` سابقاً، فجوة #10
+/// بتصميم-النظام.md، انسدّت ٢٠٢٦-٠٨-١٩).
+const String _kCairoFamily = 'Cairo';
+
 abstract final class AppTheme {
   static ThemeData light() {
     final base = ThemeData(
@@ -23,28 +25,33 @@ abstract final class AppTheme {
         onError: Colors.white,
       ),
       scaffoldBackgroundColor: AppColors.cream,
-      fontFamily: GoogleFonts.cairo().fontFamily,
-      textTheme: GoogleFonts.cairoTextTheme(),
+      fontFamily: _kCairoFamily,
     );
 
     return base.copyWith(
+      // كانت خلفية كحلية غامقة/نص أبيض بكل الشاشات الثانوية (الصلاة،
+      // الأذكار، الأحاديث، الختمة، قيام الليل) — أثقل من الهوية المطلوبة.
+      // خلفية فاتحة (نفس Cream العامة) ونص/أيقونات كحلية بدلها، بلا لمس
+      // الوضع الليلي (`AppTheme.dark()` أسفل، بلا تغيير).
       appBarTheme: base.appBarTheme.copyWith(
-        backgroundColor: AppColors.navy,
-        foregroundColor: Colors.white,
+        backgroundColor: AppColors.cream,
+        foregroundColor: AppColors.navy,
         elevation: 0,
         centerTitle: true,
-        titleTextStyle: GoogleFonts.cairo(
+        iconTheme: const IconThemeData(color: AppColors.navy),
+        titleTextStyle: const TextStyle(
+          fontFamily: _kCairoFamily,
           fontSize: 18,
           fontWeight: FontWeight.w700,
-          color: Colors.white,
+          color: AppColors.navy,
         ),
       ),
-      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: Colors.white,
         selectedItemColor: AppColors.gold,
         unselectedItemColor: AppColors.inkSoft,
-        selectedLabelStyle: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.w700),
-        unselectedLabelStyle: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.w600),
+        selectedLabelStyle: TextStyle(fontFamily: _kCairoFamily, fontSize: 11, fontWeight: FontWeight.w700),
+        unselectedLabelStyle: TextStyle(fontFamily: _kCairoFamily, fontSize: 11, fontWeight: FontWeight.w600),
         type: BottomNavigationBarType.fixed,
         elevation: 8,
       ),
@@ -75,8 +82,7 @@ abstract final class AppTheme {
         onError: Colors.black,
       ),
       scaffoldBackgroundColor: AppColors.navyDeep,
-      fontFamily: GoogleFonts.cairo().fontFamily,
-      textTheme: GoogleFonts.cairoTextTheme(ThemeData.dark().textTheme),
+      fontFamily: _kCairoFamily,
     );
 
     return base.copyWith(
@@ -85,7 +91,8 @@ abstract final class AppTheme {
         foregroundColor: AppColors.inkOnDark,
         elevation: 0,
         centerTitle: true,
-        titleTextStyle: GoogleFonts.cairo(
+        titleTextStyle: const TextStyle(
+          fontFamily: _kCairoFamily,
           fontSize: 18,
           fontWeight: FontWeight.w700,
           color: AppColors.inkOnDark,
@@ -95,8 +102,8 @@ abstract final class AppTheme {
         backgroundColor: AppColors.surfaceDark,
         selectedItemColor: AppColors.gold,
         unselectedItemColor: AppColors.inkSoftOnDark,
-        selectedLabelStyle: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.w700),
-        unselectedLabelStyle: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.w600),
+        selectedLabelStyle: const TextStyle(fontFamily: _kCairoFamily, fontSize: 11, fontWeight: FontWeight.w700),
+        unselectedLabelStyle: const TextStyle(fontFamily: _kCairoFamily, fontSize: 11, fontWeight: FontWeight.w600),
         type: BottomNavigationBarType.fixed,
         elevation: 8,
       ),

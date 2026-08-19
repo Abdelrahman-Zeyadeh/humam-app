@@ -3,14 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/data/user/location_prefs.dart';
 import '../../core/theme/app_colors.dart';
-import 'cities.dart';
+import '../notifications/adhan_notification_prefs.dart';
+import '../notifications/adhan_notification_service.dart';
+import 'prayer_countdown_card.dart';
 import 'prayer_location_controller.dart';
 import 'prayer_times_service.dart';
 import 'qibla_screen.dart';
-
-final _tickProvider = StreamProvider<DateTime>((ref) {
-  return Stream.periodic(const Duration(seconds: 1), (_) => DateTime.now());
-});
 
 /// شاشة مواقيت الصلاة: مواقيت اليوم الستة (شاملة الشروق للعرض) + عدّاد
 /// للصلاة القادمة + اختيار الموقع (GPS/مدينة) وطريقة الحساب. حساب محلي
@@ -22,12 +20,19 @@ class PrayerScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(locationVersionProvider);
+    ref.watch(adhanNotificationVersionProvider);
     final prefs = ref.watch(locationPrefsProvider);
+    final notifPrefs = ref.watch(adhanNotificationPrefsProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('مواقيت الصلاة'),
         actions: [
+          IconButton(
+            icon: Icon(notifPrefs.masterEnabled ? Icons.notifications_active_outlined : Icons.notifications_off_outlined),
+            tooltip: notifPrefs.masterEnabled ? 'إشعارات الأذان مفعّلة' : 'إشعارات الأذان معطّلة',
+            onPressed: () => _toggleNotifications(context, ref, prefs, notifPrefs),
+          ),
           IconButton(
             icon: const Icon(Icons.explore_outlined),
             tooltip: 'القبلة',
@@ -37,6 +42,44 @@ class PrayerScreen extends ConsumerWidget {
       ),
       body: prefs.hasLocation ? _TimesView(prefs: prefs) : const _LocationPrompt(),
     );
+  }
+
+  /// **لا يجب أن يرمي هون أي استثناء غير مُمسَك** — الخدمة نفسها آمنة على
+  /// أندرويد/iOS (فشل داخلي = تراجع أو `debugPrint`)، لكن على منصّات
+  /// أخرى (ويندوز مثلاً بلا `WindowsInitializationSettings`) `initialize`
+  /// نفسها ترمي. جُرِّب هذا فعلياً (`flutter run -d windows`) ورُصد
+  /// استثناء غير مُمسَك قبل إضافة try/catch هون — راجع أيضاً ملاحظة
+  /// `main.dart` بخصوص اقتصار التفعيل التلقائي على أندرويد/iOS.
+  Future<void> _toggleNotifications(
+    BuildContext context,
+    WidgetRef ref,
+    LocationPrefs prefs,
+    AdhanNotificationPrefs notifPrefs,
+  ) async {
+    final next = !notifPrefs.masterEnabled;
+    await notifPrefs.setMasterEnabled(next);
+    ref.read(adhanNotificationVersionProvider.notifier).bump();
+
+    try {
+      if (next) {
+        await AdhanNotificationService.instance.requestPermissions();
+        if (prefs.hasLocation) {
+          await AdhanNotificationService.instance.rescheduleUpcoming(
+            lat: prefs.lat!,
+            lon: prefs.lon!,
+            methodKey: prefs.calculationMethod,
+            isEnabled: notifPrefs.effectivelyEnabled,
+          );
+        }
+      } else {
+        await AdhanNotificationService.instance.cancelAll();
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذّر ضبط إشعارات الأذان على هذا الجهاز: $e')),
+      );
+    }
   }
 }
 
@@ -63,12 +106,6 @@ class _LocationPrompt extends ConsumerWidget {
               label: const Text('استخدام موقعي الحالي (GPS)'),
               onPressed: locationState.isLoading ? null : () => ref.read(locationControllerProvider.notifier).useGps(),
             ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              icon: const Icon(Icons.location_city_outlined),
-              label: const Text('اختيار مدينة'),
-              onPressed: () => _showCityPicker(context, ref),
-            ),
             if (locationState.hasError) ...[
               const SizedBox(height: 12),
               Text('${locationState.error}', style: const TextStyle(color: Color(0xFFB3261E), fontSize: 12), textAlign: TextAlign.center),
@@ -84,47 +121,6 @@ class _LocationPrompt extends ConsumerWidget {
   }
 }
 
-void _showCityPicker(BuildContext context, WidgetRef ref) {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-    builder: (sheetContext) {
-      final onSurface = Theme.of(sheetContext).colorScheme.onSurface;
-      return SafeArea(
-        child: FractionallySizedBox(
-          heightFactor: 0.7,
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-              Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.line, borderRadius: BorderRadius.circular(2))),
-              const SizedBox(height: 12),
-              Text('اختر مدينتك', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: onSurface)),
-              const Divider(height: 24),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: kPrayerCities.length,
-                  itemBuilder: (context, i) {
-                    final city = kPrayerCities[i];
-                    return ListTile(
-                      leading: const Icon(Icons.location_city_outlined),
-                      title: Text(city.nameAr, style: TextStyle(color: onSurface)),
-                      onTap: () {
-                        ref.read(locationControllerProvider.notifier).useCity(city);
-                        Navigator.of(sheetContext).pop();
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    },
-  );
-}
-
 class _TimesView extends ConsumerWidget {
   const _TimesView({required this.prefs});
   final LocationPrefs prefs;
@@ -132,7 +128,7 @@ class _TimesView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
-    final now = ref.watch(_tickProvider).value ?? DateTime.now();
+    final now = ref.watch(prayerTickProvider).value ?? DateTime.now();
     final dayTimes = computeDayTimes(lat: prefs.lat!, lon: prefs.lon!, date: now, methodKey: prefs.calculationMethod);
     var next = nextPrayer(dayTimes, now);
     // كل صلوات اليوم فاتت — نعرض فجر الغد كبديل بدل ترك العدّاد فارغاً.
@@ -149,29 +145,23 @@ class _TimesView extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Card(
-          color: AppColors.navy,
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                Text('الصلاة القادمة', style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12)),
-                const SizedBox(height: 6),
-                Text(next.moment.nameAr, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 4),
-                _CountdownText(target: next.time),
-              ],
-            ),
-          ),
-        ),
+        PrayerCountdownCard(lat: prefs.lat!, lon: prefs.lon!, methodKey: prefs.calculationMethod),
         const SizedBox(height: 16),
         Row(
           children: [
             Expanded(
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.location_on_outlined, size: 18),
-                label: Text(prefs.cityName ?? '—', overflow: TextOverflow.ellipsis),
-                onPressed: () => _showCityPicker(context, ref),
+              child: Row(
+                children: [
+                  Icon(Icons.location_on_outlined, size: 18, color: onSurface.withValues(alpha: 0.6)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      prefs.cityName ?? '—',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: onSurface.withValues(alpha: 0.8), fontSize: 13),
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(width: 8),
@@ -249,20 +239,4 @@ String _formatTime(DateTime t) {
   final period = h24 < 12 ? 'ص' : 'م';
   final m = t.minute.toString().padLeft(2, '0');
   return '$h12:$m $period';
-}
-
-class _CountdownText extends ConsumerWidget {
-  const _CountdownText({required this.target});
-  final DateTime target;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final now = ref.watch(_tickProvider).value ?? DateTime.now();
-    final remaining = target.difference(now);
-    final positive = remaining.isNegative ? Duration.zero : remaining;
-    final h = positive.inHours.toString().padLeft(2, '0');
-    final m = (positive.inMinutes % 60).toString().padLeft(2, '0');
-    final s = (positive.inSeconds % 60).toString().padLeft(2, '0');
-    return Text('باقي $h:$m:$s', style: const TextStyle(color: AppColors.goldSoft, fontSize: 16, fontWeight: FontWeight.w700));
-  }
 }

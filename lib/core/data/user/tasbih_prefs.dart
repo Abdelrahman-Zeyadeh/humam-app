@@ -1,21 +1,20 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-import 'user_prefs.dart';
+import 'user_providers.dart';
+import 'user_repository.dart';
 
 /// عدّاد المسبحة الإلكترونية — يُحفظ بين تشغيلات التطبيق (بخلاف عدّ
-/// الأذكار بالجلسة). مؤقت بـ SharedPreferences — نفس ملاحظة `UserPrefs`.
+/// الأذكار بالجلسة) — واجهة رقيقة فوق [UserRepository]. كانت تُخزَّن
+/// بـSharedPreferences؛ الهجرة كاملة الآن، أُبقيت بنفس التوقيعات.
 class TasbihPrefs {
-  TasbihPrefs(this._prefs);
-  final SharedPreferences _prefs;
+  TasbihPrefs(this._repo);
+  final UserRepository _repo;
 
-  static const _kCount = 'tasbih_count';
+  int get count => _repo.tasbihCount;
 
-  int get count => _prefs.getInt(_kCount) ?? 0;
-
-  Future<void> setCount(int value) => _prefs.setInt(_kCount, value);
+  Future<void> setCount(int value) => _repo.setTasbihCount(value);
 }
 
 final tasbihPrefsProvider = Provider<TasbihPrefs>((ref) {
-  return TasbihPrefs(ref.watch(sharedPreferencesProvider));
+  return TasbihPrefs(ref.watch(userRepositoryProvider));
 });

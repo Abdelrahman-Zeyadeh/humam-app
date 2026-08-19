@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../azkar/azkar_screen.dart';
+import '../azkar/azkar_library_screen.dart';
 import '../home/home_screen.dart';
 import '../more/more_placeholder_screen.dart';
 import '../mushaf/mushaf_screen.dart';
@@ -16,21 +16,50 @@ class RootTabIndexNotifier extends Notifier<int> {
   void select(int index) => state = index;
 }
 
-final rootTabIndexProvider = NotifierProvider<RootTabIndexNotifier, int>(RootTabIndexNotifier.new);
+final rootTabIndexProvider = NotifierProvider<RootTabIndexNotifier, int>(
+  RootTabIndexNotifier.new,
+);
 
 class _TabDef {
-  const _TabDef({required this.label, required this.icon, required this.builder});
+  const _TabDef({
+    required this.label,
+    required this.icon,
+    required this.builder,
+  });
   final String label;
   final IconData icon;
   final WidgetBuilder builder;
 }
 
 final _tabs = <_TabDef>[
-  _TabDef(label: 'الرئيسية', icon: Icons.home_outlined, builder: (_) => const HomeScreen()),
-  _TabDef(label: 'المصحف', icon: Icons.menu_book_outlined, builder: (_) => const MushafScreen()),
-  _TabDef(label: 'الصلاة', icon: Icons.access_time_outlined, builder: (_) => const PrayerScreen()),
-  _TabDef(label: 'الأذكار', icon: Icons.brightness_2_outlined, builder: (_) => const AzkarScreen()),
-  _TabDef(label: 'المزيد', icon: Icons.more_horiz, builder: (_) => const MorePlaceholderScreen()),
+  _TabDef(
+    label: 'الرئيسية',
+    icon: Icons.home_outlined,
+    builder: (_) => const HomeScreen(),
+  ),
+  _TabDef(
+    label: 'المصحف',
+    icon: Icons.menu_book_outlined,
+    builder: (_) => const MushafScreen(),
+  ),
+  _TabDef(
+    label: 'الصلاة',
+    icon: Icons.access_time_outlined,
+    builder: (_) => const PrayerScreen(),
+  ),
+  _TabDef(
+    label: 'الأذكار',
+    icon: Icons.brightness_2_outlined,
+    // مكتبة الأذكار (بحث + وصول سريع + كل التصنيفات) صارت الصفحة الأساسية
+    // للتبويب — الصباح/المساء/النوم بالعدّاد (`AzkarScreen`) تُفتح من
+    // شريط الوصول السريع بأعلاها، لا العكس، بحسب طلب صاحب المشروع.
+    builder: (_) => const AzkarLibraryScreen(),
+  ),
+  _TabDef(
+    label: 'المزيد',
+    icon: Icons.more_horiz,
+    builder: (_) => const MorePlaceholderScreen(),
+  ),
 ];
 
 /// القشرة الرئيسية: `IndexedStack` ببناء كسول للتبويبات — كل تبويب يُبنى
@@ -79,7 +108,11 @@ class _RootShellState extends ConsumerState<RootShell> {
 /// سكافولد موحّد للشاشات المؤقتة (placeholder) — يُستبدل كل واحد منها
 /// بميزته الحقيقية في مرحلته المحددة بخطة العمل.
 class ComingSoonScaffold extends StatelessWidget {
-  const ComingSoonScaffold({super.key, required this.title, required this.icon});
+  const ComingSoonScaffold({
+    super.key,
+    required this.title,
+    required this.icon,
+  });
   final String title;
   final IconData icon;
 
@@ -93,7 +126,10 @@ class ComingSoonScaffold extends StatelessWidget {
           children: [
             Icon(icon, size: 48, color: AppColors.inkSoft),
             const SizedBox(height: 12),
-            Text('قيد التطوير — مرحلة قادمة', style: TextStyle(color: AppColors.inkSoft, fontSize: 13)),
+            Text(
+              'قيد التطوير — مرحلة قادمة',
+              style: TextStyle(color: AppColors.inkSoft, fontSize: 13),
+            ),
           ],
         ),
       ),

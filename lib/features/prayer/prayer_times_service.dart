@@ -98,13 +98,16 @@ List<PrayerMomentTime> computeDayTimes({
   final params = calculationMethodByKey(methodKey).build();
   final times = PrayerTimes(coordinates: coordinates, date: date, calculationParameters: params);
 
+  // ⚠️ `adhan_dart` يرجّع كل الأوقات بصيغة UTC (`DateTime.utc(...)` داخلياً)
+  // — لازم `.toLocal()` هون قبل أي عرض، وإلا الساعة المعروضة تكون ساعة
+  // UTC لا ساعة المستخدم الفعلية (كان هذا سبب "مواقيت الصلاة خطأ" المُبلَّغ).
   return [
-    PrayerMomentTime(PrayerMoment.fajr, times.fajr),
-    PrayerMomentTime(PrayerMoment.sunrise, times.sunrise),
-    PrayerMomentTime(PrayerMoment.dhuhr, times.dhuhr),
-    PrayerMomentTime(PrayerMoment.asr, times.asr),
-    PrayerMomentTime(PrayerMoment.maghrib, times.maghrib),
-    PrayerMomentTime(PrayerMoment.isha, times.isha),
+    PrayerMomentTime(PrayerMoment.fajr, times.fajr.toLocal()),
+    PrayerMomentTime(PrayerMoment.sunrise, times.sunrise.toLocal()),
+    PrayerMomentTime(PrayerMoment.dhuhr, times.dhuhr.toLocal()),
+    PrayerMomentTime(PrayerMoment.asr, times.asr.toLocal()),
+    PrayerMomentTime(PrayerMoment.maghrib, times.maghrib.toLocal()),
+    PrayerMomentTime(PrayerMoment.isha, times.isha.toLocal()),
   ];
 }
 

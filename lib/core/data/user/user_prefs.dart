@@ -1,68 +1,70 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// تخزين مستخدم بسيط عبر `SharedPreferences` — علامات مرجعية وآخر صفحة
-/// قراءة فقط. مؤقت إلى حين `user.db` (drift) بمرحلة التخزين والهجرة؛
-/// المفاتيح هنا مصمَّمة لتُقرأ بسهولة لاحقاً عند الهجرة، لا تُعاد تسميتها.
+import 'user_providers.dart';
+import 'user_repository.dart';
+
+/// علامات مرجعية وآخر صفحة قراءة وسلسلة الأيام — واجهة رقيقة فوق
+/// [UserRepository] (`user.db` بـdrift). كانت تُخزَّن مباشرة بـ
+/// `SharedPreferences`؛ الهجرة كاملة الآن (`prefs_migration.dart`)، هذه
+/// الفئة أُبقيت بنفس التوقيعات تماماً لتفادي تغيير كل الشاشات المستهلِكة.
 class UserPrefs {
-  UserPrefs(this._prefs);
-  final SharedPreferences _prefs;
+  UserPrefs(this._repo);
+  final UserRepository _repo;
 
-  static const _kBookmarks = 'bookmarked_ayah_ids';
-  static const _kLastPage = 'last_read_page';
+  Set<int> get bookmarkedAyahIds => _repo.bookmarkedAyahIds;
 
-  Set<int> get bookmarkedAyahIds =>
-      (_prefs.getStringList(_kBookmarks) ?? const []).map(int.parse).toSet();
+  Future<void> toggleBookmark(int ayahId) => _repo.toggleBookmark(ayahId);
 
-  Future<void> toggleBookmark(int ayahId) async {
-    final current = bookmarkedAyahIds;
-    if (!current.remove(ayahId)) current.add(ayahId);
-    await _prefs.setStringList(_kBookmarks, current.map((e) => '$e').toList());
-  }
+  bool isBookmarked(int ayahId) => _repo.isBookmarked(ayahId);
 
-  bool isBookmarked(int ayahId) => bookmarkedAyahIds.contains(ayahId);
+  int? get lastReadPage => _repo.lastReadPage;
 
-  int? get lastReadPage => _prefs.getInt(_kLastPage);
+  Future<void> setLastReadPage(int page) => _repo.setLastReadPage(page);
 
-  Future<void> setLastReadPage(int page) => _prefs.setInt(_kLastPage, page);
+  int get streakDays => _repo.streakDays;
 
-  // --- سلسلة أيام القراءة المتتالية ---
-  // تُحدَّث مرة واحدة بأول تنقّل صفحة بكل يوم (راجع _bumpStreakIfNewDay).
-  static const _kStreakCount = 'reading_streak_days';
-  static const _kStreakLastDay = 'reading_streak_last_day'; // yyyy-mm-dd
+  Future<void> bumpStreakIfNewDay() => _repo.bumpStreakIfNewDay();
 
-  int get streakDays => _prefs.getInt(_kStreakCount) ?? 0;
+  // --- سلاسل استمرار مستقلة لكل نشاط (راجع UserCategories) ---
 
-  /// يُستدعى عند كل تغيير صفحة بالمصحف. يزيد السلسلة يوماً واحداً بأول
-  /// زيارة كل يوم تقويمي، ويصفّرها لو انقطع يوم كامل أو أكثر بين آخر
-  /// زيارة واليوم — لا حساب دقيق بالساعات، فقط تاريخ التقويم المحلي.
-  Future<void> bumpStreakIfNewDay() async {
-    final today = _dateKey(DateTime.now());
-    final lastDay = _prefs.getString(_kStreakLastDay);
-    if (lastDay == today) return; // زيارة تانية بنفس اليوم — لا تغيير
+  int streakDaysFor(String category) => _repo.streakDaysFor(category);
 
-    final yesterday = _dateKey(DateTime.now().subtract(const Duration(days: 1)));
-    final continued = lastDay == yesterday;
-    final newCount = continued ? streakDays + 1 : 1;
+  bool completedTodayFor(String category) => _repo.completedTodayFor(category);
 
-    await _prefs.setInt(_kStreakCount, newCount);
-    await _prefs.setString(_kStreakLastDay, today);
-  }
+  Future<void> bumpCategoryStreakIfNewDay(String category) => _repo.bumpCategoryStreakIfNewDay(category);
 
-  static String _dateKey(DateTime d) => '${d.year}-${d.month}-${d.day}';
+  // --- تذكير قيام الليل ---
+
+  bool get qiyamEnabled => _repo.qiyamEnabled;
+  int? get qiyamHour => _repo.qiyamHour;
+  int get qiyamMinute => _repo.qiyamMinute;
+
+  Future<void> setQiyamReminder({required bool enabled, int? hour, int? minute}) =>
+      _repo.setQiyamReminder(enabled: enabled, hour: hour, minute: minute);
+
+  // --- أقسام مفضَّلة من مكتبة حصن المسلم ---
+
+  bool isAzkarFavorite(int categoryId) => _repo.isAzkarFavorite(categoryId);
+
+  Set<int> get azkarFavoriteCategoryIds => _repo.azkarFavoriteCategoryIds;
+
+  Future<void> toggleAzkarFavorite(int categoryId) => _repo.toggleAzkarFavorite(categoryId);
 }
 
+/// `SharedPreferences` تبقى للإعدادات البسيطة فقط (تصميم-النظام.md
+/// القرار المعماري #٦) — علم الهجرة ووضع الثيم، لا بيانات مستخدم حقيقية.
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   throw UnimplementedError('يُهيَّأ بـ overrideWithValue داخل main() قبل تشغيل التطبيق');
 });
 
 final userPrefsProvider = Provider<UserPrefs>((ref) {
-  return UserPrefs(ref.watch(sharedPreferencesProvider));
+  return UserPrefs(ref.watch(userRepositoryProvider));
 });
 
 /// إشعار بسيط يُعاد بناؤه عند تبديل علامة — الودجتات يلي بتراقب علامات
 /// آية معيّنة تستخدم `bookmarkVersionProvider` لإجبار إعادة القراءة من
-/// [UserPrefs] (التخزين نفسه متزامن، لا حاجة لـ FutureProvider).
+/// [UserPrefs] (التخزين نفسه متزامن عبر الذاكرة المؤقتة، لا حاجة لـ Stream).
 class BookmarkVersionNotifier extends Notifier<int> {
   @override
   int build() => 0;
@@ -70,3 +72,26 @@ class BookmarkVersionNotifier extends Notifier<int> {
 }
 
 final bookmarkVersionProvider = NotifierProvider<BookmarkVersionNotifier, int>(BookmarkVersionNotifier.new);
+
+/// نفس نمط `bookmarkVersionProvider` — إجبار إعادة بناء الودجتات المراقِبة
+/// لسلاسل الاستمرار المستقلة (`streakDaysFor`/`completedTodayFor`) أو
+/// إعداد قيام الليل بعد أي تغيير، بما إنها كلها بذاكرة مؤقتة متزامنة بلا
+/// Stream خاص بها.
+class CategoryStreakVersionNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+  void bump() => state++;
+}
+
+final categoryStreakVersionProvider =
+    NotifierProvider<CategoryStreakVersionNotifier, int>(CategoryStreakVersionNotifier.new);
+
+/// نفس النمط — إجبار إعادة بناء قائمة مكتبة الأذكار عند تبديل تفضيل.
+class AzkarFavoriteVersionNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+  void bump() => state++;
+}
+
+final azkarFavoriteVersionProvider =
+    NotifierProvider<AzkarFavoriteVersionNotifier, int>(AzkarFavoriteVersionNotifier.new);

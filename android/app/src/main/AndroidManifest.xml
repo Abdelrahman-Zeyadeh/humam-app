@@ -14,6 +14,21 @@
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
+    <!-- إشعارات أذان مواقيت الصلاة (flutter_local_notifications) — غير
+         مُختبرة بجهاز فعلي بعد، راجع adhan_notification_service.dart.
+         POST_NOTIFICATIONS: إذن وقت التشغيل بأندرويد 13+، يُطلب صراحة
+         بالكود. SCHEDULE_EXACT_ALARM: قد يحتاج تفعيلاً يدوياً من المستخدم
+         بأندرويد 12+ (الخدمة تتراجع تلقائياً لجدولة غير دقيقة لو رُفض،
+         لا تفشل صامتة). RECEIVE_BOOT_COMPLETED: يسمح لإشعارات مجدولة
+         بالبقاء بعد إعادة تشغيل الجهاز. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- عمداً بلا USE_EXACT_ALARM: إذن مقيَّد بمتجر Play للتطبيقات التي
+         "المنبّه/التقويم" وظيفتها الجوهرية فقط، ومراجعته يدوية قد تُعطّل
+         النشر بلا داعٍ. SCHEDULE_EXACT_ALARM كافٍ (يحتاج موافقة يدوية من
+         المستخدم بأندرويد 12+ عبر "التنبيهات والتذكيرات")، مع تراجع تلقائي
+         لجدولة غير دقيقة لو رُفض. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <application
         android:label="humam_app"
         android:name="${applicationName}"
@@ -63,6 +78,19 @@
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
         </receiver>
+
+        <!-- flutter_local_notifications: يعيد جدولة إشعارات الأذان القادمة
+             بعد إعادة تشغيل الجهاز (AlarmManager يفقد التنبيهات المجدولة
+             عند إيقاف التشغيل). غير مُختبر فعلياً بإعادة تشغيل جهاز حقيقي. -->
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

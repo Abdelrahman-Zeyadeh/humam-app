@@ -14,7 +14,7 @@ part 'hadith_database.g.dart';
 /// قاعدة أحاديث مستقلة عن `quran.db` — **للقراءة فقط**، نفس نمط النسخ من
 /// الـ asset عند أول تشغيل (راجع `QuranDatabase` لشرح مفصّل لنفس النمط
 /// ولماذا فحص إصدار الملف ضروري).
-@DriftDatabase(tables: [HadithBooks, Hadiths])
+@DriftDatabase(tables: [HadithBooks, HadithChapters, Hadiths])
 class HadithDatabase extends _$HadithDatabase {
   HadithDatabase() : super(_openConnection());
 
@@ -22,7 +22,7 @@ class HadithDatabase extends _$HadithDatabase {
   HadithDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 3;
 }
 
 LazyDatabase _openConnection() {

@@ -36,7 +36,9 @@ class QuranAudioHandler extends BaseAudioHandler with SeekHandler {
     String title = 'المصحف';
     try {
       final surah = await _ref.read(quranRepositoryProvider).surahById(surahId);
-      title = 'سورة ${surah.nameArPlain}';
+      // `nameArPlain` يشمل كلمة "سورة" أصلاً — كانت تتكرر هون ("سورة سورة
+      // الكهف") لو أُضيفت ثانية بالنص الثابت.
+      title = surah.nameArPlain;
     } catch (_) {
       // تجاهل — يبقى العنوان الافتراضي لو تعذّر الاستعلام، ما يوقف التشغيل.
     }

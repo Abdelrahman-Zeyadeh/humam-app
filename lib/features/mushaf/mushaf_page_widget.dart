@@ -102,9 +102,20 @@ class _PageLineWidget extends ConsumerWidget {
           ),
         );
       case 'basmallah':
-        // TODO: نص البسملة الزخرفي يحتاج خط/أصل مخصص من نفس مصدر خطوط
-        // أسماء السور بـ QUL — لم يُجلب بعد. سطر فارغ مؤقتاً بدل تخمين نص.
-        return const SizedBox(height: 24);
+        // النص الثابت "بسم الله الرحمن الرحيم" لا لبس فيه إطلاقاً (بخلاف
+        // بيانات محتملة الخطأ) فنعرضه بخط عادي — **لا يطابق بعد** زخرفة
+        // خط القرآن المصوَّر (QCF) المستخدم لباقي الصفحة، لأن ذاك يحتاج
+        // ملف خط بسملة مخصّص من نفس مصدر QUL لم يُجلب بعد (راجع "قيد
+        // معروف" بـ tools/raw/README.md). تحسين بصري لاحق لا وظيفي.
+        return const SizedBox(
+          height: 30,
+          child: Center(
+            child: Text(
+              'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
+              style: TextStyle(color: AppColors.gold, fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+          ),
+        );
       case 'ayah':
       default:
         final isDark = Theme.of(context).brightness == Brightness.dark;

@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/config/remote_assets_config.dart';
 import '../../core/data/user/user_prefs.dart';
+import '../../core/data/user/user_repository.dart' show UserCategories;
 import '../../core/theme/app_colors.dart';
+import 'font_download_screen.dart';
+import 'font_download_service.dart';
 import 'mushaf_page_jump_dialog.dart';
 import 'mushaf_page_widget.dart';
 import 'mushaf_search_screen.dart';
@@ -31,6 +35,7 @@ class MushafScreen extends ConsumerStatefulWidget {
 class _MushafScreenState extends ConsumerState<MushafScreen> {
   late final PageController _controller;
   late int _currentPage;
+  bool _downloadBannerDismissed = false;
 
   @override
   void initState() {
@@ -83,6 +88,13 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
     final themeMode = ref.watch(themeModeProvider);
     final textSize = ref.watch(mushafTextSizeProvider);
     final memorizationOn = ref.watch(memorizationModeProvider);
+    final downloadState = ref.watch(fontDownloadControllerProvider);
+    final totalDownloadable = kLastDownloadablePage - kFirstDownloadablePage + 1;
+    final missingPages = totalDownloadable - downloadState.downloadedPages.length;
+    final showDownloadBanner = isFontsBaseUrlConfigured &&
+        !_downloadBannerDismissed &&
+        !downloadState.isBulkRunning &&
+        missingPages > 0;
 
     return Scaffold(
       backgroundColor: bg,
@@ -113,6 +125,10 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
             onPressed: () {
               ref.read(memorizationModeProvider.notifier).toggle();
               if (!memorizationOn) {
+                // أول تفعيل لوضع الحفظ باليوم يُحسَب "تدرّب اليوم" — لا
+                // طريقة لقياس اكتمال حفظ فعلي، فهذا أفضل تقريب صادق بلا
+                // رقم مختلَق (راجع UserCategories.hifz).
+                ref.read(userPrefsProvider).bumpCategoryStreakIfNewDay(UserCategories.hifz);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('وضع الحفظ: اضغط أي آية لكشفها')),
                 );
@@ -142,6 +158,30 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
       ),
       body: Column(
         children: [
+          if (showDownloadBanner)
+            MaterialBanner(
+              backgroundColor: AppColors.gold.withValues(alpha: 0.12),
+              leading: const Icon(Icons.cloud_download_outlined, color: AppColors.gold),
+              content: Text(
+                'موارد مطلوبة: باقي $missingPages صفحة من المصحف تحتاج تنزيلاً لعرضها بلا إنترنت لاحقاً',
+                style: TextStyle(color: fg, fontSize: 13),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => setState(() => _downloadBannerDismissed = true),
+                  child: const Text('لاحقاً'),
+                ),
+                FilledButton(
+                  onPressed: () async {
+                    setState(() => _downloadBannerDismissed = true);
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const FontDownloadScreen()),
+                    );
+                  },
+                  child: const Text('تنزيل'),
+                ),
+              ],
+            ),
           Expanded(
             child: PageView.builder(
               controller: _controller,

@@ -15,9 +15,12 @@ final _bookCountProvider = FutureProvider.family<int, int>((ref, bookId) {
   return ref.watch(hadithRepositoryProvider).countForBook(bookId);
 });
 
-/// نقطة الدخول لقسم الأحاديث: صحيح البخاري، صحيح مسلم، الأربعون النووية.
+/// نقطة الدخول لقسم الأحاديث — تسع مجموعات (البخاري، مسلم، أبو داود،
+/// الترمذي، النسائي، ابن ماجه، موطأ مالك، الأربعون النووية، الأربعون
+/// القدسية)، القائمة نفسها من `hadith_books` بلا ترميز أسماء بالكود.
 /// راجع `tools/raw/README.md` لمصدر البيانات ورخصته وحدوده (لا تصنيف صحة
-/// لكل حديث بهذا المصدر تحديداً).
+/// لكل حديث بهذا المصدر تحديداً، ولا عناوين أبواب عربية للكتب الستة
+/// المُضافة أخيراً — تُعرض بالإنجليزية مؤقتاً، راجع `build_hadith_db.py`).
 class HadithBooksScreen extends ConsumerWidget {
   const HadithBooksScreen({super.key});
 

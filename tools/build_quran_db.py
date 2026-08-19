@@ -22,6 +22,7 @@ import sys
 from pathlib import Path
 
 from quran_layout import merge_layout
+from quran_metadata import load_hizb_lookup, load_revelation_order_lookup, load_rub_lookup, load_sajda_lookup
 from quran_texts import merge_texts
 from text_normalize import normalize_search_text, strip_diacritics
 
@@ -64,6 +65,18 @@ def main() -> None:
 
     if len(text_by_key) != EXPECTED_AYAHS:
         sys.exit(f"فشل التحقق: عدد نصوص الآيات {len(text_by_key)} != {EXPECTED_AYAHS}")
+
+    # حزب/ربع/تصنيف سجدة/ترتيب نزول — من QUL، راجع quran_metadata.py
+    hizb_lookup = load_hizb_lookup(RAW)
+    rub_lookup = load_rub_lookup(RAW)
+    sajda_lookup = load_sajda_lookup(RAW)
+    revelation_order_lookup = load_revelation_order_lookup(RAW)
+    if len(set(hizb_lookup.values())) != 60:
+        sys.exit(f"فشل التحقق: {len(set(hizb_lookup.values()))} حزباً != 60")
+    if len(set(rub_lookup.values())) != 240:
+        sys.exit(f"فشل التحقق: {len(set(rub_lookup.values()))} ربعاً != 240")
+    if len(sajda_lookup) != 15:
+        sys.exit(f"فشل التحقق: {len(sajda_lookup)} سجدة != 15")
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     if OUT_DB.exists():
@@ -129,7 +142,7 @@ def main() -> None:
                 strip_diacritics(name_ar),
                 chapter["name"],
                 revelation_place,
-                None,  # TODO: ترتيب النزول — يحتاج مصدراً منفصلاً موثقاً
+                revelation_order_lookup.get(surah_no),
                 len(verses),
                 verses[0]["page"],
                 bismillah_pre,
@@ -155,10 +168,10 @@ def main() -> None:
                     v["verse"],
                     v["page"],
                     v["juz"],
-                    None,  # TODO: الحزب — يحتاج مصدراً منفصلاً موثقاً
-                    None,  # TODO: الرُّبع — يحتاج مصدراً منفصلاً موثقاً
+                    hizb_lookup.get(key),
+                    rub_lookup.get(key),
                     v["manzil"],
-                    "sajda" if v.get("sajda") else None,
+                    sajda_lookup.get(key),
                     text,
                     normalize_search_text(text),
                 ),
@@ -172,10 +185,14 @@ def main() -> None:
     merge_layout(conn, RAW_PAGES_DB, RAW_WORDS_DB, ayah_id_by_key)
     merge_texts(conn, RAW, ayah_id_by_key)
 
-    # يطابق QuranDatabase.schemaVersion بطبقة drift — قاعدة مُنشأة مسبقاً
-    # وليست فارغة، فلا داعٍ لتشغيل drift's onCreate عند أول فتح لها.
-    # رفعناه لـ٢ لإضافة tafsirs/translations — راجع ملاحظة النسخ بالإصدار
-    # بـ QuranDatabase._openConnection (يعيد نسخ الـ asset لو تغيّر الرقم).
+    # ⚠️ **PRAGMA user_version هون يطابق QuranDatabase.schemaVersion بطبقة
+    # drift حرفياً — درift يستخدم نفس الـ pragma داخلياً لتتبّع إصدار
+    # البنية (الأعمدة)، ويرفض فتح ملف لا يطابق قيمته دون استراتيجية
+    # ترحيل**. لا تغيّر هذا الرقم إلا مع رفع `QuranDatabase.schemaVersion`
+    # بنفس القيمة (تغيّر بنية جدول فعلي). تعبئة hizb/rub/sajda_type/
+    # revelation_order كانت تغيير *بيانات* لا *بنية* — بقي ٢ عمداً؛
+    # `quran_db_version.txt` بالأسفل هو الآلية الصحيحة المنفصلة لإجبار
+    # إعادة نسخ الـ asset عند تغيّر المحتوى بلا علاقة ببنية الجدول.
     conn.execute("PRAGMA user_version = 2")
 
     # تحقق نهائي مباشرة من القاعدة المكتوبة، لا من العدادات فقط
@@ -187,6 +204,17 @@ def main() -> None:
             f"فشل التحقق النهائي: سور={surah_count} آيات={ayah_count} "
             f"مجموع ayah_count={ayah_sum}"
         )
+    (null_hizb,) = conn.execute("SELECT COUNT(*) FROM ayahs WHERE hizb IS NULL").fetchone()
+    (null_rub,) = conn.execute("SELECT COUNT(*) FROM ayahs WHERE rub IS NULL").fetchone()
+    (null_revelation,) = conn.execute("SELECT COUNT(*) FROM surahs WHERE revelation_order IS NULL").fetchone()
+    (sajda_count,) = conn.execute("SELECT COUNT(*) FROM ayahs WHERE sajda_type IS NOT NULL").fetchone()
+    if null_hizb or null_rub or null_revelation:
+        sys.exit(
+            f"فشل التحقق النهائي: آيات بلا حزب={null_hizb} بلا ربع={null_rub} "
+            f"سور بلا ترتيب نزول={null_revelation}"
+        )
+    if sajda_count != 15:
+        sys.exit(f"فشل التحقق النهائي: {sajda_count} آية سجدة != 15")
 
     conn.commit()
     conn.close()
@@ -195,7 +223,7 @@ def main() -> None:
     # محفوظة بمجلد المستندات ليقرر إعادة نسخ القاعدة عند تغيّره، بدل
     # الاعتماد فقط على "الملف موجود؟" (كان سيُبقي نسخة قديمة بلا الجداول
     # الجديدة عالأجهزة التي جرّبت التطبيق قبل هذا التحديث).
-    (OUT_DIR / "quran_db_version.txt").write_text("2", encoding="utf-8")
+    (OUT_DIR / "quran_db_version.txt").write_text("3", encoding="utf-8")
 
     size_kb = OUT_DB.stat().st_size / 1024
     print(f"تم بنجاح: {OUT_DB} ({size_kb:.0f} كيلوبايت)")

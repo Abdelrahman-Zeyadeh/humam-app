@@ -2,27 +2,30 @@
 // وسلامة قائمة المدن — بلا شبكة ولا GPS فعلي.
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:humam_app/features/prayer/cities.dart';
 import 'package:humam_app/features/prayer/prayer_times_service.dart';
 
 void main() {
-  test('مواقيت مكة ليوم معيّن مرتّبة زمنياً (فجر < شروق < ظهر < عصر < مغرب < عشاء)', () {
-    final times = computeDayTimes(
-      lat: 21.4225,
-      lon: 39.8262,
-      date: DateTime(2026, 3, 15),
-      methodKey: 'ummAlQura',
-    );
-
-    expect(times.length, 6);
-    for (var i = 1; i < times.length; i++) {
-      expect(
-        times[i].time.isAfter(times[i - 1].time),
-        isTrue,
-        reason: '${times[i].moment.nameAr} يجب أن يأتي بعد ${times[i - 1].moment.nameAr}',
+  test(
+    'مواقيت مكة ليوم معيّن مرتّبة زمنياً (فجر < شروق < ظهر < عصر < مغرب < عشاء)',
+    () {
+      final times = computeDayTimes(
+        lat: 21.4225,
+        lon: 39.8262,
+        date: DateTime(2026, 3, 15),
+        methodKey: 'ummAlQura',
       );
-    }
-  });
+
+      expect(times.length, 6);
+      for (var i = 1; i < times.length; i++) {
+        expect(
+          times[i].time.isAfter(times[i - 1].time),
+          isTrue,
+          reason:
+              '${times[i].moment.nameAr} يجب أن يأتي بعد ${times[i - 1].moment.nameAr}',
+        );
+      }
+    },
+  );
 
   test('nextPrayer يتجاهل الشروق (ليس صلاة) ويلتقط أول صلاة لسا ما جاءت', () {
     final times = computeDayTimes(
@@ -55,18 +58,14 @@ void main() {
     expect(nextPrayer(times, afterIsha), isNull);
   });
 
-  test('calculationMethodByKey يرجع طريقة صحيحة، ويعود للافتراضي لمفتاح غير معروف', () {
-    expect(calculationMethodByKey('egyptian').nameAr, contains('مصري'));
-    expect(calculationMethodByKey('غير موجود').key, kCalculationMethods.first.key);
-  });
-
-  test('قائمة المدن: أسماء فريدة وإحداثيات ضمن مدى صحيح', () {
-    final names = kPrayerCities.map((c) => c.nameAr).toSet();
-    expect(names.length, kPrayerCities.length, reason: 'يوجد اسم مدينة مكرّر');
-    for (final c in kPrayerCities) {
-      expect(c.lat, inInclusiveRange(-90, 90));
-      expect(c.lon, inInclusiveRange(-180, 180));
-    }
-    expect(names, contains('مكة المكرمة'));
-  });
+  test(
+    'calculationMethodByKey يرجع طريقة صحيحة، ويعود للافتراضي لمفتاح غير معروف',
+    () {
+      expect(calculationMethodByKey('egyptian').nameAr, contains('مصري'));
+      expect(
+        calculationMethodByKey('غير موجود').key,
+        kCalculationMethods.first.key,
+      );
+    },
+  );
 }

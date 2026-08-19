@@ -5,8 +5,9 @@ import 'package:humam_app/core/config/remote_assets_config.dart';
 import 'package:humam_app/features/mushaf/font_download_service.dart';
 
 void main() {
-  test('الاستضافة غير مهيّأة افتراضياً (placeholder) — يجب تحديثه يدوياً قبل النشر', () {
-    expect(isFontsBaseUrlConfigured, isFalse);
+  test('الاستضافة مهيّأة برابط GitHub Releases حقيقي (تحقّق يدوي ٢٠٢٦-٠٨-١٩)', () {
+    expect(isFontsBaseUrlConfigured, isTrue);
+    expect(kFontsBaseUrl, startsWith('https://github.com/'));
   });
 
   test('رابط تنزيل صفحة يطابق نمط p{page}.ttf', () {

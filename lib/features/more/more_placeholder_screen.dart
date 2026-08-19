@@ -4,7 +4,6 @@ import '../../core/theme/app_colors.dart';
 import '../hadith/hadith_books_screen.dart';
 import '../khatma/khatma_screen.dart';
 import '../mushaf/bookmarks_screen.dart';
-import '../mushaf/font_download_screen.dart';
 
 /// المزيد: نقاط الدخول للميزات المستقلة عن التبويبات الأربعة الرئيسية.
 /// كل عنصر هنا شاشة حقيقية شغّالة — لا وعود بمزايا غير منفَّذة.
@@ -34,12 +33,6 @@ class MorePlaceholderScreen extends StatelessWidget {
             title: 'الأحاديث',
             subtitle: 'صحيح البخاري، صحيح مسلم، الأربعون النووية',
             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const HadithBooksScreen())),
-          ),
-          _MoreTile(
-            icon: Icons.cloud_download_outlined,
-            title: 'تنزيل بقية صفحات المصحف',
-            subtitle: 'الصفحات ٥١-٦٠٤ (أول ٥٠ مضمَّنة أصلاً)',
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FontDownloadScreen())),
           ),
         ],
       ),

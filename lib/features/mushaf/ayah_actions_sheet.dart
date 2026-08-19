@@ -25,6 +25,11 @@ class AyahActionsSheet extends ConsumerWidget {
     return showModalBottomSheet(
       context: context,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      // `isScrollControlled` يسمح للشيت يتجاوز نصف الشاشة الافتراضي —
+      // بدونه محتوى الشيت (نص الآية الطويل + ٧ أزرار إجراءات) يفيض ويظهر
+      // شريط "BOTTOM OVERFLOWED" على شاشات أقصر أو بخط نظام أكبر. مع
+      // `SingleChildScrollView` بالأسفل، أي فيض متبقٍّ يُمرَّر بدل ما يُقصّ.
+      isScrollControlled: true,
       builder: (_) => AyahActionsSheet(ayahId: ayahId),
     );
   }
@@ -41,14 +46,26 @@ class AyahActionsSheet extends ConsumerWidget {
 
     return SafeArea(
       child: ayahAsync.when(
-        loading: () => const SizedBox(height: 120, child: Center(child: CircularProgressIndicator())),
-        error: (e, _) => const SizedBox(height: 80, child: Center(child: Text('تعذّر تحميل الآية'))),
+        loading: () => const SizedBox(
+          height: 120,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+        error: (e, _) => const SizedBox(
+          height: 80,
+          child: Center(child: Text('تعذّر تحميل الآية')),
+        ),
         data: (ayah) {
           final isBookmarked = prefs.isBookmarked(ayah.id);
-          final isThisAyahPlaying = audio.isActive && audio.currentAyahId == ayah.id && audio.isPlaying;
+          final isThisAyahPlaying =
+              audio.isActive &&
+              audio.currentAyahId == ayah.id &&
+              audio.isPlaying;
           final isThisSurahPlaying =
-              audio.isActive && audio.currentSurah == ayah.surah && audio.fromAyah == null && audio.isPlaying;
-          return Padding(
+              audio.isActive &&
+              audio.currentSurah == ayah.surah &&
+              audio.fromAyah == null &&
+              audio.isPlaying;
+          return SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -56,14 +73,48 @@ class AyahActionsSheet extends ConsumerWidget {
               children: [
                 Container(
                   alignment: Alignment.center,
-                  child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.line, borderRadius: BorderRadius.circular(2))),
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.line,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 14),
                 Text(
                   'السورة ${ayah.surah} · الآية ${ayah.ayah}',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: onSurface.withValues(alpha: 0.6), fontSize: 12),
+                  style: TextStyle(
+                    color: onSurface.withValues(alpha: 0.6),
+                    fontSize: 12,
+                  ),
                 ),
+                if (ayah.sajdaType != null) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.gold.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      ayah.sajdaType == 'required'
+                          ? '۩ سجدة تلاوة (واجبة)'
+                          : '۩ سجدة تلاوة (مستحبّة)',
+                      style: const TextStyle(
+                        color: AppColors.gold,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 8),
                 Text(
                   ayah.textUthmani,
@@ -77,56 +128,70 @@ class AyahActionsSheet extends ConsumerWidget {
                   runSpacing: 8,
                   children: [
                     _ActionButton(
-                      icon: isThisAyahPlaying ? Icons.pause_circle_outline : Icons.play_circle_outline,
+                      icon: isThisAyahPlaying
+                          ? Icons.pause_circle_outline
+                          : Icons.play_circle_outline,
                       label: isThisAyahPlaying ? 'إيقاف' : 'استماع',
-                      onTap: () => _toggleAyah(context, ref, ayah, isThisAyahPlaying),
+                      onTap: () =>
+                          _toggleAyah(context, ref, ayah, isThisAyahPlaying),
                     ),
                     _ActionButton(
-                      icon: isThisSurahPlaying ? Icons.pause_circle_filled : Icons.playlist_play,
-                      label: isThisSurahPlaying ? 'إيقاف السورة' : 'تشغيل السورة',
-                      onTap: () => _toggleSurah(context, ref, ayah.surah, isThisSurahPlaying),
+                      icon: isThisSurahPlaying
+                          ? Icons.pause_circle_filled
+                          : Icons.playlist_play,
+                      label: isThisSurahPlaying
+                          ? 'إيقاف السورة'
+                          : 'تشغيل السورة',
+                      onTap: () => _toggleSurah(
+                        context,
+                        ref,
+                        ayah.surah,
+                        isThisSurahPlaying,
+                      ),
                     ),
                     _ActionButton(
                       icon: Icons.menu_book_outlined,
                       label: 'التفسير',
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => AyahTextViewScreen(ayahId: ayah.id, kind: AyahTextViewKind.tafsir),
+                          builder: (_) => AyahTextViewScreen(
+                            ayahId: ayah.id,
+                            kind: AyahTextViewKind.tafsir,
+                          ),
                         ),
                       ),
                     ),
                     _ActionButton(
-                      icon: Icons.translate_outlined,
-                      label: 'الترجمة',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => AyahTextViewScreen(ayahId: ayah.id, kind: AyahTextViewKind.translation),
-                        ),
-                      ),
-                    ),
-                    _ActionButton(
-                      icon: Icons.copy_outlined,
-                      label: 'نسخ',
-                      onTap: () async {
-                        await Clipboard.setData(ClipboardData(text: ayah.textUthmani));
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('نُسخت الآية')));
-                        }
-                      },
-                    ),
-                    _ActionButton(
-                      icon: Icons.share_outlined,
-                      label: 'مشاركة',
-                      onTap: () => SharePlus.instance.share(ShareParams(text: ayah.textUthmani)),
-                    ),
-                    _ActionButton(
-                      icon: isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                      icon: isBookmarked
+                          ? Icons.bookmark
+                          : Icons.bookmark_border,
                       label: isBookmarked ? 'إزالة العلامة' : 'علامة مرجعية',
                       iconColor: isBookmarked ? AppColors.gold : null,
                       onTap: () async {
                         await prefs.toggleBookmark(ayah.id);
                         ref.read(bookmarkVersionProvider.notifier).bump();
                       },
+                    ),
+                    _ActionButton(
+                      icon: Icons.copy_outlined,
+                      label: 'نسخ',
+                      onTap: () async {
+                        await Clipboard.setData(
+                          ClipboardData(text: ayah.textUthmani),
+                        );
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('نُسخت الآية')),
+                          );
+                        }
+                      },
+                    ),
+                    _ActionButton(
+                      icon: Icons.share_outlined,
+                      label: 'مشاركة',
+                      onTap: () => SharePlus.instance.share(
+                        ShareParams(text: ayah.textUthmani),
+                      ),
                     ),
                   ],
                 ),
@@ -143,7 +208,12 @@ class AyahActionsSheet extends ConsumerWidget {
 /// يستبدل أي تشغيل جارٍ (سورة أو آية أخرى) بهذه — مشغّل واحد مشترك بكل
 /// التطبيق (راجع `quran_audio_controller.dart`). يعرض رسالة عند فشل
 /// الشبكة بدل تجاهل الخطأ صامتاً.
-Future<void> _toggleAyah(BuildContext context, WidgetRef ref, Ayah ayah, bool isPlaying) async {
+Future<void> _toggleAyah(
+  BuildContext context,
+  WidgetRef ref,
+  Ayah ayah,
+  bool isPlaying,
+) async {
   final controller = ref.read(quranAudioControllerProvider.notifier);
   if (isPlaying) {
     await controller.togglePlayPause();
@@ -154,7 +224,12 @@ Future<void> _toggleAyah(BuildContext context, WidgetRef ref, Ayah ayah, bool is
 }
 
 /// يبدّل تشغيل/إيقاف السورة كاملة من أوّلها.
-Future<void> _toggleSurah(BuildContext context, WidgetRef ref, int surahId, bool isPlaying) async {
+Future<void> _toggleSurah(
+  BuildContext context,
+  WidgetRef ref,
+  int surahId,
+  bool isPlaying,
+) async {
   final controller = ref.read(quranAudioControllerProvider.notifier);
   if (isPlaying) {
     await controller.togglePlayPause();
@@ -172,7 +247,12 @@ void _showErrorIfAny(BuildContext context, WidgetRef ref) {
 }
 
 class _ActionButton extends StatelessWidget {
-  const _ActionButton({required this.icon, required this.label, required this.onTap, this.iconColor});
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.iconColor,
+  });
   final IconData icon;
   final String label;
   final VoidCallback onTap;
@@ -191,7 +271,13 @@ class _ActionButton extends StatelessWidget {
           children: [
             Icon(icon, color: iconColor ?? onSurface),
             const SizedBox(height: 6),
-            Text(label, style: TextStyle(fontSize: 11, color: onSurface.withValues(alpha: 0.8))),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: onSurface.withValues(alpha: 0.8),
+              ),
+            ),
           ],
         ),
       ),

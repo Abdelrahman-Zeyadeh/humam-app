@@ -1,12 +1,10 @@
-/// رابط استضافة خطوط صفحات المصحف غير المضمَّنة (٥١-٦٠٤). **قيمة مؤقتة
-/// غير فعلية بعد** — راجع "مدير تنزيل الخطوط" بـ tools/raw/README.md
-/// لخطوات الاستضافة (GitHub Releases مُوصى به: مجاني، رابط ثابت، بلا
-/// حدّ سرعة عملياً لحجمنا). حدّث هذا الثابت فقط بالرابط الحقيقي بعد رفع
-/// ملفات `p51.ttf` … `p604.ttf` (بنفس التسمية حرفياً) كـ release assets.
+/// رابط استضافة خطوط صفحات المصحف غير المضمَّنة (٥١-٦٠٤) — GitHub
+/// Releases بمستودع `humam-app-assets`، الإصدار v1، تحقّق ٢٠٢٦-٠٨-١٩ من
+/// أن `p51.ttf` و`p604.ttf` ينزّلان بنجاح (HTTP 200) بالحجم الصحيح.
 ///
 /// شكل الرابط النهائي لكل صفحة: `$kFontsBaseUrl/p{page}.ttf`
-/// مثال GitHub Releases: `https://github.com/OWNER/REPO/releases/download/TAG`
-const String kFontsBaseUrl = 'PLACEHOLDER_NOT_CONFIGURED';
+const String kFontsBaseUrl =
+    'https://github.com/Abdelrahman-Zeyadeh/humam-app-assets/releases/download/v1';
 
 bool get isFontsBaseUrlConfigured => kFontsBaseUrl != 'PLACEHOLDER_NOT_CONFIGURED';
 

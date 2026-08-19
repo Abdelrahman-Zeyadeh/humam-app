@@ -37,7 +37,6 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   flutter_riverpod: ^3.3.2
-  google_fonts: ^8.1.0
   drift: ^2.34.3
   sqlite3_flutter_libs: ^0.6.0+eol
   path_provider: ^2.1.6
@@ -51,6 +50,10 @@ dependencies:
   dio: ^5.11.0 # مدير تنزيل خطوط الصفحات ٥١-٦٠٤ (استئناف بـ HTTP Range)
   geolocator: ^14.0.3 # موقع GPS اختياري — يحتاج إذن نظام، راجع prayer_screen.dart
   flutter_compass: ^0.8.1 # اتجاه البوصلة لشاشة القبلة
+  hijri: ^3.0.1 # تاريخ هجري محلي (جدولي أم القرى) بلا إنترنت — BSD-2-Clause
+  flutter_local_notifications: ^22.3.0
+  timezone: ^0.11.1
+  flutter_timezone: ^5.1.0
 
 dev_dependencies:
   flutter_test:
@@ -64,6 +67,18 @@ dev_dependencies:
   flutter_lints: ^5.0.0
   drift_dev: ^2.34.5
   build_runner: ^2.16.0
+  flutter_launcher_icons: ^0.14.4
+
+# أيقونة هُمَام: قوس محراب ذهبي + نجمة ثمانية على خلفية navy (هوية
+# الألوان المعتمدة) — رسم هندسي مولَّد ببرنامج tools/generate_app_icon.py،
+# لا نص ولا صورة مستوردة. لتوليد كل قياسات المنصّات:
+#   dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/icon.png"
+  min_sdk_android: 21
+  remove_alpha_ios: true  # أبل ترفض قنوات ألفا بأيقونة App Store — خلفيتنا مصمتة أصلاً فلا فقد بصري
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -80,6 +95,7 @@ flutter:
     - assets/quran/quran.db
     - assets/quran/quran_db_version.txt
     - assets/azkar/azkar.json
+    - assets/azkar/azkar_categories.json
     - assets/hadith/hadith.db
     - assets/hadith/hadith_db_version.txt
     # أول ٥٠ صفحة فقط مضمّنة كـ asset (~١٨ ميجا) — الباقي (٥١-٦٠٤) يُنزَّل
@@ -105,17 +121,13 @@ flutter:
   # "family" key with the font family name, and a "fonts" key with a
   # list giving the asset and other descriptors for the font. For
   # example:
-  # fonts:
-  #   - family: Schyler
-  #     fonts:
-  #       - asset: fonts/Schyler-Regular.ttf
-  #       - asset: fonts/Schyler-Italic.ttf
-  #         style: italic
-  #   - family: Trajan Pro
-  #     fonts:
-  #       - asset: fonts/TrajanPro.ttf
-  #       - asset: fonts/TrajanPro_Bold.ttf
-  #         weight: 700
-  #
+  # خط الواجهة (Cairo) — مضمّن محلياً، لا جلب شبكي عند الإقلاع. خط متغيّر
+  # الوزن واحد (SIL OFL 1.1، من google/fonts) يغطي كل الأوزان المستخدمة
+  # (400-700) بلا الحاجة لملفات ثابتة منفصلة لكل وزن.
+  fonts:
+    - family: Cairo
+      fonts:
+        - asset: assets/fonts/Cairo-Variable.ttf
+
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package

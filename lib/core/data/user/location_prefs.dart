@@ -1,38 +1,31 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-import 'user_prefs.dart';
+import 'user_providers.dart';
+import 'user_repository.dart';
 
 /// موقع محفوظ لحساب مواقيت الصلاة/القبلة (GPS أو مدينة مختارة يدوياً)،
-/// وطريقة الحساب المفضّلة. مؤقت بـ SharedPreferences — نفس ملاحظة `UserPrefs`.
+/// وطريقة الحساب المفضّلة — واجهة رقيقة فوق [UserRepository]. كانت
+/// تُخزَّن بـSharedPreferences؛ الهجرة كاملة الآن، أُبقيت بنفس التوقيعات.
 class LocationPrefs {
-  LocationPrefs(this._prefs);
-  final SharedPreferences _prefs;
+  LocationPrefs(this._repo);
+  final UserRepository _repo;
 
-  static const _kLat = 'prayer_lat';
-  static const _kLon = 'prayer_lon';
-  static const _kCityName = 'prayer_city_name';
-  static const _kMethod = 'prayer_calc_method';
+  double? get lat => _repo.lat;
+  double? get lon => _repo.lon;
+  String? get cityName => _repo.cityName;
 
-  double? get lat => _prefs.getDouble(_kLat);
-  double? get lon => _prefs.getDouble(_kLon);
-  String? get cityName => _prefs.getString(_kCityName);
+  bool get hasLocation => _repo.hasLocation;
 
-  bool get hasLocation => lat != null && lon != null;
-
-  Future<void> setLocation({required double lat, required double lon, required String cityName}) async {
-    await _prefs.setDouble(_kLat, lat);
-    await _prefs.setDouble(_kLon, lon);
-    await _prefs.setString(_kCityName, cityName);
-  }
+  Future<void> setLocation({required double lat, required double lon, required String cityName}) =>
+      _repo.setLocation(lat: lat, lon: lon, cityName: cityName);
 
   /// مفتاح طريقة حساب المواقيت — يطابق أحد مفاتيح `kCalculationMethods`
   /// بـ `prayer_times_service.dart`. الافتراضي أم القرى (الأشيع بالمنطقة).
-  String get calculationMethod => _prefs.getString(_kMethod) ?? 'ummAlQura';
+  String get calculationMethod => _repo.calculationMethod;
 
-  Future<void> setCalculationMethod(String key) => _prefs.setString(_kMethod, key);
+  Future<void> setCalculationMethod(String key) => _repo.setCalculationMethod(key);
 }
 
 final locationPrefsProvider = Provider<LocationPrefs>((ref) {
-  return LocationPrefs(ref.watch(sharedPreferencesProvider));
+  return LocationPrefs(ref.watch(userRepositoryProvider));
 });

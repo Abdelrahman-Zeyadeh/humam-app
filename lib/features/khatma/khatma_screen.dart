@@ -41,6 +41,23 @@ class KhatmaScreen extends ConsumerWidget {
   }
 }
 
+/// وحدة قراءة يومية بديلة عن تحديد الأيام مباشرة — عدد الصفحات هون
+/// **متوسط تقريبي** (٦٠٤ صفحة ÷ عدد الوحدات بالمصحف كاملاً: ٣٠ جزء/٦٠
+/// حزب/٢٤٠ ربع، وهذي حقائق هيكلية ثابتة عن المصحف، لا علاقة لها بفجوة
+/// "حدود حزب/ربع لكل آية" المذكورة بـtools/raw/README.md — تلك لتحديد
+/// أين يبدأ كل حزب بالضبط لعرضه بالنص، لا لحساب المدة التقريبية هنا).
+enum _DailyUnit {
+  rub('ربع', 240),
+  hizb('حزب', 60),
+  juz('جزء', 30);
+
+  const _DailyUnit(this.nameAr, this.totalCount);
+  final String nameAr;
+  final int totalCount;
+
+  double get pagesPerUnit => 604 / totalCount;
+}
+
 class _StartPlanView extends StatefulWidget {
   const _StartPlanView({required this.onStart});
   final ValueChanged<int> onStart;
@@ -50,7 +67,15 @@ class _StartPlanView extends StatefulWidget {
 }
 
 class _StartPlanViewState extends State<_StartPlanView> {
+  bool _byDailyAmount = false;
   int _days = 30;
+  _DailyUnit _unit = _DailyUnit.hizb;
+  int _unitsPerDay = 1;
+
+  int get _computedDaysFromDailyAmount {
+    final dailyPages = _unit.pagesPerUnit * _unitsPerDay;
+    return (604 / dailyPages).ceil().clamp(1, 604);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -62,30 +87,84 @@ class _StartPlanViewState extends State<_StartPlanView> {
           children: [
             const Icon(Icons.menu_book_outlined, size: 48, color: AppColors.gold),
             const SizedBox(height: 16),
-            const Text('حدّد عدد الأيام لختم المصحف', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            Text('الورد اليومي: ${(604 / _days).ceil()} صفحة', style: const TextStyle(color: AppColors.inkSoft, fontSize: 13)),
+            const Text('خطة الختمة', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 16),
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(value: false, label: Text('بعدد الأيام')),
+                ButtonSegment(value: true, label: Text('بالورد اليومي')),
+              ],
+              selected: {_byDailyAmount},
+              onSelectionChanged: (s) => setState(() => _byDailyAmount = s.first),
+            ),
             const SizedBox(height: 20),
-            Slider(
-              value: _days.toDouble(),
-              min: 7,
-              max: 604,
-              divisions: 100,
-              label: '$_days يوماً',
-              onChanged: (v) => setState(() => _days = v.round()),
-            ),
-            Wrap(
-              spacing: 8,
-              children: [7, 30, 60, 604].map((d) {
-                return ChoiceChip(
-                  label: Text(d == 604 ? 'يوم بيوم (604)' : '$d يوماً'),
-                  selected: _days == d,
-                  onSelected: (_) => setState(() => _days = d),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 24),
-            FilledButton(onPressed: () => widget.onStart(_days), child: const Text('ابدأ الختمة')),
+            if (!_byDailyAmount) ...[
+              Text('الورد اليومي: ${(604 / _days).ceil()} صفحة', style: const TextStyle(color: AppColors.inkSoft, fontSize: 13)),
+              const SizedBox(height: 12),
+              Slider(
+                value: _days.toDouble(),
+                min: 7,
+                max: 604,
+                divisions: 100,
+                label: '$_days يوماً',
+                onChanged: (v) => setState(() => _days = v.round()),
+              ),
+              Wrap(
+                spacing: 8,
+                children: [7, 30, 60, 604].map((d) {
+                  return ChoiceChip(
+                    label: Text(d == 604 ? 'يوم بيوم (604)' : '$d يوماً'),
+                    selected: _days == d,
+                    onSelected: (_) => setState(() => _days = d),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 24),
+              FilledButton(onPressed: () => widget.onStart(_days), child: const Text('ابدأ الختمة')),
+            ] else ...[
+              Wrap(
+                spacing: 8,
+                children: _DailyUnit.values.map((u) {
+                  return ChoiceChip(
+                    label: Text(u.nameAr),
+                    selected: _unit == u,
+                    onSelected: (_) => setState(() => _unit = u),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle_outline),
+                    onPressed: _unitsPerDay > 1 ? () => setState(() => _unitsPerDay--) : null,
+                  ),
+                  Text('$_unitsPerDay ${_unit.nameAr} / يوم', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_outline),
+                    onPressed: _unitsPerDay < _unit.totalCount ? () => setState(() => _unitsPerDay++) : null,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'يعني تقريباً ${(_unit.pagesPerUnit * _unitsPerDay).round()} صفحة يومياً — ختمة كل ~$_computedDaysFromDailyAmount يوماً',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.inkSoft, fontSize: 13),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'تقريبي: متوسط صفحات الوحدة على كامل المصحف، لا حدود دقيقة لكل حزب/ربع بعد',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.inkSoft, fontSize: 11),
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: () => widget.onStart(_computedDaysFromDailyAmount),
+                child: const Text('ابدأ الختمة'),
+              ),
+            ],
           ],
         ),
       ),

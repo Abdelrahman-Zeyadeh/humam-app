@@ -1,19 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// وضع الثيم العام للتطبيق. TODO(تخزين): لا يُحفظ بعد بين جلسات التشغيل —
-/// ينتظر مرحلة `user.db`/الإعدادات (المرحلة ٢ بخطة العمل). حتى ذلك الحين
-/// يبدأ دايماً بـ [ThemeMode.system].
+import '../../core/data/user/user_prefs.dart';
+
+const _kThemeModeKey = 'app_theme_mode'; // 'system' | 'light' | 'dark'
+
+/// وضع الثيم العام للتطبيق — مُحفَّظ بـ`SharedPreferences` (إعداد بسيط،
+/// لا بيانات مستخدم، فيبقى هون حسب القرار المعماري #٦ بتصميم-النظام.md
+/// بدل `user.db`). كان بلا حفظ إطلاقاً (TODO سابق)؛ انسدّت الفجوة
+/// ٢٠٢٦-٠٨-١٩ مع هجرة بيانات المستخدم لـdrift.
 class ThemeModeNotifier extends Notifier<ThemeMode> {
   @override
-  ThemeMode build() => ThemeMode.system;
+  ThemeMode build() {
+    final raw = ref.watch(sharedPreferencesProvider).getString(_kThemeModeKey);
+    return switch (raw) {
+      'light' => ThemeMode.light,
+      'dark' => ThemeMode.dark,
+      _ => ThemeMode.system,
+    };
+  }
 
   void cycle() {
-    state = switch (state) {
+    final next = switch (state) {
       ThemeMode.system => ThemeMode.light,
       ThemeMode.light => ThemeMode.dark,
       ThemeMode.dark => ThemeMode.system,
     };
+    state = next;
+    ref.read(sharedPreferencesProvider).setString(_kThemeModeKey, next.name);
   }
 }
 
