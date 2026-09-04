@@ -1,59 +1,58 @@
 import 'package:flutter/material.dart';
+import 'app_accent_colors.dart';
 import 'app_colors.dart';
 
-/// ثيم هُمَام: `light()` و`dark()` بنفس الهوية البصرية.
-///
-/// خط الواجهة Cairo مضمّن كـ asset (`assets/fonts/Cairo-Variable.ttf`،
-/// خط متغيّر الوزن SIL OFL 1.1 من `google/fonts`) — لا جلب شبكي عند
-/// الإقلاع بعد الآن (كان عبر حزمة `google_fonts` سابقاً، فجوة #10
-/// بتصميم-النظام.md، انسدّت ٢٠٢٦-٠٨-١٩).
 const String _kCairoFamily = 'Cairo';
 
 abstract final class AppTheme {
-  static ThemeData light() {
+  static ThemeData light({AppAccentColor accent = kDefaultAppAccentColor}) {
     final base = ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-      colorScheme: const ColorScheme.light(
-        primary: AppColors.navy,
+      colorScheme: ColorScheme.light(
+        primary: accent.primaryLight,
         onPrimary: Colors.white,
-        secondary: AppColors.gold,
-        onSecondary: AppColors.navyDeep,
-        surface: AppColors.cream,
+        secondary: accent.color,
+        onSecondary: accent.onColor,
+        surface: accent.surfaceLight,
         onSurface: AppColors.ink,
-        error: Color(0xFFB3261E),
+        error: const Color(0xFFB3261E),
         onError: Colors.white,
       ),
-      scaffoldBackgroundColor: AppColors.cream,
+      scaffoldBackgroundColor: accent.surfaceLight,
       fontFamily: _kCairoFamily,
     );
 
     return base.copyWith(
-      // كانت خلفية كحلية غامقة/نص أبيض بكل الشاشات الثانوية (الصلاة،
-      // الأذكار، الأحاديث، الختمة، قيام الليل) — أثقل من الهوية المطلوبة.
-      // خلفية فاتحة (نفس Cream العامة) ونص/أيقونات كحلية بدلها، بلا لمس
-      // الوضع الليلي (`AppTheme.dark()` أسفل، بلا تغيير).
       appBarTheme: base.appBarTheme.copyWith(
-        backgroundColor: AppColors.cream,
-        foregroundColor: AppColors.navy,
+        backgroundColor: accent.surfaceLight,
+        foregroundColor: accent.primaryLight,
         elevation: 0,
         centerTitle: true,
-        iconTheme: const IconThemeData(color: AppColors.navy),
-        titleTextStyle: const TextStyle(
+        iconTheme: IconThemeData(color: accent.primaryLight),
+        titleTextStyle: TextStyle(
           fontFamily: _kCairoFamily,
           fontSize: 18,
           fontWeight: FontWeight.w700,
-          color: AppColors.navy,
+          color: accent.primaryLight,
         ),
       ),
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: Colors.white,
-        selectedItemColor: AppColors.gold,
+        selectedItemColor: accent.color,
         unselectedItemColor: AppColors.inkSoft,
-        selectedLabelStyle: TextStyle(fontFamily: _kCairoFamily, fontSize: 11, fontWeight: FontWeight.w700),
-        unselectedLabelStyle: TextStyle(fontFamily: _kCairoFamily, fontSize: 11, fontWeight: FontWeight.w600),
+        selectedLabelStyle: const TextStyle(
+          fontFamily: _kCairoFamily,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w700,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontFamily: _kCairoFamily,
+          fontSize: 10,
+          fontWeight: FontWeight.w500,
+        ),
         type: BottomNavigationBarType.fixed,
-        elevation: 8,
+        elevation: 6,
       ),
       dividerTheme: const DividerThemeData(color: AppColors.line, space: 1),
       cardTheme: base.cardTheme.copyWith(
@@ -67,27 +66,27 @@ abstract final class AppTheme {
     );
   }
 
-  static ThemeData dark() {
+  static ThemeData dark({AppAccentColor accent = kDefaultAppAccentColor}) {
     final base = ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      colorScheme: const ColorScheme.dark(
-        primary: AppColors.gold,
-        onPrimary: AppColors.navyDeep,
-        secondary: AppColors.gold,
-        onSecondary: AppColors.navyDeep,
+      colorScheme: ColorScheme.dark(
+        primary: accent.color,
+        onPrimary: accent.onColor,
+        secondary: accent.color,
+        onSecondary: accent.onColor,
         surface: AppColors.surfaceDark,
         onSurface: AppColors.inkOnDark,
-        error: Color(0xFFCF6679),
+        error: const Color(0xFFCF6679),
         onError: Colors.black,
       ),
-      scaffoldBackgroundColor: AppColors.navyDeep,
+      scaffoldBackgroundColor: accent.primaryDark,
       fontFamily: _kCairoFamily,
     );
 
     return base.copyWith(
       appBarTheme: base.appBarTheme.copyWith(
-        backgroundColor: AppColors.navyDeep,
+        backgroundColor: accent.primaryDark,
         foregroundColor: AppColors.inkOnDark,
         elevation: 0,
         centerTitle: true,
@@ -100,12 +99,20 @@ abstract final class AppTheme {
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: AppColors.surfaceDark,
-        selectedItemColor: AppColors.gold,
+        selectedItemColor: accent.color,
         unselectedItemColor: AppColors.inkSoftOnDark,
-        selectedLabelStyle: const TextStyle(fontFamily: _kCairoFamily, fontSize: 11, fontWeight: FontWeight.w700),
-        unselectedLabelStyle: const TextStyle(fontFamily: _kCairoFamily, fontSize: 11, fontWeight: FontWeight.w600),
+        selectedLabelStyle: const TextStyle(
+          fontFamily: _kCairoFamily,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w700,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontFamily: _kCairoFamily,
+          fontSize: 10,
+          fontWeight: FontWeight.w500,
+        ),
         type: BottomNavigationBarType.fixed,
-        elevation: 8,
+        elevation: 6,
       ),
       dividerTheme: const DividerThemeData(color: AppColors.lineDark, space: 1),
       cardTheme: base.cardTheme.copyWith(

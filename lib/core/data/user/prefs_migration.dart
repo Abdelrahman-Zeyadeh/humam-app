@@ -26,7 +26,7 @@ Future<void> migrateSharedPreferencesToUserDb({
   final bookmarkIds =
       (prefs.getStringList('bookmarked_ayah_ids') ?? const []).map(int.tryParse).whereType<int>();
   for (final id in bookmarkIds) {
-    await repo.toggleBookmark(id);
+    await repo.addBookmarkIfAbsent(id);
   }
 
   // --- آخر صفحة وسلسلة الأيام (UserPrefs) + خطة الختمة (KhatmaPrefs) ---
@@ -60,4 +60,29 @@ Future<void> migrateSharedPreferencesToUserDb({
   if (tasbihCount != null) await repo.setTasbihCount(tasbihCount);
 
   await prefs.setBool(_kMigratedFlag, true);
+}
+
+const _kMigratedAdhanPrefsFlag = 'migrated_adhan_prefs_v1';
+
+/// هجرة منفصلة **بعلم مستقل** عن [migrateSharedPreferencesToUserDb] —
+/// أُضيفت لاحقاً بعد أن كان `_kMigratedFlag` قد يكون `true` فعلاً على
+/// أجهزة هاجرت الدفعة الأولى، فإعادة استخدام نفس العلم كانت ستمنع تنفيذ
+/// هذه الدفعة الجديدة إطلاقاً على تلك الأجهزة. تنقل تفضيلات إشعارات
+/// الأذان (`AdhanNotificationPrefs` القديمة) إلى `AdhanNotificationSettings`
+/// بـ`user.db`. **لا تحذف المفاتيح القديمة** — نفس قاعدة §٢.٥.
+Future<void> migrateAdhanNotificationPrefs({
+  required SharedPreferences prefs,
+  required UserRepository repo,
+}) async {
+  if (prefs.getBool(_kMigratedAdhanPrefsFlag) == true) return;
+
+  final master = prefs.getBool('adhan_notifications_enabled');
+  if (master != null) await repo.setAdhanNotifEnabled('master', master);
+
+  for (final prayer in const ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']) {
+    final enabled = prefs.getBool('adhan_enabled_$prayer');
+    if (enabled != null) await repo.setAdhanNotifEnabled(prayer, enabled);
+  }
+
+  await prefs.setBool(_kMigratedAdhanPrefsFlag, true);
 }

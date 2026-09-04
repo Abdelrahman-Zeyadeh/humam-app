@@ -10,6 +10,13 @@ abstract final class AppColors {
   static const gold = Color(0xFFC9A24B);
   static const goldSoft = Color(0xFFE7D2A0);
 
+  /// نسخة أغمق وأقل تشبّعاً من [gold]، لاستخدامها حصراً كلون **نص أو
+  /// أيقونة** فوق خلفيات فاتحة (بطاقات بيضاء/كريمية) — [gold]/[goldSoft]
+  /// المباشرين تباينهما هناك ~2.2:1 فقط (دون حد WCAG الأدنى 4.5:1 للنص
+  /// العادي). `goldDeep` بتباين ~4.6:1 يحافظ على نفس عائلة اللون بإحساس
+  /// أهدأ. [gold]/[goldSoft] يبقيان كما هما لكل استخدامات الخلفية/الزخرفة.
+  static const goldDeep = Color(0xFF8C6D3F);
+
   // الخلفيات
   static const paper = Color(0xFFF6EEDA); // خلفية صفحة المصحف الورقية
   static const cream = Color(0xFFFBF6EC); // خلفية شاشات التطبيق العامة
@@ -22,6 +29,12 @@ abstract final class AppColors {
   static const teal = Color(0xFF2F8F82);
   static const purple = Color(0xFF6E5B95);
 
+  /// نسخة أغمق من [teal] لاستخدامها كنص/أيقونة فوق خلفيات فاتحة — نفس
+  /// سبب وجود [goldDeep]: [teal] المباشر على أبيض/كريمي تباينه ~3.9:1
+  /// فقط (دون حد WCAG 4.5:1 للنص العادي). نفس قيمة `primaryLight` لباقة
+  /// الفيروزي بـ`app_accent_colors.dart` — تباين ~7.5:1، بلا لون جديد كلياً.
+  static const tealDeep = Color(0xFF005B52);
+
   static const line = Color(0x1A0B2545); // navy بشفافية 10%
 
   // الوضع الليلي — دافئة لا سوداء صريحة، بنفس الهوية
@@ -31,3 +44,14 @@ abstract final class AppColors {
   static const inkSoftOnDark = Color(0xFFAFA391);
   static const lineDark = Color(0x22EDE6D8); // inkOnDark بشفافية 13%
 }
+
+/// لون تمييز التطبيق **الحالي** — بديل `AppColors.gold` المباشر بكل
+/// الودجتات القابلة للتخصيص (أيقونات/شارات/حدود ملوَّنة)، بطلب صاحب
+/// المشروع "لون التطبيق لا كامل مش بس الايقونات" (كانت الجولة الأولى مقصورة
+/// على `ThemeData.colorScheme.secondary` القياسي — أزرار/مفاتيح/تبويب سفلي
+/// فقط، لا هذه الاستخدامات المباشرة الـ٩٠+ بـ٣٠ ملفاً). يقرأ نفس
+/// `colorScheme.secondary` المربوط أصلاً بـ`AppTheme.light/dark` حسب اللون
+/// المختار بالإعدادات (`app_accent_colors.dart`) — أي `Theme.of(context)`
+/// هون يعيد بناء أي ودجت يستخدمه تلقائياً عند تغيّر الثيم (خلافاً لقراءة
+/// `AppColors.gold` الثابتة القديمة).
+Color themeAccent(BuildContext context) => Theme.of(context).colorScheme.secondary;

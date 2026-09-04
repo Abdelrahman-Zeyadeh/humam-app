@@ -17,14 +17,17 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import sys
 from pathlib import Path
 
 from quran_layout import merge_layout
 from quran_metadata import load_hizb_lookup, load_revelation_order_lookup, load_rub_lookup, load_sajda_lookup
+from quran_mutashabihat import merge_mutashabihat
 from quran_texts import merge_texts
-from text_normalize import normalize_search_text, strip_diacritics
+from text_normalize import normalize_search_text, strip_diacritics_for_display
+from update_surah_names import CANONICAL_SURAHS
 
 ROOT = Path(__file__).resolve().parent
 RAW = ROOT / "raw"
@@ -41,6 +44,10 @@ EXPECTED_AYAHS = 6236
 # (مضمّنة بتدفق الآيات) لا سطر بسملة منفصل قبلها.
 SURAH_NO_BISMILLAH = 9
 SURAH_FATIHA = 1
+
+CANONICAL_SURAHS_MAP = {
+    sid: (name_ar, name_plain) for sid, name_ar, name_plain in CANONICAL_SURAHS
+}
 
 def load_json(name: str):
     path = RAW / name
@@ -59,9 +66,17 @@ def main() -> None:
         sys.exit(f"فشل التحقق: عدد السور {len(chapters)} != {EXPECTED_SURAHS}")
 
     # نص كل آية: {(surah, ayah): text}
+    # إزالة المسافات الخاطئة بين تنوين الفتح حصراً وحرف الألف/الياء التابع لنفس الكلمة
+    # (مثال: 'عِلْمࣰ ا' -> 'عِلْمࣰا'، 'هُدࣰ ى' -> 'هُدࣰى'، 'نَارࣰ ا' -> 'نَارࣰا')
     text_by_key: dict[tuple[int, int], str] = {}
     for row in uthmani["quran"]:
-        text_by_key[(row["chapter"], row["verse"])] = row["text"]
+        raw_text = row["text"]
+        cleaned_text = re.sub(
+            r'([\u064B\u08F0])\s+([اى][ۖ-ۭ]?)(?=\s|$|[\u2000-\u200F])',
+            r'\1\2',
+            raw_text,
+        )
+        text_by_key[(row["chapter"], row["verse"])] = cleaned_text
 
     if len(text_by_key) != EXPECTED_AYAHS:
         sys.exit(f"فشل التحقق: عدد نصوص الآيات {len(text_by_key)} != {EXPECTED_AYAHS}")
@@ -127,7 +142,13 @@ def main() -> None:
         if not verses:
             sys.exit(f"فشل التحقق: السورة {surah_no} بلا آيات في info.json")
 
-        name_ar = chapter["arabicname"].strip()
+        name_ar, name_ar_plain = CANONICAL_SURAHS_MAP.get(
+            surah_no,
+            (
+                chapter["arabicname"].strip().replace("\u0653", ""),
+                strip_diacritics_for_display(chapter["arabicname"].strip().replace("\u0653", "")),
+            ),
+        )
         revelation_place = "makkah" if chapter["revelation"] == "Mecca" else "madinah"
         bismillah_pre = 0 if surah_no in (SURAH_NO_BISMILLAH, SURAH_FATIHA) else 1
 
@@ -139,7 +160,7 @@ def main() -> None:
             (
                 surah_no,
                 name_ar,
-                strip_diacritics(name_ar),
+                name_ar_plain,
                 chapter["name"],
                 revelation_place,
                 revelation_order_lookup.get(surah_no),
@@ -184,16 +205,18 @@ def main() -> None:
 
     merge_layout(conn, RAW_PAGES_DB, RAW_WORDS_DB, ayah_id_by_key)
     merge_texts(conn, RAW, ayah_id_by_key)
+    merge_mutashabihat(conn, RAW, ayah_id_by_key)
 
     # ⚠️ **PRAGMA user_version هون يطابق QuranDatabase.schemaVersion بطبقة
     # drift حرفياً — درift يستخدم نفس الـ pragma داخلياً لتتبّع إصدار
     # البنية (الأعمدة)، ويرفض فتح ملف لا يطابق قيمته دون استراتيجية
     # ترحيل**. لا تغيّر هذا الرقم إلا مع رفع `QuranDatabase.schemaVersion`
     # بنفس القيمة (تغيّر بنية جدول فعلي). تعبئة hizb/rub/sajda_type/
-    # revelation_order كانت تغيير *بيانات* لا *بنية* — بقي ٢ عمداً؛
-    # `quran_db_version.txt` بالأسفل هو الآلية الصحيحة المنفصلة لإجبار
-    # إعادة نسخ الـ asset عند تغيّر المحتوى بلا علاقة ببنية الجدول.
-    conn.execute("PRAGMA user_version = 2")
+    # revelation_order كانت تغيير *بيانات* لا *بنية* — بقيت ٢ عمداً؛ رُفعت
+    # الآن لـ٣ لأن جدول `mutashabihat` الجديد **بنية** فعلية (جدول كامل
+    # إضافي)، بخلاف تلك. `quran_db_version.txt` بالأسفل آلية منفصلة
+    # لإجبار إعادة نسخ الـ asset عند تغيّر المحتوى بلا علاقة ببنية الجدول.
+    conn.execute("PRAGMA user_version = 3")
 
     # تحقق نهائي مباشرة من القاعدة المكتوبة، لا من العدادات فقط
     (surah_count,) = conn.execute("SELECT COUNT(*) FROM surahs").fetchone()
@@ -223,7 +246,7 @@ def main() -> None:
     # محفوظة بمجلد المستندات ليقرر إعادة نسخ القاعدة عند تغيّره، بدل
     # الاعتماد فقط على "الملف موجود؟" (كان سيُبقي نسخة قديمة بلا الجداول
     # الجديدة عالأجهزة التي جرّبت التطبيق قبل هذا التحديث).
-    (OUT_DIR / "quran_db_version.txt").write_text("3", encoding="utf-8")
+    (OUT_DIR / "quran_db_version.txt").write_text("5", encoding="utf-8")
 
     size_kb = OUT_DB.stat().st_size / 1024
     print(f"تم بنجاح: {OUT_DB} ({size_kb:.0f} كيلوبايت)")

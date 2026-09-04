@@ -6,12 +6,35 @@ import 'package:humam_app/features/audio/quran_audio_controller.dart';
 import 'package:humam_app/features/audio/reciters.dart';
 
 void main() {
-  test('القرّاء الأربعة المعتمدون بأنماطهم الصحيحة', () {
-    expect(kReciters.map((r) => r.id).toSet(), {'husary', 'minshawy', 'qasim', 'baleela'});
-    expect(reciterById('baleela').mode, ReciterAudioMode.perSurahOnly);
-    expect(reciterById('husary').mode, ReciterAudioMode.perAyah);
-    expect(reciterById('minshawy').mode, ReciterAudioMode.perAyah);
-    expect(reciterById('qasim').mode, ReciterAudioMode.perAyah);
+  test('القرّاء المعتمدون بأنماطهم الصحيحة', () {
+    expect(kReciters.map((r) => r.id).toSet(), {
+      'husary', 'husary_mujawwad', 'husary_muallim',
+      'minshawy', 'minshawy_mujawwad', 'minshawy_teacher',
+      'abdulbasit_murattal', 'abdulbasit_mujawwad',
+      'tablawi', 'mustafa_ismail', 'banna',
+      'alafasy', 'dossari', 'muaiqly', 'qatami', 'ajamy', 'ghamadi', 'fares_abbad',
+      'shuraym', 'sudais', 'juhaynee', 'hudhaify', 'qasim', 'jaber', 'ayyoub', 'basfar',
+      'shatri', 'rifai', 'budair', 'tunaiji', 'matroud', 'akhdar',
+      'baleela', 'barhaji', 'talib_hamid', 'qarafi', 'badr_turki', 'buaijan', 'abkar', 'hazza',
+    });
+    // القرّاء بنمط سورة كاملة
+    for (final id in [
+      'baleela', 'barhaji', 'talib_hamid', 'qarafi', 'badr_turki', 'buaijan', 'abkar', 'hazza',
+    ]) {
+      expect(reciterById(id).mode, ReciterAudioMode.perSurahOnly, reason: id);
+    }
+    // القرّاء بنمط آية بآية
+    for (final id in [
+      'husary', 'husary_mujawwad', 'husary_muallim',
+      'minshawy', 'minshawy_mujawwad', 'minshawy_teacher',
+      'abdulbasit_murattal', 'abdulbasit_mujawwad',
+      'tablawi', 'mustafa_ismail', 'banna',
+      'alafasy', 'dossari', 'muaiqly', 'qatami', 'ajamy', 'ghamadi', 'fares_abbad',
+      'shuraym', 'sudais', 'juhaynee', 'hudhaify', 'qasim', 'jaber', 'ayyoub', 'basfar',
+      'shatri', 'rifai', 'budair', 'tunaiji', 'matroud', 'akhdar',
+    ]) {
+      expect(reciterById(id).mode, ReciterAudioMode.perAyah, reason: id);
+    }
   });
 
   test('رابط آية everyayah.com بصيغة SSSAAA.mp3 صحيحة', () {
@@ -21,8 +44,8 @@ void main() {
   });
 
   test('رابط سورة بندر بليلة كاملة بصيغة SSS.mp3', () {
-    expect(surahAudioUrl('baleela', 1), 'https://server6.mp3quran.net/balilah/001.mp3');
-    expect(surahAudioUrl('baleela', 114), 'https://server6.mp3quran.net/balilah/114.mp3');
+    expect(surahAudioUrl('baleela', 1), 'https://media.way2quran.com/bandar-balila/hafs-an-asim/001.mp3');
+    expect(surahAudioUrl('baleela', 114), 'https://media.way2quran.com/bandar-balila/hafs-an-asim/114.mp3');
   });
 
   test('لا رابط سورة كاملة للقرّاء المقسَّمين بالآية (يستخدمون طابور آيات بدله)', () {

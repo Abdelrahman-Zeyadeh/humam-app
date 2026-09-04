@@ -30,9 +30,10 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <application
-        android:label="humam_app"
+        android:label="@string/app_name"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:networkSecurityConfig="@xml/network_security_config">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -54,12 +55,32 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- ضغطة ويدجت الشاشة الرئيسية تفتح هذا Activity — راجع
+                 HumamWidgetProvider.kt (HomeWidgetLaunchIntent.getActivity). -->
+            <intent-filter>
+                <action android:name="es.antonborri.home_widget.action.LAUNCH"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:scheme="humam"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- تشخيص ٢٠٢٦-٠٨-٢٢: تعطيل Impeller **لم يحل** الشاشة الحمراء —
+             تأكّدت فعلياً (`dumpsys gfxinfo` على الجهاز بهالبناء بالذات)
+             إنه Pipeline=Skia (OpenGL)، ومع هيك الشاشة احمرّت بنفس صفحة
+             الفاتحة بعد حذف كامل للتطبيق وتنصيب نظيف. يعني تخمين الجولة
+             السابقة (Impeller/Huawei-red) غلط — **لا تُعِد تفعيل هذا
+             التعطيل بناءً على تلك النظرية القديمة**. أُزيل التعطيل هون
+             لاختبار Impeller كبديل (GPU الجهاز فعلياً Adreno لا Mali،
+             فالسيناريو المرجعي بمشاكل Huawei/Mali أصلاً غير مطابق) — لو
+             ظهرت الشاشة الحمراء **معه أيضاً** فهذا دليل إضافي إنه المحرّك
+             (Impeller أو Skia) مش السبب الجذري، والاشتباه ينتقل لتعقيد
+             الگليف الشعاعي بخط QCF نفسه (راجع محادثة التشخيص وملف الذاكرة
+             لتفاصيل أكتر لو استمر البحث). -->
 
         <!-- خدمة audio_service للتشغيل بالخلفية + إشعار التحكّم. -->
         <service
@@ -91,6 +112,59 @@
             </intent-filter>
         </receiver>
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
+
+        <!-- ويدجت هُمَام الشامل (آية وصلاة) -->
+        <receiver
+            android:name=".HumamWidgetProvider"
+            android:exported="true"
+            android:label="هُمَام - الشامل">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/humam_widget_info"/>
+        </receiver>
+
+        <!-- ويدجت مواقيت الصلاة الشريطي (4×1) -->
+        <receiver
+            android:name=".PrayerBarWidgetProvider"
+            android:exported="true"
+            android:label="هُمَام - مواقيت الصلاة (4×1)">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/prayer_bar_widget_info"/>
+        </receiver>
+
+        <!-- ويدجت الأذكار والتسبيح (2×2) -->
+        <receiver
+            android:name=".DhikrWidgetProvider"
+            android:exported="true"
+            android:label="هُمَام - الأذكار والتسبيح (2×2)">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/dhikr_widget_info"/>
+        </receiver>
+
+        <!-- ويدجت الآية والذكر (4×2) -->
+        <receiver
+            android:name=".AyahDhikrWidgetProvider"
+            android:exported="true"
+            android:label="هُمَام - الآية والذكر (4×2)">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/ayah_dhikr_widget_info"/>
+        </receiver>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

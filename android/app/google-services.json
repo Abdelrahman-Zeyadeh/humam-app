@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "312827165247",
+    "project_id": "humam-app-ad1cf",
+    "storage_bucket": "humam-app-ad1cf.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:312827165247:android:b737aeeddd3bc36efb168a",
+        "android_client_info": {
+          "package_name": "com.humam.humam_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "312827165247-n1fu9f164c2784v384nkbcun95vd5eq3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.humam.humam_app",
+            "certificate_hash": "e72bc2ec88caae864c6b98d99dc653d8e58fa350"
+          }
+        },
+        {
+          "client_id": "312827165247-scjdv0abrf8lr8739llt5c7lrc2js5ij.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB7FvGrPKZ2mo9tGNX2qYKYDYSNQ_NSEHc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "312827165247-scjdv0abrf8lr8739llt5c7lrc2js5ij.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

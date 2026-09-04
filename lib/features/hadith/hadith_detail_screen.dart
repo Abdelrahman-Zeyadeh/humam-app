@@ -3,27 +3,28 @@ import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../core/data/hadith/hadith_book_catalog.dart';
 import '../../core/data/hadith/hadith_database.dart';
 import '../../core/data/hadith/hadith_providers.dart';
+import '../mushaf/mushaf_settings.dart';
 
-final _hadithByIdProvider = FutureProvider.family<Hadith, int>((ref, id) {
-  return ref.watch(hadithRepositoryProvider).hadithById(id);
-});
-
-final _hadithBookProvider = FutureProvider.family<HadithBook, int>((ref, id) {
-  return ref.watch(hadithRepositoryProvider).bookById(id);
+final _hadithByIdProvider = FutureProvider.family<Hadith, (int bookId, int hadithId)>((ref, args) {
+  return ref.watch(hadithRepositoryProvider).hadithById(args.$1, args.$2);
 });
 
 /// عرض حديث واحد كاملاً — النص حرفياً من `hadith.db` (مصدر Unlicense
 /// موثّق، راجع tools/raw/README.md)، بلا أي صياغة أو تلخيص من الكود.
 class HadithDetailScreen extends ConsumerWidget {
-  const HadithDetailScreen({super.key, required this.hadithId});
+  const HadithDetailScreen({super.key, required this.bookId, required this.hadithId});
+  final int bookId;
   final int hadithId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hadithAsync = ref.watch(_hadithByIdProvider(hadithId));
+    final hadithAsync = ref.watch(_hadithByIdProvider((bookId, hadithId)));
     final onSurface = Theme.of(context).colorScheme.onSurface;
+    final fontSize = ref.watch(tafsirFontSizeProvider) + 2.0;
+    final book = hadithBookCatalogById(bookId);
 
     return Scaffold(
       appBar: AppBar(title: const Text('الحديث')),
@@ -31,12 +32,11 @@ class HadithDetailScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => const Center(child: Text('تعذّر تحميل الحديث')),
         data: (hadith) {
-          final bookAsync = ref.watch(_hadithBookProvider(hadith.bookId));
           return ListView(
             padding: const EdgeInsets.all(20),
             children: [
               Text(
-                '${bookAsync.value?.nameAr ?? ''} · حديث ${hadith.hadithNumber}',
+                '${book.nameAr} · حديث ${hadith.hadithNumber}',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: onSurface.withValues(alpha: 0.6), fontSize: 12),
               ),
@@ -45,7 +45,7 @@ class HadithDetailScreen extends ConsumerWidget {
                 hadith.content,
                 textAlign: TextAlign.right,
                 textDirection: TextDirection.rtl,
-                style: TextStyle(color: onSurface, fontSize: 18, height: 2),
+                style: TextStyle(color: onSurface, fontSize: fontSize, height: 2),
               ),
               const SizedBox(height: 20),
               Row(

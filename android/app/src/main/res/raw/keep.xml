@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  بلا هذا الملف، Flutter's Gradle plugin يفعّل R8 minify + resource
+  shrinking تلقائياً بكل بناء release (FlutterPlugin.kt، بلا أي خيار
+  بـbuild.gradle.kts يوقفه) — وكل موارد adhan_* بـres/raw/ يُستخدَمان فقط
+  عبر نص Dart يُبنى وقت التشغيل (RawResourceAndroidNotificationSound(voice.id)
+  بـadhan_notification_service.dart)، بلا أي مرجع ثابت بكود Kotlin/Java —
+  فالـshrinker ما بيشوفهن "مُستخدَمين" ويحذفهن كلياً من الـAPK النهائي
+  (تأكد بـaapt2 dump resources: صفر مدخلات "type raw"، وبـفحص zip مباشر).
+  tools:keep هي الآلية الرسمية لأندرويد بالضبط لهيك حالة: مورد مُستخدَم
+  فعلياً لكن بمرجع ديناميكي ما بيقدر الـshrinker يتتبّعه ثابتاً.
+  لازم أي مؤذن جديد ينضاف بـadhan_voices.dart ينضاف id تبعه هون كمان،
+  وإلا صوته رح يُحذف من نسخة release بصمت.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@raw/adhan_qassas,@raw/adhan_saqqaf,@raw/adhan_sunbul,@raw/adhan_makkah,@raw/adhan_madinah,@raw/adhan_aqsa,@raw/adhan_alafasy,@raw/adhan_abdulbasit,@raw/adhan_qatami,@raw/adhan_surayhi" />

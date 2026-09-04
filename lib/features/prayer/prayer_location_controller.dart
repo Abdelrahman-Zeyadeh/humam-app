@@ -2,8 +2,33 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../core/data/user/location_prefs.dart';
+import '../../core/data/user/user_prefs.dart';
+import '../../core/services/reverse_geocode_service.dart';
 import '../notifications/adhan_notification_prefs.dart';
 import '../notifications/adhan_notification_service.dart';
+
+/// نصوص GPS الثابتة القديمة — أي موقع محفوظ بأحد هذه الأسماء حرفياً معناه
+/// لم يُحلَّل باسم منطقة حقيقي بعد (إما اتحدَّد **قبل** إضافة الـReverse
+/// Geocoding، أو كتبه رادار المساجد بنص ثابت — راجع
+/// `mosque_radar_screen.dart`)، فيحتاج تحديثاً تلقائياً.
+const _kLegacyCityNamePlaceholders = {'الموقع الحالي (GPS)', 'الموقع الحالي'};
+
+/// يحلّل اسم المنطقة تلقائياً **بلا أي ضغطة من المستخدم** — بطلب صاحب
+/// المشروع "خليه بالعربي من غير ما اضغط زر التحديث": لو الموقع محفوظ
+/// مسبقاً بأحد الأسماء الثابتة القديمة [_kLegacyCityNamePlaceholders]،
+/// يعيد تحليله بنفس الإحداثيات المحفوظة فعلياً — بلا طلب موقع GPS جديد،
+/// فقط استدعاء شبكة صغير. يُشاهَد (`ref.watch`) من شاشة الصلاة فيعمل
+/// مرّة تلقائياً عند فتحها، ولا يعيد نفسه بعد النجاح (`cityName` يصير
+/// غير الاسم الثابت فتتوقف الحاجة له).
+final cityNameBackfillProvider = FutureProvider<void>((ref) async {
+  final loc = ref.watch(locationPrefsProvider);
+  if (!loc.hasLocation) return;
+  if (!_kLegacyCityNamePlaceholders.contains(loc.cityName)) return;
+  final resolved = await reverseGeocodeCityName(loc.lat!, loc.lon!);
+  if (resolved == null) return;
+  await loc.setLocation(lat: loc.lat!, lon: loc.lon!, cityName: resolved);
+  ref.read(locationVersionProvider.notifier).bump();
+});
 
 /// إشعار بسيط يُعاد بناؤه عند تغيير الموقع/طريقة الحساب — نفس نمط
 /// `bookmarkVersionProvider` (تخزين متزامن بلا Stream خاص به).
@@ -48,12 +73,16 @@ class LocationController extends Notifier<AsyncValue<void>> {
       }
 
       final position = await Geolocator.getCurrentPosition();
+      final resolvedName = await reverseGeocodeCityName(
+        position.latitude,
+        position.longitude,
+      );
       await ref
           .read(locationPrefsProvider)
           .setLocation(
             lat: position.latitude,
             lon: position.longitude,
-            cityName: 'الموقع الحالي (GPS)',
+            cityName: resolvedName ?? 'الموقع الحالي (GPS)',
           );
       ref.read(locationVersionProvider.notifier).bump();
       await _rescheduleAdhanNotifications();
@@ -77,11 +106,15 @@ class LocationController extends Notifier<AsyncValue<void>> {
       final loc = ref.read(locationPrefsProvider);
       if (!loc.hasLocation) return;
       final notifPrefs = ref.read(adhanNotificationPrefsProvider);
+      final userPrefs = ref.read(userPrefsProvider);
       await AdhanNotificationService.instance.rescheduleUpcoming(
         lat: loc.lat!,
         lon: loc.lon!,
         methodKey: loc.calculationMethod,
         isEnabled: notifPrefs.effectivelyEnabled,
+        voiceId: userPrefs.adhanVoiceId,
+        checkinEnabled: userPrefs.prayerCheckinEnabled,
+        checkinFirstDelayMinutes: userPrefs.prayerCheckinFirstDelayMinutes,
       );
     } catch (_) {
       // راجع تعليق الدالة — لا نُفشل تحديث الموقع بسبب الإشعارات.

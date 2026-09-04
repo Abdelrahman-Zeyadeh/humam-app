@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- باقة "الأزرق النيلي" — accent.primaryLight → accent.primaryDark. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <corners android:radius="20dp" />
+    <gradient
+        android:type="linear"
+        android:angle="135"
+        android:startColor="#15406A"
+        android:endColor="#0F263E" />
+    <stroke android:width="1dp" android:color="#592C5E8A" />
+</shape>

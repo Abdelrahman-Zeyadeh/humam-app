@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/config/remote_assets_config.dart';
 import '../../core/theme/app_colors.dart';
 import 'font_download_service.dart';
 
@@ -32,7 +31,7 @@ class FontDownloadScreen extends ConsumerWidget {
             Icon(
               allDone ? Icons.check_circle : Icons.cloud_download_outlined,
               size: 56,
-              color: allDone ? AppColors.teal : AppColors.gold,
+              color: allDone ? AppColors.tealDeep : themeAccent(context),
             ),
             const SizedBox(height: 16),
             Text(
@@ -41,24 +40,17 @@ class FontDownloadScreen extends ConsumerWidget {
               style: TextStyle(color: onSurface.withValues(alpha: 0.7), fontSize: 13),
             ),
             const SizedBox(height: 24),
-            if (!isFontsBaseUrlConfigured)
-              Text(
-                'الاستضافة غير مهيّأة بهذا الإصدار بعد — راجع صاحب التطبيق',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: onSurface.withValues(alpha: 0.5), fontSize: 12),
-              )
-            else ...[
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: LinearProgressIndicator(value: progress, minHeight: 10, backgroundColor: AppColors.line),
-              ),
-              const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(value: progress, minHeight: 10, backgroundColor: AppColors.line),
+            ),
+            const SizedBox(height: 8),
               Text('$downloadedCount من $totalPages صفحة', style: TextStyle(color: onSurface, fontSize: 13)),
               if (state.currentPage != null)
                 Text('يُنزَّل الآن: صفحة ${state.currentPage}', style: TextStyle(color: onSurface.withValues(alpha: 0.5), fontSize: 11)),
               const SizedBox(height: 20),
               if (allDone)
-                const Text('اكتمل تنزيل المصحف كاملاً 🎉', style: TextStyle(color: AppColors.teal, fontWeight: FontWeight.w700))
+                const Text('اكتمل تنزيل المصحف كاملاً 🎉', style: TextStyle(color: AppColors.tealDeep, fontWeight: FontWeight.w700))
               else if (state.isBulkRunning)
                 OutlinedButton.icon(
                   icon: const Icon(Icons.stop_circle_outlined),
@@ -76,9 +68,8 @@ class FontDownloadScreen extends ConsumerWidget {
                 Text(state.errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFFB3261E), fontSize: 12)),
               ],
             ],
-          ],
+          ),
         ),
-      ),
-    );
+      );
   }
 }

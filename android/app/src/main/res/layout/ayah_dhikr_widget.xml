@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/ayah_dhikr_widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/humam_widget_background"
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp"
+    android:paddingTop="10dp"
+    android:paddingBottom="10dp">
+
+    <!-- 1. شريط التاريخ الهجري والتطبيق -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/widget_hijri_date"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="السبت 09 ربيع الأول 1448"
+            android:textColor="#C5A059"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:gravity="start" />
+
+        <TextView
+            android:id="@+id/widget_app_brand"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="هُمَام"
+            android:textColor="#80FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- فاصل رفيع -->
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="5dp"
+        android:layout_marginBottom="6dp"
+        android:background="#1FFFFFFF" />
+
+    <!-- 2. آية الفترة -->
+    <LinearLayout
+        android:id="@+id/widget_ayah_section"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center">
+
+        <TextView
+            android:id="@+id/widget_ayah_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="﴿ أَلَا بِذِكْرِ اللَّهِ تَطْمَئِنُّ الْقُلُوبُ ﴾"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:maxLines="3"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/widget_ayah_ref"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="سورة الرعد · آية 28"
+            android:textColor="#C5A059"
+            android:textSize="10sp"
+            android:gravity="center"
+            android:layout_marginTop="2dp" />
+    </LinearLayout>
+
+    <!-- فاصل رفيع -->
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="4dp"
+        android:background="#1FFFFFFF" />
+
+    <!-- 3. ذكر الفترة -->
+    <LinearLayout
+        android:id="@+id/widget_dhikr_section"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp">
+
+        <TextView
+            android:id="@+id/widget_dhikr_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📿 ذكر الفترة:"
+            android:textColor="#E7D2A0"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_dhikr_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:text="سُبْحَانَ اللَّهِ وَبِحَمْدِهِ"
+            android:textColor="#FFFFFF"
+            android:textSize="10sp"
+            android:gravity="start"
+            android:maxLines="1"
+            android:ellipsize="end" />
+    </LinearLayout>
+
+</LinearLayout>

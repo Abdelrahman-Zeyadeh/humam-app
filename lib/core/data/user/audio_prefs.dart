@@ -17,6 +17,11 @@ class AudioPrefs {
   double get speed => _repo.speed;
 
   Future<void> setSpeed(double speed) => _repo.setSpeed(speed);
+
+  /// وضع "سماع مباشر" — راجع توثيق `AudioSettings.liveListenEnabled`.
+  bool get liveListenEnabled => _repo.liveListenEnabled;
+
+  Future<void> setLiveListenEnabled(bool value) => _repo.setLiveListenEnabled(value);
 }
 
 final audioPrefsProvider = Provider<AudioPrefs>((ref) {

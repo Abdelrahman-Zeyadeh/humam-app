@@ -8,7 +8,8 @@ class AzkarLibraryProgressNotifier extends Notifier<Map<String, int>> {
   @override
   Map<String, int> build() => const {};
 
-  static String keyFor(int categoryId, int itemIndex) => '$categoryId:$itemIndex';
+  static String keyFor(int categoryId, int itemIndex) =>
+      '$categoryId:$itemIndex';
 
   int remainingFor(String key, int total) => state[key] ?? total;
 
@@ -23,4 +24,6 @@ class AzkarLibraryProgressNotifier extends Notifier<Map<String, int>> {
 }
 
 final azkarLibraryProgressProvider =
-    NotifierProvider<AzkarLibraryProgressNotifier, Map<String, int>>(AzkarLibraryProgressNotifier.new);
+    NotifierProvider<AzkarLibraryProgressNotifier, Map<String, int>>(
+      AzkarLibraryProgressNotifier.new,
+    );

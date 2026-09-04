@@ -49,10 +49,10 @@ class _HadithSearchScreenState extends ConsumerState<HadithSearchScreen> {
           controller: _controller,
           autofocus: true,
           textDirection: TextDirection.rtl,
-          style: const TextStyle(color: Colors.white, fontSize: 16),
-          decoration: const InputDecoration(
+          style: TextStyle(color: onSurface, fontSize: 16),
+          decoration: InputDecoration(
             hintText: 'ابحث بالأحاديث…',
-            hintStyle: TextStyle(color: Colors.white70),
+            hintStyle: TextStyle(color: onSurface.withValues(alpha: 0.5)),
             border: InputBorder.none,
           ),
           onSubmitted: _search,
@@ -89,7 +89,9 @@ class _HadithSearchScreenState extends ConsumerState<HadithSearchScreen> {
                   style: const TextStyle(fontSize: 12, color: AppColors.inkSoft),
                 ),
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => HadithDetailScreen(hadithId: r.hadith.id)),
+                  MaterialPageRoute(
+                    builder: (_) => HadithDetailScreen(bookId: r.hadith.bookId, hadithId: r.hadith.id),
+                  ),
                 ),
               );
             },

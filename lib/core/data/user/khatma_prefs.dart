@@ -5,29 +5,36 @@ import 'user_repository.dart' show KhatmaPlan, UserRepository;
 
 export 'user_repository.dart' show KhatmaPlan;
 
-/// خطة ختمة نشطة — واجهة رقيقة فوق [UserRepository]. كانت تُخزَّن بـ
-/// SharedPreferences؛ الهجرة كاملة الآن، أُبقيت بنفس التوقيعات.
+/// خطط الختمة — واجهة رقيقة فوق [UserRepository]. تدير **قائمة** خطط لا
+/// خطة واحدة (بطلب صاحب المشروع توحيد سلوك الختمة مع الحفظ) — نفس نمط
+/// `hifz_prefs.dart` بالضبط.
 class KhatmaPrefs {
   KhatmaPrefs(this._repo);
   final UserRepository _repo;
 
-  KhatmaPlan? get activePlan => _repo.activePlan;
+  List<KhatmaPlan> get activePlans => _repo.khatmaPlans;
 
-  Future<void> start(int targetDays) => _repo.startKhatma(targetDays);
+  Future<KhatmaPlan> start(int targetDays, {required int startPage}) =>
+      _repo.startKhatma(targetDays, startPage: startPage);
 
-  Future<void> cancel() => _repo.cancelKhatma();
+  Future<void> cancel(int planId) => _repo.cancelKhatmaPlan(planId);
+
+  Future<void> updateCurrentPage(int planId, int page) =>
+      _repo.updateKhatmaCurrentPage(planId, page);
 }
 
 final khatmaPrefsProvider = Provider<KhatmaPrefs>((ref) {
   return KhatmaPrefs(ref.watch(userRepositoryProvider));
 });
 
-/// نفس نمط `bookmarkVersionProvider` — تخزين متزامن عبر الذاكرة المؤقتة،
-/// فنجبر إعادة البناء يدوياً بعد بدء/إلغاء الخطة عبر `bump()`.
+/// نفس نمط `hifzVersionProvider` — تخزين متزامن عبر الذاكرة المؤقتة،
+/// فنجبر إعادة البناء يدوياً بعد بدء/إلغاء خطة عبر `bump()`.
 class KhatmaVersionNotifier extends Notifier<int> {
   @override
   int build() => 0;
   void bump() => state++;
 }
 
-final khatmaVersionProvider = NotifierProvider<KhatmaVersionNotifier, int>(KhatmaVersionNotifier.new);
+final khatmaVersionProvider = NotifierProvider<KhatmaVersionNotifier, int>(
+  KhatmaVersionNotifier.new,
+);

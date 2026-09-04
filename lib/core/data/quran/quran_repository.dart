@@ -2,12 +2,30 @@ import 'package:drift/drift.dart';
 
 import '../../text/arabic_normalizer.dart';
 import 'quran_database.dart';
+import 'tafsir_edition_catalog.dart';
+import 'tafsir_edition_registry.dart';
 
 /// نتيجة بحث في نص المصحف: الآية + رقم صفحتها للانتقال والتظليل.
 class AyahSearchResult {
   const AyahSearchResult({required this.ayah, required this.surahNameAr});
   final Ayah ayah;
   final String surahNameAr;
+}
+
+/// آية متشابهة لفظاً بآية أخرى (قد تكون بسورة مختلفة) — راجع توثيق
+/// [QuranRepository.similarAyahsFor].
+class SimilarAyahResult {
+  const SimilarAyahResult({required this.ayah, required this.surahNameAr});
+  final Ayah ayah;
+  final String surahNameAr;
+}
+
+/// ربع واحد ضمن جزء (١-٤) — راجع توثيق [QuranRepository.rubDetailsForJuz].
+class RubDetail {
+  const RubDetail({required this.rubInJuz, required this.startAyah, required this.startPage});
+  final int rubInJuz;
+  final Ayah startAyah;
+  final int startPage;
 }
 
 /// تخطيط صفحة مصحف كامل جاهز للعرض: سطورها بالترتيب، وكلمات كل سطر
@@ -22,8 +40,10 @@ class MushafPage {
 /// طبقة الوصول لقاعدة `quran.db`. كل الاستعلامات تُنفَّذ على isolate drift
 /// المنفصل (`NativeDatabase.createInBackground`) — لا تحجب الخيط الرئيسي.
 class QuranRepository {
-  QuranRepository(this._db);
+  QuranRepository(this._db, [TafsirEditionRegistry? tafsirRegistry])
+    : _tafsirRegistry = tafsirRegistry ?? TafsirEditionRegistry();
   final QuranDatabase _db;
+  final TafsirEditionRegistry _tafsirRegistry;
 
   Future<List<Surah>> allSurahs() => _db.select(_db.surahs).get();
 
@@ -33,13 +53,26 @@ class QuranRepository {
   Future<Ayah> ayahById(int id) =>
       (_db.select(_db.ayahs)..where((a) => a.id.equals(id))).getSingle();
 
-  /// تفسير الجلالين لآية واحدة — `null` لو غير متوفّر (لا يجب أن يحصل،
-  /// كل آية لها صف تفسير واحد على الأقل حالياً، لكن الاستدعاء الآمن أفضل
-  /// من افتراض دايماً موجود).
-  Future<Tafsir?> tafsirForAyah(int ayahId, {String edition = 'jalalayn'}) =>
-      (_db.select(_db.tafsirs)
+  /// تفسير آية واحدة بإصدار معيّن. **كل الإصدارات الأربعة تنزيل حسب
+  /// الحاجة الآن** (`kEmbeddedTafsirEditions` فارغة، لا شيء مضمَّن
+  /// بـ`quran.db` — راجع `tafsir_edition_catalog.dart`): `null` لو
+  /// الإصدار غير منزَّل بعد **أو** لا تفسير لهذه الآية بهذا الإصدار (لا
+  /// تمييز بين الحالتين هون عمداً — الواجهة تميّز عبر
+  /// `TafsirDownloadController.statusFor` قبل الاستدعاء أصلاً، راجع
+  /// `ayah_text_view_screen.dart`).
+  Future<Tafsir?> tafsirForAyah(int ayahId, {String edition = 'jalalayn'}) async {
+    if (kEmbeddedTafsirEditions.contains(edition)) {
+      return (_db.select(_db.tafsirs)
             ..where((t) => t.ayahId.equals(ayahId) & t.edition.equals(edition)))
           .getSingleOrNull();
+    }
+    final editionDb = await _tafsirRegistry.dbForEdition(edition);
+    if (editionDb == null) return null;
+    final row = await (editionDb.select(editionDb.tafsirTexts)..where((t) => t.ayahId.equals(ayahId)))
+        .getSingleOrNull();
+    if (row == null) return null;
+    return Tafsir(id: row.ayahId, ayahId: row.ayahId, edition: edition, content: row.body);
+  }
 
   /// ترجمة صحيح إنترناشونال الإنجليزية لآية واحدة.
   Future<Translation?> translationForAyah(int ayahId, {String edition = 'en_sahih'}) =>
@@ -56,6 +89,87 @@ class QuranRepository {
         ..where((a) => a.surah.equals(surah))
         ..orderBy([(a) => OrderingTerm.asc(a.ayah)]))
       .get();
+
+  /// نطاق آيات متتالٍ بمعرّفات صفوف من fromId إلى toId شاملَين — يُستخدَم
+  /// لميزة "من — إلى" باستوديو بطاقات الآيات (`AyahStoryMakerScreen`).
+  Future<List<Ayah>> ayahsInIdRange(int fromId, int toId) => (_db.select(_db.ayahs)
+        ..where((a) =>
+            a.id.isBiggerOrEqualValue(fromId) & a.id.isSmallerOrEqualValue(toId))
+        ..orderBy([(a) => OrderingTerm.asc(a.id)]))
+      .get();
+
+  /// غليف علامة نهاية الآية لخط صفحتها بالمصحف (QCF V2)
+  Future<String?> ayahMarkerGlyph(int ayahId) async {
+    final row = await (_db.select(_db.words)
+          ..where((w) => w.ayahId.equals(ayahId) & w.charType.equals('ayah_marker'))
+          ..limit(1))
+        .getSingleOrNull();
+    return row?.glyph;
+  }
+
+  /// أول صفحة لكل جزء (١-٣٠) — للتنقّل بالجزء من فهرس المصحف. تقريب على
+  /// مستوى الصفحة لا الآية الدقيقة، كافٍ لفتح الصفحة الأولى للجزء.
+  Future<Map<int, int>> juzStartPages() async {
+    final rows = await _db
+        .customSelect(
+          'SELECT juz, MIN(page) AS start_page FROM ayahs GROUP BY juz ORDER BY juz',
+          readsFrom: {_db.ayahs},
+        )
+        .get();
+    return {for (final r in rows) r.read<int>('juz'): r.read<int>('start_page')};
+  }
+
+  /// رقم الحزب لأول آية بصفحة معيّنة — لعرضه بشريط تنقّل الصفحات (نفس
+  /// تقريب [juzStartPages]: مستوى الصفحة لا الآية الدقيقة). `Ayahs.hizb`
+  /// مُعبَّأ بالكامل فعلياً (٦٢٣٦/٦٢٣٦ آية، ٦٠ حزباً — راجع
+  /// `tools/build_quran_db.py`)، لا حاجة تنزيل/إعادة بناء `quran.db`.
+  Future<int> hizbForPage(int page) async {
+    final row = await (_db.select(_db.ayahs)
+          ..where((a) => a.page.equals(page))
+          ..orderBy([(a) => OrderingTerm.asc(a.ayah)])
+          ..limit(1))
+        .getSingleOrNull();
+    return row?.hizb ?? 1;
+  }
+
+  /// ربع-الحزب (`Ayahs.rub`، ١..٢٤٠) لأول آية بصفحة — نفس نمط [hizbForPage].
+  /// **تحقّق مباشر بالبيانات:** الترقيم متسلسل ومحاذٍ لحدود الأحزاب فعلياً
+  /// (حزب ١ = ربع ١..٤، حزب ٢ = ربع ٥..٨...، ٤ أرباع لكل حزب بالضبط
+  /// ٦٠×٤=٢٤٠)، فحساب "أي ربع ضمن هذا الحزب" = `((rub - 1) % 4) + 1`
+  /// صحيح دوماً بلا استثناء — راجع `_PageIdentityBar` بـ`mushaf_screen.dart`
+  /// لاستخدامه (تسمية "ربع/نصف/ثلاثة أرباع الحزب" بدل رقم حزب مجرَّد).
+  Future<int> rubForPage(int page) async {
+    final row = await (_db.select(_db.ayahs)
+          ..where((a) => a.page.equals(page))
+          ..orderBy([(a) => OrderingTerm.asc(a.ayah)])
+          ..limit(1))
+        .getSingleOrNull();
+    return row?.rub ?? 1;
+  }
+
+  /// تفصيل الأرباع الأربعة لجزء معيّن (١-٣٠): رقم الربع ضمن الجزء (١-٤)،
+  /// أول آية له (سورة+رقم آية)، وصفحة بدايته. `Ayahs.rub` مُعبَّأ بالكامل
+  /// فعلياً (٢٤٠ ربعاً بكل المصحف = ٤ لكل جزء)، راجع توثيق [hizbForPage].
+  Future<List<RubDetail>> rubDetailsForJuz(int juz) async {
+    final rows = await _db
+        .customSelect(
+          'SELECT rub, MIN(id) AS start_ayah_id, MIN(page) AS start_page '
+          'FROM ayahs WHERE juz = ? GROUP BY rub ORDER BY rub',
+          variables: [Variable.withInt(juz)],
+          readsFrom: {_db.ayahs},
+        )
+        .get();
+    final result = <RubDetail>[];
+    for (final r in rows) {
+      final startAyah = await ayahById(r.read<int>('start_ayah_id'));
+      result.add(RubDetail(
+        rubInJuz: result.length + 1,
+        startAyah: startAyah,
+        startPage: r.read<int>('start_page'),
+      ));
+    }
+    return result;
+  }
 
   /// تخطيط صفحة كاملة: سطورها وكلماتها، جاهزة للرسم بخط `p{page}.ttf`.
   Future<MushafPage> pageLayout(int page) async {
@@ -105,6 +219,33 @@ class QuranRepository {
     return rows.map((row) {
       final ayah = _db.ayahs.map(row.data);
       return AyahSearchResult(ayah: ayah, surahNameAr: row.read<String>('surah_name_ar'));
+    }).toList();
+  }
+
+  /// كل الآيات المتشابهة لفظاً بهذه الآية (قد تكون بسور مختلفة تماماً) —
+  /// راجع `tools/raw/README.md` "المتشابهات". كل صف بجدول `mutashabihat`
+  /// اتجاه واحد فقط (`ayah_id → similar_ayah_id`)، والمصدر يخزّن الاتجاهين
+  /// كصفّين مستقلّين بالفعل — فاستعلام `WHERE ayah_id = ?` وحده كافٍ، بلا
+  /// حاجة لـ`OR` أو تطبيع طرف.
+  Future<List<SimilarAyahResult>> similarAyahsFor(int ayahId) async {
+    final rows = await _db
+        .customSelect(
+          '''
+          SELECT ayahs.*, surahs.name_ar AS surah_name_ar
+          FROM mutashabihat
+          JOIN ayahs ON ayahs.id = mutashabihat.similar_ayah_id
+          JOIN surahs ON surahs.id = ayahs.surah
+          WHERE mutashabihat.ayah_id = ?
+          ORDER BY ayahs.id
+          ''',
+          variables: [Variable.withInt(ayahId)],
+          readsFrom: {_db.mutashabihat, _db.ayahs, _db.surahs},
+        )
+        .get();
+
+    return rows.map((row) {
+      final ayah = _db.ayahs.map(row.data);
+      return SimilarAyahResult(ayah: ayah, surahNameAr: row.read<String>('surah_name_ar'));
     }).toList();
   }
 }

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  just_audio يحتاج حقن ترويسة Referer/HTTP مخصّصة (راجع
+  duroos_lectures_screen.dart — سيرفر إسلام ويب Azure CDN يحمي ملفاته من
+  hotlinking بلا Referer صحيح). لتنفيذ هذا بأندرويد، يشغّل just_audio
+  بروكسي HTTP محلي على 127.0.0.1 يمرّر الطلب بعد إضافة الترويسة، وExoPlayer
+  يتصل بهذا البروكسي أولاً — لكن أندرويد ٩+ (API 28+) يمنع حركة HTTP
+  الصريحة (cleartext) افتراضياً حتى لـ127.0.0.1، فيفشل الاتصال بخطأ
+  "Cleartext HTTP traffic to 127.0.0.1 not permitted". هذا التصريح يسمح
+  بها فقط لعنوان اللوكال هوست، لا لأي نطاق خارجي آخر — لا يُضعف أمان
+  الاتصالات الحقيقية بالإنترنت.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+    <!-- إذاعتا "القرآن الكريم - السعودية" و"القرآن الكريم - القاهرة"
+         (quran_radio_screen.dart) تبدآن بطلب https لـ stream.radiojar.com
+         لكنه يرجع 302 لعقدة بث فرعية عشوائية (n04/n0a/n0d/...radiojar.com)
+         عبر http صريح لا https — تحقّقنا فعلياً: تدور بلا نمط ثابت بكل طلب،
+         فلا يمكن تحديد نطاق فرعي واحد. أندرويد ٩+ يمنع http الصريح
+         افتراضياً حتى بعد نجاح الطلب الأول https، فيفشل just_audio فوراً
+         برسالة خطأ للمستخدم رغم أن الرابط سليم فعلياً (تحقّق بـ curl مباشر).
+         هذا السماح يقتصر على radiojar.com وكل نطاقاتها الفرعية فقط — بث
+         صوتي علني لا بيانات مستخدم حسّاسة، فالمخاطرة (تلاعب بالبث بهجوم
+         MITM) منخفضة عملياً مقابل حل المشكلة الحقيقية. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">radiojar.com</domain>
+    </domain-config>
+</network-security-config>

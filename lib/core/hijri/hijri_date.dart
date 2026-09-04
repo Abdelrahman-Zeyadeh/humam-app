@@ -1,15 +1,26 @@
 import 'package:hijri/hijri_calendar.dart';
 
 /// التاريخ الهجري لليوم، محسوب محلياً بالكامل (خوارزمية جدولية أم القرى
-/// عبر حزمة `hijri`، BSD-2-Clause) — بلا استدعاء شبكة إطلاقاً. راجع
-/// تصميم-النظام.md بند ٤ (كان يجلب من الشبكة، لم تكن الميزة موجودة أصلاً
-/// بهذا البناء قبل ٢٠٢٦-٠٨-١٩).
-///
-/// ⚠️ الحساب الجدولي تقريبي بيوم واحد أحياناً عن رؤية الهلال الفعلية —
-/// هذا قيد معروف بكل الخوارزميات الجدولية (لا اعتماد على رصد فلكي حي)،
-/// لا خطأ بالتنفيذ. لا واجهة لتعديل الإزاحة ±يوم يدوياً بعد.
-String todayHijriArabic() {
-  final cal = HijriCalendar.now();
+/// عبر حزمة `hijri`، BSD-2-Clause) — بلا استدعاء شبكة إطلاقاً.
+String todayHijriArabic([DateTime? date]) {
+  final cal = date == null ? HijriCalendar.now() : HijriCalendar.fromDate(date);
   HijriCalendar.language = 'ar';
-  return '${cal.hDay} ${cal.getLongMonthName()} ${cal.hYear}هـ';
+  final day = cal.hDay.toString().padLeft(2, '0');
+  return '$day ${cal.getLongMonthName()} ${cal.hYear}هـ';
+}
+
+/// اليوم والتاريخ الهجري كاملين بالعربية (مثال: "السبت 09 ربيع الأول 1448هـ")
+String todayHijriWithDayArabic([DateTime? date]) {
+  final dt = date ?? DateTime.now();
+  const weekdays = [
+    'الإثنين',
+    'الثلاثاء',
+    'الأربعاء',
+    'الخميس',
+    'الجمعة',
+    'السبت',
+    'الأحد',
+  ];
+  final weekday = weekdays[dt.weekday - 1];
+  return '$weekday ${todayHijriArabic(dt)}';
 }

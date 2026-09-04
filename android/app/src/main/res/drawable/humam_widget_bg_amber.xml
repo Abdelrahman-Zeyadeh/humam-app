@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- باقة "العنبري الدافئ" — accent.primaryLight → accent.primaryDark. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <corners android:radius="20dp" />
+    <gradient
+        android:type="linear"
+        android:angle="135"
+        android:startColor="#704310"
+        android:endColor="#2E1B06" />
+    <stroke android:width="1dp" android:color="#59D48B28" />
+</shape>

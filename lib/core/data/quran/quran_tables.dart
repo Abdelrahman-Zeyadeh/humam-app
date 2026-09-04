@@ -44,6 +44,7 @@ class Words extends Table {
   IntColumn get page => integer()();
   IntColumn get lineNo => integer().named('line_no')();
   TextColumn get glyph => text()();
+  TextColumn get glyphV1 => text().named('glyph_v1').nullable()();
   TextColumn get charType => text().named('char_type')(); // word | ayah_marker
 
   @override
@@ -76,14 +77,25 @@ class Translations extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// زوج آيتين متشابهتين لفظاً (قد تكونان بسورتين مختلفتين). كل صف اتجاه
+/// واحد فقط — المصدر (QUL، راجع `tools/raw/README.md` "المتشابهات")
+/// يخزّن الاتجاهين كصفّين مستقلّين بالفعل، فلا حاجة لاستعلام `OR`.
+class Mutashabihat extends Table {
+  IntColumn get ayahId => integer().named('ayah_id')();
+  IntColumn get similarAyahId => integer().named('similar_ayah_id')();
+  TextColumn get matchWordsRange => text().named('match_words_range').nullable()();
+}
+
 class Ayahs extends Table {
   IntColumn get id => integer()();
   IntColumn get surah => integer()();
   IntColumn get ayah => integer()();
   IntColumn get page => integer()();
   IntColumn get juz => integer()();
-  IntColumn get hizb => integer().nullable()(); // TODO: مصدر بيانات منفصل
-  IntColumn get rub => integer().nullable()(); // TODO: مصدر بيانات منفصل
+  // `nullable()` تاريخياً فقط — مُعبَّآن بالكامل فعلياً بـ`quran.db` (٦٢٣٦/٦٢٣٦
+  // آية، ٦٠ حزباً و٢٤٠ ربعاً، راجع `tools/build_quran_db.py`)، لا TODO متبقٍّ.
+  IntColumn get hizb => integer().nullable()();
+  IntColumn get rub => integer().nullable()();
   IntColumn get manzil => integer()();
   TextColumn get sajdaType => text().named('sajda_type').nullable()();
   TextColumn get textUthmani => text().named('text_uthmani')();

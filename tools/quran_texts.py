@@ -48,6 +48,27 @@ def _load(path: Path) -> list[dict]:
     return rows
 
 
+# التفاسير الثلاثة الإضافية (الميسر/السعدي/ابن كثير) مصدرها مختلف
+# (spa5k/tafsir_api عبر tools/fetch_extra_tafsirs.py) — ملف مسطّح جاهز
+# أصلاً {surah, ayah, text} بلا غلاف {"quran": [...]}، فيحتاج تحميلاً منفصلاً
+# لا `_load` أعلاه (خاصة بصيغة fawazahmed0 {"quran": [{chapter, verse, text}]}).
+_EXTRA_TAFSIRS = [
+    ("muyassar", "tafsir_muyassar.json"),
+    ("saadi", "tafsir_saadi.json"),
+    ("ibnkathir", "tafsir_ibnkathir.json"),
+]
+
+
+def _load_flat(path: Path) -> list[dict]:
+    if not path.exists():
+        sys.exit(f"خطأ: الملف الخام غير موجود: {path}")
+    with path.open(encoding="utf-8") as f:
+        rows = json.load(f)
+    if len(rows) != EXPECTED_AYAHS:
+        sys.exit(f"فشل التحقق: {path.name} فيه {len(rows)} سطر != {EXPECTED_AYAHS}")
+    return rows
+
+
 def merge_texts(
     conn: sqlite3.Connection,
     raw_dir: Path,
@@ -73,6 +94,25 @@ def merge_texts(
             (tafsir_id, ayah_id, "jalalayn", text),
         )
 
+    for edition_key, filename in _EXTRA_TAFSIRS:
+        rows = _load_flat(raw_dir / filename)
+        for row in rows:
+            key = (row["surah"], row["ayah"])
+            ayah_id = ayah_id_by_key.get(key)
+            if ayah_id is None:
+                sys.exit(f"فشل التحقق: تفسير {edition_key} يحوي آية غير موجودة {key}")
+            text = row["text"].strip()
+            if not text:
+                sys.exit(f"فشل التحقق: نص تفسير {edition_key} فارغ للآية {key}")
+            tafsir_id += 1
+            conn.execute(
+                "INSERT INTO tafsirs (id, ayah_id, edition, text) VALUES (?,?,?,?)",
+                (tafsir_id, ayah_id, edition_key, text),
+            )
+        (count,) = conn.execute("SELECT COUNT(*) FROM tafsirs WHERE edition=?", (edition_key,)).fetchone()
+        if count != EXPECTED_AYAHS:
+            sys.exit(f"فشل التحقق: تفسير {edition_key} أدرج {count} صف != {EXPECTED_AYAHS}")
+
     translation_id = 0
     for row in translation_rows:
         key = (row["chapter"], row["verse"])
@@ -88,10 +128,15 @@ def merge_texts(
             (translation_id, ayah_id, "en_sahih", "en", text),
         )
 
+    # ٤ إصدارات تفسير الآن (جلالين + الميسر + السعدي + ابن كثير) — المتوقّع
+    # الإجمالي ٤×EXPECTED_AYAHS، لا EXPECTED_AYAHS وحدها (كانت صحيحة أيام
+    # إصدار وحيد فقط). التحقّق لكل إصدار على حدة يحصل أصلاً بحلقة
+    # `_EXTRA_TAFSIRS` أعلاه؛ هذا فقط تحقّق إجمالي أخير.
+    tafsir_editions = 1 + len(_EXTRA_TAFSIRS)  # jalalayn + الثلاثة الإضافية
     (tafsir_count,) = conn.execute("SELECT COUNT(*) FROM tafsirs").fetchone()
     (translation_count,) = conn.execute("SELECT COUNT(*) FROM translations").fetchone()
-    if tafsir_count != EXPECTED_AYAHS or translation_count != EXPECTED_AYAHS:
+    if tafsir_count != EXPECTED_AYAHS * tafsir_editions or translation_count != EXPECTED_AYAHS:
         sys.exit(
             f"فشل التحقق النهائي: تفسير={tafsir_count} ترجمة={translation_count} "
-            f"(المتوقّع {EXPECTED_AYAHS} لكل منهما)"
+            f"(المتوقّع {EXPECTED_AYAHS * tafsir_editions} تفسير و{EXPECTED_AYAHS} ترجمة)"
         )

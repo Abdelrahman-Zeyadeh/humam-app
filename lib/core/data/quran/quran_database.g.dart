@@ -1741,6 +1741,17 @@ class $WordsTable extends Words with TableInfo<$WordsTable, Word> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _glyphV1Meta = const VerificationMeta(
+    'glyphV1',
+  );
+  @override
+  late final GeneratedColumn<String> glyphV1 = GeneratedColumn<String>(
+    'glyph_v1',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _charTypeMeta = const VerificationMeta(
     'charType',
   );
@@ -1760,6 +1771,7 @@ class $WordsTable extends Words with TableInfo<$WordsTable, Word> {
     page,
     lineNo,
     glyph,
+    glyphV1,
     charType,
   ];
   @override
@@ -1817,6 +1829,12 @@ class $WordsTable extends Words with TableInfo<$WordsTable, Word> {
     } else if (isInserting) {
       context.missing(_glyphMeta);
     }
+    if (data.containsKey('glyph_v1')) {
+      context.handle(
+        _glyphV1Meta,
+        glyphV1.isAcceptableOrUnknown(data['glyph_v1']!, _glyphV1Meta),
+      );
+    }
     if (data.containsKey('char_type')) {
       context.handle(
         _charTypeMeta,
@@ -1858,6 +1876,10 @@ class $WordsTable extends Words with TableInfo<$WordsTable, Word> {
         DriftSqlType.string,
         data['${effectivePrefix}glyph'],
       )!,
+      glyphV1: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}glyph_v1'],
+      ),
       charType: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}char_type'],
@@ -1878,6 +1900,7 @@ class Word extends DataClass implements Insertable<Word> {
   final int page;
   final int lineNo;
   final String glyph;
+  final String? glyphV1;
   final String charType;
   const Word({
     required this.id,
@@ -1886,6 +1909,7 @@ class Word extends DataClass implements Insertable<Word> {
     required this.page,
     required this.lineNo,
     required this.glyph,
+    this.glyphV1,
     required this.charType,
   });
   @override
@@ -1897,6 +1921,9 @@ class Word extends DataClass implements Insertable<Word> {
     map['page'] = Variable<int>(page);
     map['line_no'] = Variable<int>(lineNo);
     map['glyph'] = Variable<String>(glyph);
+    if (!nullToAbsent || glyphV1 != null) {
+      map['glyph_v1'] = Variable<String>(glyphV1);
+    }
     map['char_type'] = Variable<String>(charType);
     return map;
   }
@@ -1909,6 +1936,9 @@ class Word extends DataClass implements Insertable<Word> {
       page: Value(page),
       lineNo: Value(lineNo),
       glyph: Value(glyph),
+      glyphV1: glyphV1 == null && nullToAbsent
+          ? const Value.absent()
+          : Value(glyphV1),
       charType: Value(charType),
     );
   }
@@ -1925,6 +1955,7 @@ class Word extends DataClass implements Insertable<Word> {
       page: serializer.fromJson<int>(json['page']),
       lineNo: serializer.fromJson<int>(json['lineNo']),
       glyph: serializer.fromJson<String>(json['glyph']),
+      glyphV1: serializer.fromJson<String?>(json['glyphV1']),
       charType: serializer.fromJson<String>(json['charType']),
     );
   }
@@ -1938,6 +1969,7 @@ class Word extends DataClass implements Insertable<Word> {
       'page': serializer.toJson<int>(page),
       'lineNo': serializer.toJson<int>(lineNo),
       'glyph': serializer.toJson<String>(glyph),
+      'glyphV1': serializer.toJson<String?>(glyphV1),
       'charType': serializer.toJson<String>(charType),
     };
   }
@@ -1949,6 +1981,7 @@ class Word extends DataClass implements Insertable<Word> {
     int? page,
     int? lineNo,
     String? glyph,
+    Value<String?> glyphV1 = const Value.absent(),
     String? charType,
   }) => Word(
     id: id ?? this.id,
@@ -1957,6 +1990,7 @@ class Word extends DataClass implements Insertable<Word> {
     page: page ?? this.page,
     lineNo: lineNo ?? this.lineNo,
     glyph: glyph ?? this.glyph,
+    glyphV1: glyphV1.present ? glyphV1.value : this.glyphV1,
     charType: charType ?? this.charType,
   );
   Word copyWithCompanion(WordsCompanion data) {
@@ -1967,6 +2001,7 @@ class Word extends DataClass implements Insertable<Word> {
       page: data.page.present ? data.page.value : this.page,
       lineNo: data.lineNo.present ? data.lineNo.value : this.lineNo,
       glyph: data.glyph.present ? data.glyph.value : this.glyph,
+      glyphV1: data.glyphV1.present ? data.glyphV1.value : this.glyphV1,
       charType: data.charType.present ? data.charType.value : this.charType,
     );
   }
@@ -1980,6 +2015,7 @@ class Word extends DataClass implements Insertable<Word> {
           ..write('page: $page, ')
           ..write('lineNo: $lineNo, ')
           ..write('glyph: $glyph, ')
+          ..write('glyphV1: $glyphV1, ')
           ..write('charType: $charType')
           ..write(')'))
         .toString();
@@ -1987,7 +2023,7 @@ class Word extends DataClass implements Insertable<Word> {
 
   @override
   int get hashCode =>
-      Object.hash(id, ayahId, position, page, lineNo, glyph, charType);
+      Object.hash(id, ayahId, position, page, lineNo, glyph, glyphV1, charType);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1998,6 +2034,7 @@ class Word extends DataClass implements Insertable<Word> {
           other.page == this.page &&
           other.lineNo == this.lineNo &&
           other.glyph == this.glyph &&
+          other.glyphV1 == this.glyphV1 &&
           other.charType == this.charType);
 }
 
@@ -2008,6 +2045,7 @@ class WordsCompanion extends UpdateCompanion<Word> {
   final Value<int> page;
   final Value<int> lineNo;
   final Value<String> glyph;
+  final Value<String?> glyphV1;
   final Value<String> charType;
   const WordsCompanion({
     this.id = const Value.absent(),
@@ -2016,6 +2054,7 @@ class WordsCompanion extends UpdateCompanion<Word> {
     this.page = const Value.absent(),
     this.lineNo = const Value.absent(),
     this.glyph = const Value.absent(),
+    this.glyphV1 = const Value.absent(),
     this.charType = const Value.absent(),
   });
   WordsCompanion.insert({
@@ -2025,6 +2064,7 @@ class WordsCompanion extends UpdateCompanion<Word> {
     required int page,
     required int lineNo,
     required String glyph,
+    this.glyphV1 = const Value.absent(),
     required String charType,
   }) : ayahId = Value(ayahId),
        position = Value(position),
@@ -2039,6 +2079,7 @@ class WordsCompanion extends UpdateCompanion<Word> {
     Expression<int>? page,
     Expression<int>? lineNo,
     Expression<String>? glyph,
+    Expression<String>? glyphV1,
     Expression<String>? charType,
   }) {
     return RawValuesInsertable({
@@ -2048,6 +2089,7 @@ class WordsCompanion extends UpdateCompanion<Word> {
       if (page != null) 'page': page,
       if (lineNo != null) 'line_no': lineNo,
       if (glyph != null) 'glyph': glyph,
+      if (glyphV1 != null) 'glyph_v1': glyphV1,
       if (charType != null) 'char_type': charType,
     });
   }
@@ -2059,6 +2101,7 @@ class WordsCompanion extends UpdateCompanion<Word> {
     Value<int>? page,
     Value<int>? lineNo,
     Value<String>? glyph,
+    Value<String?>? glyphV1,
     Value<String>? charType,
   }) {
     return WordsCompanion(
@@ -2068,6 +2111,7 @@ class WordsCompanion extends UpdateCompanion<Word> {
       page: page ?? this.page,
       lineNo: lineNo ?? this.lineNo,
       glyph: glyph ?? this.glyph,
+      glyphV1: glyphV1 ?? this.glyphV1,
       charType: charType ?? this.charType,
     );
   }
@@ -2093,6 +2137,9 @@ class WordsCompanion extends UpdateCompanion<Word> {
     if (glyph.present) {
       map['glyph'] = Variable<String>(glyph.value);
     }
+    if (glyphV1.present) {
+      map['glyph_v1'] = Variable<String>(glyphV1.value);
+    }
     if (charType.present) {
       map['char_type'] = Variable<String>(charType.value);
     }
@@ -2108,6 +2155,7 @@ class WordsCompanion extends UpdateCompanion<Word> {
           ..write('page: $page, ')
           ..write('lineNo: $lineNo, ')
           ..write('glyph: $glyph, ')
+          ..write('glyphV1: $glyphV1, ')
           ..write('charType: $charType')
           ..write(')'))
         .toString();
@@ -2741,6 +2789,291 @@ class TranslationsCompanion extends UpdateCompanion<Translation> {
   }
 }
 
+class $MutashabihatTable extends Mutashabihat
+    with TableInfo<$MutashabihatTable, MutashabihatData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MutashabihatTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ayahIdMeta = const VerificationMeta('ayahId');
+  @override
+  late final GeneratedColumn<int> ayahId = GeneratedColumn<int>(
+    'ayah_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _similarAyahIdMeta = const VerificationMeta(
+    'similarAyahId',
+  );
+  @override
+  late final GeneratedColumn<int> similarAyahId = GeneratedColumn<int>(
+    'similar_ayah_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _matchWordsRangeMeta = const VerificationMeta(
+    'matchWordsRange',
+  );
+  @override
+  late final GeneratedColumn<String> matchWordsRange = GeneratedColumn<String>(
+    'match_words_range',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    ayahId,
+    similarAyahId,
+    matchWordsRange,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'mutashabihat';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MutashabihatData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('ayah_id')) {
+      context.handle(
+        _ayahIdMeta,
+        ayahId.isAcceptableOrUnknown(data['ayah_id']!, _ayahIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_ayahIdMeta);
+    }
+    if (data.containsKey('similar_ayah_id')) {
+      context.handle(
+        _similarAyahIdMeta,
+        similarAyahId.isAcceptableOrUnknown(
+          data['similar_ayah_id']!,
+          _similarAyahIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_similarAyahIdMeta);
+    }
+    if (data.containsKey('match_words_range')) {
+      context.handle(
+        _matchWordsRangeMeta,
+        matchWordsRange.isAcceptableOrUnknown(
+          data['match_words_range']!,
+          _matchWordsRangeMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => const {};
+  @override
+  MutashabihatData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MutashabihatData(
+      ayahId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}ayah_id'],
+      )!,
+      similarAyahId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}similar_ayah_id'],
+      )!,
+      matchWordsRange: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}match_words_range'],
+      ),
+    );
+  }
+
+  @override
+  $MutashabihatTable createAlias(String alias) {
+    return $MutashabihatTable(attachedDatabase, alias);
+  }
+}
+
+class MutashabihatData extends DataClass
+    implements Insertable<MutashabihatData> {
+  final int ayahId;
+  final int similarAyahId;
+  final String? matchWordsRange;
+  const MutashabihatData({
+    required this.ayahId,
+    required this.similarAyahId,
+    this.matchWordsRange,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['ayah_id'] = Variable<int>(ayahId);
+    map['similar_ayah_id'] = Variable<int>(similarAyahId);
+    if (!nullToAbsent || matchWordsRange != null) {
+      map['match_words_range'] = Variable<String>(matchWordsRange);
+    }
+    return map;
+  }
+
+  MutashabihatCompanion toCompanion(bool nullToAbsent) {
+    return MutashabihatCompanion(
+      ayahId: Value(ayahId),
+      similarAyahId: Value(similarAyahId),
+      matchWordsRange: matchWordsRange == null && nullToAbsent
+          ? const Value.absent()
+          : Value(matchWordsRange),
+    );
+  }
+
+  factory MutashabihatData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MutashabihatData(
+      ayahId: serializer.fromJson<int>(json['ayahId']),
+      similarAyahId: serializer.fromJson<int>(json['similarAyahId']),
+      matchWordsRange: serializer.fromJson<String?>(json['matchWordsRange']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ayahId': serializer.toJson<int>(ayahId),
+      'similarAyahId': serializer.toJson<int>(similarAyahId),
+      'matchWordsRange': serializer.toJson<String?>(matchWordsRange),
+    };
+  }
+
+  MutashabihatData copyWith({
+    int? ayahId,
+    int? similarAyahId,
+    Value<String?> matchWordsRange = const Value.absent(),
+  }) => MutashabihatData(
+    ayahId: ayahId ?? this.ayahId,
+    similarAyahId: similarAyahId ?? this.similarAyahId,
+    matchWordsRange: matchWordsRange.present
+        ? matchWordsRange.value
+        : this.matchWordsRange,
+  );
+  MutashabihatData copyWithCompanion(MutashabihatCompanion data) {
+    return MutashabihatData(
+      ayahId: data.ayahId.present ? data.ayahId.value : this.ayahId,
+      similarAyahId: data.similarAyahId.present
+          ? data.similarAyahId.value
+          : this.similarAyahId,
+      matchWordsRange: data.matchWordsRange.present
+          ? data.matchWordsRange.value
+          : this.matchWordsRange,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MutashabihatData(')
+          ..write('ayahId: $ayahId, ')
+          ..write('similarAyahId: $similarAyahId, ')
+          ..write('matchWordsRange: $matchWordsRange')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(ayahId, similarAyahId, matchWordsRange);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MutashabihatData &&
+          other.ayahId == this.ayahId &&
+          other.similarAyahId == this.similarAyahId &&
+          other.matchWordsRange == this.matchWordsRange);
+}
+
+class MutashabihatCompanion extends UpdateCompanion<MutashabihatData> {
+  final Value<int> ayahId;
+  final Value<int> similarAyahId;
+  final Value<String?> matchWordsRange;
+  final Value<int> rowid;
+  const MutashabihatCompanion({
+    this.ayahId = const Value.absent(),
+    this.similarAyahId = const Value.absent(),
+    this.matchWordsRange = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  MutashabihatCompanion.insert({
+    required int ayahId,
+    required int similarAyahId,
+    this.matchWordsRange = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : ayahId = Value(ayahId),
+       similarAyahId = Value(similarAyahId);
+  static Insertable<MutashabihatData> custom({
+    Expression<int>? ayahId,
+    Expression<int>? similarAyahId,
+    Expression<String>? matchWordsRange,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (ayahId != null) 'ayah_id': ayahId,
+      if (similarAyahId != null) 'similar_ayah_id': similarAyahId,
+      if (matchWordsRange != null) 'match_words_range': matchWordsRange,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  MutashabihatCompanion copyWith({
+    Value<int>? ayahId,
+    Value<int>? similarAyahId,
+    Value<String?>? matchWordsRange,
+    Value<int>? rowid,
+  }) {
+    return MutashabihatCompanion(
+      ayahId: ayahId ?? this.ayahId,
+      similarAyahId: similarAyahId ?? this.similarAyahId,
+      matchWordsRange: matchWordsRange ?? this.matchWordsRange,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ayahId.present) {
+      map['ayah_id'] = Variable<int>(ayahId.value);
+    }
+    if (similarAyahId.present) {
+      map['similar_ayah_id'] = Variable<int>(similarAyahId.value);
+    }
+    if (matchWordsRange.present) {
+      map['match_words_range'] = Variable<String>(matchWordsRange.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MutashabihatCompanion(')
+          ..write('ayahId: $ayahId, ')
+          ..write('similarAyahId: $similarAyahId, ')
+          ..write('matchWordsRange: $matchWordsRange, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$QuranDatabase extends GeneratedDatabase {
   _$QuranDatabase(QueryExecutor e) : super(e);
   $QuranDatabaseManager get managers => $QuranDatabaseManager(this);
@@ -2750,6 +3083,7 @@ abstract class _$QuranDatabase extends GeneratedDatabase {
   late final $WordsTable words = $WordsTable(this);
   late final $TafsirsTable tafsirs = $TafsirsTable(this);
   late final $TranslationsTable translations = $TranslationsTable(this);
+  late final $MutashabihatTable mutashabihat = $MutashabihatTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2761,6 +3095,7 @@ abstract class _$QuranDatabase extends GeneratedDatabase {
     words,
     tafsirs,
     translations,
+    mutashabihat,
   ];
 }
 
@@ -3591,6 +3926,7 @@ typedef $$WordsTableCreateCompanionBuilder =
       required int page,
       required int lineNo,
       required String glyph,
+      Value<String?> glyphV1,
       required String charType,
     });
 typedef $$WordsTableUpdateCompanionBuilder =
@@ -3601,6 +3937,7 @@ typedef $$WordsTableUpdateCompanionBuilder =
       Value<int> page,
       Value<int> lineNo,
       Value<String> glyph,
+      Value<String?> glyphV1,
       Value<String> charType,
     });
 
@@ -3640,6 +3977,11 @@ class $$WordsTableFilterComposer
 
   ColumnFilters<String> get glyph => $composableBuilder(
     column: $table.glyph,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get glyphV1 => $composableBuilder(
+    column: $table.glyphV1,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3688,6 +4030,11 @@ class $$WordsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get glyphV1 => $composableBuilder(
+    column: $table.glyphV1,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get charType => $composableBuilder(
     column: $table.charType,
     builder: (column) => ColumnOrderings(column),
@@ -3720,6 +4067,9 @@ class $$WordsTableAnnotationComposer
 
   GeneratedColumn<String> get glyph =>
       $composableBuilder(column: $table.glyph, builder: (column) => column);
+
+  GeneratedColumn<String> get glyphV1 =>
+      $composableBuilder(column: $table.glyphV1, builder: (column) => column);
 
   GeneratedColumn<String> get charType =>
       $composableBuilder(column: $table.charType, builder: (column) => column);
@@ -3759,6 +4109,7 @@ class $$WordsTableTableManager
                 Value<int> page = const Value.absent(),
                 Value<int> lineNo = const Value.absent(),
                 Value<String> glyph = const Value.absent(),
+                Value<String?> glyphV1 = const Value.absent(),
                 Value<String> charType = const Value.absent(),
               }) => WordsCompanion(
                 id: id,
@@ -3767,6 +4118,7 @@ class $$WordsTableTableManager
                 page: page,
                 lineNo: lineNo,
                 glyph: glyph,
+                glyphV1: glyphV1,
                 charType: charType,
               ),
           createCompanionCallback:
@@ -3777,6 +4129,7 @@ class $$WordsTableTableManager
                 required int page,
                 required int lineNo,
                 required String glyph,
+                Value<String?> glyphV1 = const Value.absent(),
                 required String charType,
               }) => WordsCompanion.insert(
                 id: id,
@@ -3785,6 +4138,7 @@ class $$WordsTableTableManager
                 page: page,
                 lineNo: lineNo,
                 glyph: glyph,
+                glyphV1: glyphV1,
                 charType: charType,
               ),
           withReferenceMapper: (p0) => p0
@@ -4172,6 +4526,176 @@ typedef $$TranslationsTableProcessedTableManager =
       Translation,
       PrefetchHooks Function()
     >;
+typedef $$MutashabihatTableCreateCompanionBuilder =
+    MutashabihatCompanion Function({
+      required int ayahId,
+      required int similarAyahId,
+      Value<String?> matchWordsRange,
+      Value<int> rowid,
+    });
+typedef $$MutashabihatTableUpdateCompanionBuilder =
+    MutashabihatCompanion Function({
+      Value<int> ayahId,
+      Value<int> similarAyahId,
+      Value<String?> matchWordsRange,
+      Value<int> rowid,
+    });
+
+class $$MutashabihatTableFilterComposer
+    extends Composer<_$QuranDatabase, $MutashabihatTable> {
+  $$MutashabihatTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get ayahId => $composableBuilder(
+    column: $table.ayahId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get similarAyahId => $composableBuilder(
+    column: $table.similarAyahId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get matchWordsRange => $composableBuilder(
+    column: $table.matchWordsRange,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$MutashabihatTableOrderingComposer
+    extends Composer<_$QuranDatabase, $MutashabihatTable> {
+  $$MutashabihatTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get ayahId => $composableBuilder(
+    column: $table.ayahId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get similarAyahId => $composableBuilder(
+    column: $table.similarAyahId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get matchWordsRange => $composableBuilder(
+    column: $table.matchWordsRange,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$MutashabihatTableAnnotationComposer
+    extends Composer<_$QuranDatabase, $MutashabihatTable> {
+  $$MutashabihatTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get ayahId =>
+      $composableBuilder(column: $table.ayahId, builder: (column) => column);
+
+  GeneratedColumn<int> get similarAyahId => $composableBuilder(
+    column: $table.similarAyahId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get matchWordsRange => $composableBuilder(
+    column: $table.matchWordsRange,
+    builder: (column) => column,
+  );
+}
+
+class $$MutashabihatTableTableManager
+    extends
+        RootTableManager<
+          _$QuranDatabase,
+          $MutashabihatTable,
+          MutashabihatData,
+          $$MutashabihatTableFilterComposer,
+          $$MutashabihatTableOrderingComposer,
+          $$MutashabihatTableAnnotationComposer,
+          $$MutashabihatTableCreateCompanionBuilder,
+          $$MutashabihatTableUpdateCompanionBuilder,
+          (
+            MutashabihatData,
+            BaseReferences<
+              _$QuranDatabase,
+              $MutashabihatTable,
+              MutashabihatData
+            >,
+          ),
+          MutashabihatData,
+          PrefetchHooks Function()
+        > {
+  $$MutashabihatTableTableManager(_$QuranDatabase db, $MutashabihatTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MutashabihatTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MutashabihatTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$MutashabihatTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> ayahId = const Value.absent(),
+                Value<int> similarAyahId = const Value.absent(),
+                Value<String?> matchWordsRange = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => MutashabihatCompanion(
+                ayahId: ayahId,
+                similarAyahId: similarAyahId,
+                matchWordsRange: matchWordsRange,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required int ayahId,
+                required int similarAyahId,
+                Value<String?> matchWordsRange = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => MutashabihatCompanion.insert(
+                ayahId: ayahId,
+                similarAyahId: similarAyahId,
+                matchWordsRange: matchWordsRange,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$MutashabihatTableProcessedTableManager =
+    ProcessedTableManager<
+      _$QuranDatabase,
+      $MutashabihatTable,
+      MutashabihatData,
+      $$MutashabihatTableFilterComposer,
+      $$MutashabihatTableOrderingComposer,
+      $$MutashabihatTableAnnotationComposer,
+      $$MutashabihatTableCreateCompanionBuilder,
+      $$MutashabihatTableUpdateCompanionBuilder,
+      (
+        MutashabihatData,
+        BaseReferences<_$QuranDatabase, $MutashabihatTable, MutashabihatData>,
+      ),
+      MutashabihatData,
+      PrefetchHooks Function()
+    >;
 
 class $QuranDatabaseManager {
   final _$QuranDatabase _db;
@@ -4188,4 +4712,6 @@ class $QuranDatabaseManager {
       $$TafsirsTableTableManager(_db, _db.tafsirs);
   $$TranslationsTableTableManager get translations =>
       $$TranslationsTableTableManager(_db, _db.translations);
+  $$MutashabihatTableTableManager get mutashabihat =>
+      $$MutashabihatTableTableManager(_db, _db.mutashabihat);
 }

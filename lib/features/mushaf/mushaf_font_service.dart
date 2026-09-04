@@ -4,55 +4,66 @@ import 'package:flutter/services.dart' show FontLoader, rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'font_download_service.dart';
+import 'mushaf_settings.dart' show MushafFontEdition, mushafFontEditionProvider;
 
-/// يُرمى عند طلب خط صفحة غير مُضمَّنة **ولا محمَّلة محلياً بعد** (الصفحات
-/// ١-٥٠ مضمَّنة أصلاً، ٥١-٦٠٤ تحتاج تنزيلاً — راجع `FontDownloadController`).
+/// يُرمى عند طلب خط صفحة غير مُضمَّنة **ولا محمَّلة محلياً بعد**
 class PageFontNotBundledException implements Exception {
-  PageFontNotBundledException(this.page);
+  PageFontNotBundledException(this.page, [this.edition = MushafFontEdition.v2]);
   final int page;
+  final MushafFontEdition edition;
 
   @override
-  String toString() => 'خط الصفحة $page غير متوفّر بعد — يحتاج تنزيلاً';
+  String toString() => 'خط الصفحة $page (${edition.name}) غير متوفّر بعد — يحتاج تنزيلاً';
 }
 
-/// تحميل خطوط QCF V2 الديناميكية (خط منفصل لكل صفحة، glyph-per-page)
-/// وتسجيلها كعائلة خط بمعرّف فريد لكل صفحة. يُخزَّن ما حُمِّل فعلاً بذاكرة
-/// الجلسة لتفادي إعادة القراءة والتسجيل — لا حدّ أقصى بعد لأن أول ٥٠ صفحة
-/// فقط مضمَّنة أصلاً؛ نافذة LRU الفعلية (تفريغ الأبعد) مرحلة أداء لاحقة.
-///
-/// يجرّب أولاً الـ asset المضمَّن (١-٥٠)، ثم ملف مُنزَّل محلياً (٥١-٦٠٤ لو
-/// المستخدم نزّله عبر `FontDownloadController`)، وإلا يرمي الاستثناء أعلاه.
+/// تحميل خطوط QCF (خط منفصل لكل صفحة، glyph-per-page) لطبعتي V1 و V2
+/// وتسجيلها كعائلة خط بمعرّف فريد لكل صفحة وطبعة.
 class MushafFontService {
   MushafFontService(this._downloads);
   final FontDownloadController _downloads;
 
-  final Set<int> _loaded = {};
+  final Set<String> _loaded = {};
 
-  String familyFor(int page) => 'QCF_P$page';
+  String familyFor(int page, [MushafFontEdition edition = MushafFontEdition.v2]) =>
+      edition == MushafFontEdition.v1 ? 'QCF_V1_P$page' : 'QCF_P$page';
 
-  Future<String> ensureLoaded(int page) async {
-    final family = familyFor(page);
-    if (_loaded.contains(page)) return family;
+  Future<String> ensureLoaded(int page, [MushafFontEdition edition = MushafFontEdition.v2]) async {
+    final family = familyFor(page, edition);
+    if (_loaded.contains(family)) return family;
 
-    try {
-      final loader = FontLoader(family)
-        ..addFont(rootBundle.load('assets/quran/fonts/pages/p$page.ttf'));
-      await loader.load();
-      _loaded.add(page);
-      return family;
-    } catch (_) {
-      // rootBundle.load ترمي عند غياب الـ asset — طبيعي لصفحات ٥١+.
+    // لـ V2: تجربة الـ asset المضمّن (صفحات 1-50) أولاً
+    if (edition == MushafFontEdition.v2) {
+      try {
+        final loader = FontLoader(family)
+          ..addFont(rootBundle.load('assets/quran/fonts/pages/p$page.ttf'));
+        await loader.load();
+        _loaded.add(family);
+        return family;
+      } catch (_) {
+        // غياب الـ asset طبيعي لصفحات 51+
+      }
     }
 
-    final downloadedFile = await _downloads.localFontFile(page);
-    if (await downloadedFile.exists()) {
+    final downloadedFile = await _downloads.localFontFile(page, edition);
+    if (await downloadedFile.exists() && (await downloadedFile.length()) > 0) {
       final loader = FontLoader(family)..addFont(downloadedFile.readAsBytes().then(ByteData.sublistView));
       await loader.load();
-      _loaded.add(page);
+      _loaded.add(family);
       return family;
     }
 
-    throw PageFontNotBundledException(page);
+    // تنزيل فوري إذا كان خط V1 أو خط صفحة مطلوب
+    try {
+      await _downloads.downloadPage(page, edition);
+      if (await downloadedFile.exists() && (await downloadedFile.length()) > 0) {
+        final loader = FontLoader(family)..addFont(downloadedFile.readAsBytes().then(ByteData.sublistView));
+        await loader.load();
+        _loaded.add(family);
+        return family;
+      }
+    } catch (_) {}
+
+    throw PageFontNotBundledException(page, edition);
   }
 }
 
@@ -61,5 +72,6 @@ final mushafFontServiceProvider = Provider<MushafFontService>((ref) {
 });
 
 final pageFontFamilyProvider = FutureProvider.family<String, int>((ref, page) {
-  return ref.watch(mushafFontServiceProvider).ensureLoaded(page);
+  final edition = ref.watch(mushafFontEditionProvider);
+  return ref.watch(mushafFontServiceProvider).ensureLoaded(page, edition);
 });

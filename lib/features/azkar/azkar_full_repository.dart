@@ -6,7 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// ذكر مفرد ضمن قسم من مكتبة حصن المسلم الكاملة — راجع
 /// `tools/build_azkar_full.py` ومصدره (`asellam/HisnElMuslim`، رخصة MIT).
 class AzkarLibraryItem {
-  const AzkarLibraryItem({required this.text, required this.count, this.reference});
+  const AzkarLibraryItem({
+    required this.text,
+    required this.count,
+    this.reference,
+  });
 
   factory AzkarLibraryItem.fromJson(Map<String, dynamic> json) {
     return AzkarLibraryItem(
@@ -25,7 +29,11 @@ class AzkarLibraryItem {
 /// بشاشة `AzkarScreen` المخصّصة أصلاً). `id` مستقر عبر إعادة البناء
 /// (فهرس القسم بالملف الخام الأصلي)، يُستخدم مفتاحاً لتتبّع تقدّم العدّ.
 class AzkarLibraryCategory {
-  const AzkarLibraryCategory({required this.id, required this.title, required this.items});
+  const AzkarLibraryCategory({
+    required this.id,
+    required this.title,
+    required this.items,
+  });
 
   factory AzkarLibraryCategory.fromJson(Map<String, dynamic> json) {
     return AzkarLibraryCategory(
@@ -44,10 +52,14 @@ class AzkarLibraryCategory {
 
 /// مكتبة أذكار حصن المسلم الكاملة (١٣١ قسماً غير أذكار الصباح/المساء) —
 /// راجع `tools/raw/README.md` لمصدرها ورخصتها.
-final azkarLibraryProvider = FutureProvider<List<AzkarLibraryCategory>>((ref) async {
+final azkarLibraryProvider = FutureProvider<List<AzkarLibraryCategory>>((
+  ref,
+) async {
   final raw = await rootBundle.loadString('assets/azkar/azkar_categories.json');
   final list = jsonDecode(raw) as List<dynamic>;
-  return list.map((e) => AzkarLibraryCategory.fromJson(e as Map<String, dynamic>)).toList();
+  return list
+      .map((e) => AzkarLibraryCategory.fromJson(e as Map<String, dynamic>))
+      .toList();
 });
 
 /// أذكار النوم تحديداً (القسم `id == 28` — "أَذْكَارُ النَّوْمِ"، ١٥ ذكراً —

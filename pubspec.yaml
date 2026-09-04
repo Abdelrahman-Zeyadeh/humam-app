@@ -43,18 +43,27 @@ dependencies:
   path: ^1.9.1
   shared_preferences: ^2.5.3
   share_plus: ^13.3.0
+  url_launcher: ^6.3.1
+  html: ^0.15.6 # تحليل صفحة نتائج بحث دُرر السنية محلياً — راجع hadith_verification/services/dorar_search_service.dart
+  webview_flutter: ^4.10.0 # جلب صفحة دُرر السنية عبر محرك متصفح حقيقي (WebView) — راجع dorar_webview_fetcher.dart لسبب الحاجة إليه بدل Dio مباشرة
   just_audio: ^0.10.6
   just_audio_windows: ^0.2.3 # مطلوب فقط لبناء Windows (اختبار مكتبي) — أندرويد/iOS يشتغلان بلا هذا
   audio_service: ^0.18.19 # لا يدعم Windows — تفعيله مشروط بالمنصّة، راجع main.dart
   adhan_dart: ^2.0.1 # حساب مواقيت الصلاة محلياً بلا إنترنت
-  dio: ^5.11.0 # مدير تنزيل خطوط الصفحات ٥١-٦٠٤ (استئناف بـ HTTP Range)
+  dio: ^5.11.0 # تنزيل خطوط الصفحات/الصوت/التفاسير — استئناف حقيقي بـ HTTP Range عبر core/data/download_helper.dart
   geolocator: ^14.0.3 # موقع GPS اختياري — يحتاج إذن نظام، راجع prayer_screen.dart
   flutter_compass: ^0.8.1 # اتجاه البوصلة لشاشة القبلة
   hijri: ^3.0.1 # تاريخ هجري محلي (جدولي أم القرى) بلا إنترنت — BSD-2-Clause
   flutter_local_notifications: ^22.3.0
   timezone: ^0.11.1
   flutter_timezone: ^5.1.0
-
+  home_widget: ^0.9.3 # ويدجت الشاشة الرئيسية (آية الفترة + الصلاة القادمة)
+  file_picker: ^12.0.0 # اختيار ملف نسخة احتياطية (استعادة) — راجع backup_service.dart
+  firebase_core: ^4.13.0
+  cloud_firestore: ^6.8.0
+  firebase_auth: ^6.5.7
+  google_sign_in: ^7.2.0
+  image: ^4.5.4 # تصغير/ضغط صورة الملف الشخصي محلياً قبل رفعها لـ Firestore (بلا Storage) — Dart خالص، يعمل على كل المنصّات
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -68,6 +77,7 @@ dev_dependencies:
   drift_dev: ^2.34.5
   build_runner: ^2.16.0
   flutter_launcher_icons: ^0.14.4
+  path_provider_platform_interface: ^2.1.2 # لتزييف getApplicationDocumentsDirectory باختبارات وحدة — راجع test/mushaf_image_download_test.dart
 
 # أيقونة هُمَام: قوس محراب ذهبي + نجمة ثمانية على خلفية navy (هوية
 # الألوان المعتمدة) — رسم هندسي مولَّد ببرنامج tools/generate_app_icon.py،
@@ -75,10 +85,9 @@ dev_dependencies:
 #   dart run flutter_launcher_icons
 flutter_launcher_icons:
   android: true
-  ios: true
+  ios: false
   image_path: "assets/icon/icon.png"
   min_sdk_android: 21
-  remove_alpha_ios: true  # أبل ترفض قنوات ألفا بأيقونة App Store — خلفيتنا مصمتة أصلاً فلا فقد بصري
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -98,12 +107,26 @@ flutter:
     - assets/azkar/azkar_categories.json
     - assets/hadith/hadith.db
     - assets/hadith/hadith_db_version.txt
+    # صور شخصية حقيقية لبعض علماء/مشايخ قسم "الدروس" (مصدرها ويكيبيديا
+    # العربية wikimedia commons، بطلب صاحب المشروع) — راجع
+    # duroos_screen.dart لخريطة كل مصدر لصورته. الباقي (بلا صورة بعد) يعرض
+    # أيقونة احتياطية تلقائياً.
+    - assets/images/scholars/
     # أول ٥٠ صفحة فقط مضمّنة كـ asset (~١٨ ميجا) — الباقي (٥١-٦٠٤) يُنزَّل
     # عند الطلب عبر FontDownloadService. راجع lib/features/mushaf/
     # font_download_service.dart وlib/core/config/remote_assets_config.dart
     # (رابط الاستضافة لسا placeholder — راجع tools/raw/README.md، قسم
     # "مدير تنزيل الخطوط").
     - assets/quran/fonts/pages/
+    # أصوات أذان مختارة للمعاينة داخل الإعدادات (نفس الملفين مضمَّنين أيضاً
+    # كموارد Android خام بـandroid/app/src/main/res/raw لتشغيلهما كصوت
+    # إشعار فعلي — راجع adhan_notification_service.dart وadhan_voices.dart).
+    - assets/audio/adhan/
+    # أيقونة التطبيق — تُستخدَم أيضاً كشعار شاشة الترحيب (splash_screen.dart)،
+    # لا تكفي وحدها كإعداد flutter_launcher_icons أدناه (ذاك تصنيع أيقونة
+    # النظام وقت البناء فقط، لا يجعلها asset قابلاً للتحميل وقت التشغيل).
+    - assets/icon/icon.png
+    - assets/images/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -128,6 +151,16 @@ flutter:
     - family: Cairo
       fonts:
         - asset: assets/fonts/Cairo-Variable.ttf
+    # خط البسملة أول كل سورة (`mushaf_page_widget.dart`، سطر lineType==
+    # 'basmallah') — SIL OFL 1.1 (راجع assets/fonts/AmiriQuran-OFL.txt)،
+    # نسخة "Amiri Quran" المخصَّصة لنص قرآني (لا Amiri العادي) من مشروع
+    # aliftype/amiri الرسمي. **لا يطابق خط QCF V2 بيكسلياً** (ذاك يحتاج
+    # ملف بسملة مخصّص من QUL نفسها لم يُحسم ترخيصه بعد) — بس خط ناسخي
+    # أنيق مصمَّم أصلاً لمحاكاة طباعة مصحف بولاق القرآنية، أفضل بكثير من
+    # السقوط على Cairo (خط واجهة عادي بلا تصميم قرآني) كحل مؤقت.
+    - family: AmiriQuran
+      fonts:
+        - asset: assets/fonts/AmiriQuran.ttf
 
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package

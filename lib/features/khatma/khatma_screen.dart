@@ -3,13 +3,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/data/user/khatma_prefs.dart';
 import '../../core/data/user/user_prefs.dart';
+import '../../core/theme/app_card.dart';
 import '../../core/theme/app_colors.dart';
 import '../mushaf/mushaf_screen.dart';
+import '../mushaf/mushaf_surah_index_sheet.dart';
 
-/// خطة ختمة بسيطة: يحدّد المستخدم عدد الأيام، ونحسب الورد اليومي والتقدّم
-/// المتوقّع مقارنة بآخر صفحة قرأها فعلياً (`UserPrefs.lastReadPage`).
-/// لا نتتبّع "صفحات اليوم" بجلسة منفصلة بعد — التقدّم تقريبي بمقارنة
-/// الصفحة الحالية بالمتوقّعة، لا سجلّ قراءة يومي حقيقي.
+Color _textSoft(BuildContext c) => Theme.of(c).brightness == Brightness.dark
+    ? AppColors.inkSoftOnDark
+    : AppColors.inkSoft;
+
+/// خطط ختمة: يحدّد المستخدم عدد الأيام أو مقدار القراءة اليومي (بوحدات
+/// المصحف التقليدية)، ونقطة بداية اختيارية (لا صفحة ١ إلزامياً). **أكثر
+/// من خطة بنفس الوقت** (بطلب صاحب المشروع: توحيد سلوك الختمة مع قسم
+/// الحفظ) — راجع توثيق `KhatmaPlan` بـ`user_repository.dart`. تقدّم كل
+/// خطة **مستقل تماماً** عن القراءة العامة (`plan.currentPage`، يُحدَّث
+/// فقط أثناء "تابع القراءة" لهذه الخطة تحديداً — راجع
+/// `MushafScreen.khatmaPracticeMode`).
 class KhatmaScreen extends ConsumerWidget {
   const KhatmaScreen({super.key});
 
@@ -17,64 +26,187 @@ class KhatmaScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(khatmaVersionProvider); // يجبر إعادة البناء بعد bump()
     final khatmaPrefs = ref.watch(khatmaPrefsProvider);
-    final plan = khatmaPrefs.activePlan;
+    final plans = khatmaPrefs.activePlans;
     final userPrefs = ref.watch(userPrefsProvider);
-    final currentPage = userPrefs.lastReadPage ?? 1;
+    final suggestedStartPage = userPrefs.lastReadPage ?? 1;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('خطة الختمة')),
-      body: plan == null
-          ? _StartPlanView(onStart: (days) async {
-              await khatmaPrefs.start(days);
-              ref.read(khatmaVersionProvider.notifier).bump();
-            })
-          : _ActivePlanView(
-              plan: plan,
-              currentPage: currentPage,
-              streakDays: userPrefs.streakDays,
-              onCancel: () async {
-                await khatmaPrefs.cancel();
-                ref.read(khatmaVersionProvider.notifier).bump();
-              },
+      // هيدر بتدرّج كحلي مطابق للوحة التصميم المعتمدة (`Plans.dc.html`) —
+      // بقي `AppBar` عادياً بلا لمس هيكل الجسم (`body`)، فقط زُيِّن بصرياً
+      // (`flexibleSpace` + شكل حواف سفلية دائرية) بدل خلفية بيضاء مسطّحة.
+      appBar: const GradientAppBar(
+        title: 'خطة الختمة',
+        colors: [AppColors.blue, AppColors.navy],
+      ),
+      body: plans.isEmpty
+          ? _StartPlanView(
+              initialStartPage: suggestedStartPage,
+              onStart: (days, startPage) =>
+                  _start(context, ref, days, startPage),
+            )
+          : ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                for (final plan in plans) ...[
+                  _ActivePlanView(
+                    plan: plan,
+                    streakDays: userPrefs.streakDays,
+                    onCancel: () => _confirmCancel(context, ref, plan),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.add),
+                  label: const Text('خطة ختمة جديدة'),
+                  onPressed: () =>
+                      _startNewPlanSheet(context, ref, suggestedStartPage),
+                ),
+              ],
             ),
     );
   }
+
+  Future<void> _start(
+    BuildContext context,
+    WidgetRef ref,
+    int days,
+    int startPage,
+  ) async {
+    await ref.read(khatmaPrefsProvider).start(days, startPage: startPage);
+    ref.read(khatmaVersionProvider.notifier).bump();
+  }
+
+  Future<void> _startNewPlanSheet(
+    BuildContext context,
+    WidgetRef ref,
+    int suggestedStartPage,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+          ),
+          child: _StartPlanView(
+            initialStartPage: suggestedStartPage,
+            onStart: (days, startPage) async {
+              await _start(context, ref, days, startPage);
+              if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmCancel(
+    BuildContext context,
+    WidgetRef ref,
+    KhatmaPlan plan,
+  ) async {
+    // تأكيد قبل الحذف — بلا تراجع، نفس نمط `hifz_screen.dart._confirmDelete`.
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('إلغاء خطة الختمة؟'),
+        content: const Text(
+          'لن يمكن التراجع عن هذا — يمكنك بدء خطة جديدة لاحقاً.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('تراجع'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('إلغاء الخطة'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await ref.read(khatmaPrefsProvider).cancel(plan.id);
+    ref.read(khatmaVersionProvider.notifier).bump();
+  }
 }
 
-/// وحدة قراءة يومية بديلة عن تحديد الأيام مباشرة — عدد الصفحات هون
-/// **متوسط تقريبي** (٦٠٤ صفحة ÷ عدد الوحدات بالمصحف كاملاً: ٣٠ جزء/٦٠
-/// حزب/٢٤٠ ربع، وهذي حقائق هيكلية ثابتة عن المصحف، لا علاقة لها بفجوة
-/// "حدود حزب/ربع لكل آية" المذكورة بـtools/raw/README.md — تلك لتحديد
-/// أين يبدأ كل حزب بالضبط لعرضه بالنص، لا لحساب المدة التقريبية هنا).
-enum _DailyUnit {
-  rub('ربع', 240),
-  hizb('حزب', 60),
-  juz('جزء', 30);
+/// طريقتا تحديد خطة الختمة: كم يوم، أو مقدار القراءة اليومي بوحدات المصحف
+/// التقليدية — بطلب صاحب المشروع: "شيل كم اية ومقدار القراءة خليه مثلا
+/// حزب وربع نص حزب جزء ثلاثة اجزاء وبتحكيله كم صفحة"، ثم "مقدار القراءة
+/// مش هيك ثابت خليه اتحكم فيه ازيد وانقص زي عداد" (شرائح ثابتة أولاً، ثم
+/// طُلب عدّاد +/- بدلها).
+enum _PlanMode { days, unit }
 
-  const _DailyUnit(this.nameAr, this.totalCount);
-  final String nameAr;
-  final int totalCount;
+/// وحدة القياس الذرّية "ربع حزب" (٦٠٤ ÷ ٢٤٠) — العدّاد يتحرّك بخطوات
+/// ربع-حزب، و[_quarterHizbLabel] يترجم أي عدد أرباع لنص عربي مفهوم
+/// (حزب/أحزاب + كسر متبقٍّ). ٢٤٠ ربعاً = المصحف كاملاً كحد أقصى منطقي.
+const double _kQuarterHizbPages = 604 / 240;
+const int _kMaxQuarters = 240;
 
-  double get pagesPerUnit => 604 / totalCount;
+const Map<int, String> _kFractionLabel = {1: 'ربع', 2: 'نصف', 3: 'ثلاثة أرباع'};
+
+/// نص العدد الحالي من الأرباع — مثلاً ٤ → "حزب"، ٦ → "حزب ونصف"،
+/// ٣ → "ثلاثة أرباع حزب"، **وبطلب صاحب المشروع "احكي كم الجزء... بس يصير
+/// حزبان يوضح انه جزء"**: أي مضاعف لـ٨ أرباع (= حزبان = جزء كامل) يُعرَض
+/// بوحدة "جزء" مباشرة بدل "حزبان"/"٤ أحزاب" — ٨ → "جزء"، ١٦ → "جزءان"،
+/// ٢٤ → "٣ أجزاء". غير مضاعفات ٨ (حزب أو ٣ أحزاب مثلاً) تبقى بوحدة الحزب.
+String _quarterHizbLabel(int quarters) {
+  if (quarters % 8 == 0) {
+    final juz = quarters ~/ 8;
+    return switch (juz) {
+      1 => 'جزء',
+      2 => 'جزءان',
+      _ => '$juz أجزاء',
+    };
+  }
+  final hizb = quarters ~/ 4;
+  final rest = quarters % 4;
+  if (hizb == 0) return '${_kFractionLabel[rest]} حزب';
+  final hizbPart = switch (hizb) {
+    1 => 'حزب',
+    2 => 'حزبان',
+    _ => '$hizb أحزاب',
+  };
+  return rest == 0 ? hizbPart : '$hizbPart و${_kFractionLabel[rest]}';
 }
 
 class _StartPlanView extends StatefulWidget {
-  const _StartPlanView({required this.onStart});
-  final ValueChanged<int> onStart;
+  const _StartPlanView({required this.initialStartPage, required this.onStart});
+  final int initialStartPage;
+
+  /// `(days, startPage)`.
+  final void Function(int days, int startPage) onStart;
 
   @override
   State<_StartPlanView> createState() => _StartPlanViewState();
 }
 
 class _StartPlanViewState extends State<_StartPlanView> {
-  bool _byDailyAmount = false;
+  _PlanMode _mode = _PlanMode.days;
   int _days = 30;
-  _DailyUnit _unit = _DailyUnit.hizb;
-  int _unitsPerDay = 1;
+  int _quarters = 4; // افتراضي: حزب واحد يومياً
+  late int _startPage = widget.initialStartPage;
 
-  int get _computedDaysFromDailyAmount {
-    final dailyPages = _unit.pagesPerUnit * _unitsPerDay;
-    return (604 / dailyPages).ceil().clamp(1, 604);
+  /// عدد الصفحات المتبقّية للختمة من نقطة البداية المختارة — ٦٠٤ لو بدأت
+  /// من الصفحة ١.
+  int get _totalPagesToRead => 604 - _startPage + 1;
+
+  double get _unitPages => _quarters * _kQuarterHizbPages;
+
+  int get _computedDays => switch (_mode) {
+    _PlanMode.days => _days,
+    _PlanMode.unit => (_totalPagesToRead / _unitPages).ceil().clamp(1, 604),
+  };
+
+  Future<void> _pickStartPage() async {
+    final page = await MushafSurahIndexSheet.show(
+      context,
+      currentPage: _startPage,
+    );
+    if (page != null && mounted) setState(() => _startPage = page);
   }
 
   @override
@@ -85,86 +217,73 @@ class _StartPlanViewState extends State<_StartPlanView> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.menu_book_outlined, size: 48, color: AppColors.gold),
+            Icon(
+              Icons.menu_book_outlined,
+              size: 48,
+              color: themeAccent(context),
+            ),
             const SizedBox(height: 16),
-            const Text('خطة الختمة', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 16),
-            SegmentedButton<bool>(
-              segments: const [
-                ButtonSegment(value: false, label: Text('بعدد الأيام')),
-                ButtonSegment(value: true, label: Text('بالورد اليومي')),
-              ],
-              selected: {_byDailyAmount},
-              onSelectionChanged: (s) => setState(() => _byDailyAmount = s.first),
+            const Text(
+              'خطة الختمة',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 20),
-            if (!_byDailyAmount) ...[
-              Text('الورد اليومي: ${(604 / _days).ceil()} صفحة', style: const TextStyle(color: AppColors.inkSoft, fontSize: 13)),
-              const SizedBox(height: 12),
-              Slider(
-                value: _days.toDouble(),
-                min: 7,
+            // نقطة البداية — مقترحة تلقائياً من آخر صفحة مقروءة فعلياً،
+            // قابلة للتغيير من فهرس المصحف مباشرة. بطلب صاحب المشروع "ضيف
+            // اقتراح مكان بداية الختمة".
+            OutlinedButton.icon(
+              icon: const Icon(Icons.bookmark_border, size: 18),
+              label: Text(
+                _startPage == widget.initialStartPage
+                    ? 'نقطة البداية: صفحة $_startPage (من حيث توقّفت)'
+                    : 'نقطة البداية: صفحة $_startPage',
+              ),
+              onPressed: _pickStartPage,
+            ),
+            const SizedBox(height: 20),
+            SegmentedButton<_PlanMode>(
+              segments: const [
+                ButtonSegment(value: _PlanMode.days, label: Text('كم يوم')),
+                ButtonSegment(
+                  value: _PlanMode.unit,
+                  label: Text('مقدار القراءة'),
+                ),
+              ],
+              selected: {_mode},
+              onSelectionChanged: (s) => setState(() => _mode = s.first),
+              showSelectedIcon: false,
+            ),
+            const SizedBox(height: 20),
+            switch (_mode) {
+              _PlanMode.days => _PresetStepper(
+                presets: const [7, 14, 30, 60],
+                presetSuffix: 'يوم',
+                value: _days,
+                min: 1,
                 max: 604,
-                divisions: 100,
-                label: '$_days يوماً',
-                onChanged: (v) => setState(() => _days = v.round()),
+                onChanged: (v) => setState(() => _days = v),
+                summary:
+                    'الورد اليومي: ${(_totalPagesToRead / _days).ceil()} صفحة تقريباً',
               ),
-              Wrap(
-                spacing: 8,
-                children: [7, 30, 60, 604].map((d) {
-                  return ChoiceChip(
-                    label: Text(d == 604 ? 'يوم بيوم (604)' : '$d يوماً'),
-                    selected: _days == d,
-                    onSelected: (_) => setState(() => _days = d),
-                  );
-                }).toList(),
+              // بلا شرائح جاهزة هون — بطلب صاحب المشروع "مقدار القراءة...
+              // شيل الثوابت خليه عداد": عدّاد +/- بحت لمقدار القراءة (خلافاً
+              // لوضع "كم يوم" الذي أبقى شرائحه، لم يُشتكَ منها).
+              _PlanMode.unit => _PresetStepper(
+                presets: const [],
+                value: _quarters,
+                min: 1,
+                max: _kMaxQuarters,
+                onChanged: (v) => setState(() => _quarters = v),
+                labelBuilder: _quarterHizbLabel,
+                summary:
+                    'كل يوم ~${_unitPages.toStringAsFixed(1)} صفحة — ختمة كل ~$_computedDays يوماً',
               ),
-              const SizedBox(height: 24),
-              FilledButton(onPressed: () => widget.onStart(_days), child: const Text('ابدأ الختمة')),
-            ] else ...[
-              Wrap(
-                spacing: 8,
-                children: _DailyUnit.values.map((u) {
-                  return ChoiceChip(
-                    label: Text(u.nameAr),
-                    selected: _unit == u,
-                    onSelected: (_) => setState(() => _unit = u),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.remove_circle_outline),
-                    onPressed: _unitsPerDay > 1 ? () => setState(() => _unitsPerDay--) : null,
-                  ),
-                  Text('$_unitsPerDay ${_unit.nameAr} / يوم', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                  IconButton(
-                    icon: const Icon(Icons.add_circle_outline),
-                    onPressed: _unitsPerDay < _unit.totalCount ? () => setState(() => _unitsPerDay++) : null,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'يعني تقريباً ${(_unit.pagesPerUnit * _unitsPerDay).round()} صفحة يومياً — ختمة كل ~$_computedDaysFromDailyAmount يوماً',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.inkSoft, fontSize: 13),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'تقريبي: متوسط صفحات الوحدة على كامل المصحف، لا حدود دقيقة لكل حزب/ربع بعد',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.inkSoft, fontSize: 11),
-              ),
-              const SizedBox(height: 20),
-              FilledButton(
-                onPressed: () => widget.onStart(_computedDaysFromDailyAmount),
-                child: const Text('ابدأ الختمة'),
-              ),
-            ],
+            },
+            const SizedBox(height: 24),
+            FilledButton(
+              onPressed: () => widget.onStart(_computedDays, _startPage),
+              child: const Text('ابدأ الختمة'),
+            ),
           ],
         ),
       ),
@@ -172,78 +291,300 @@ class _StartPlanViewState extends State<_StartPlanView> {
   }
 }
 
+/// شرائح جاهزة (`presets`) + خطوة يدوية دقيقة (+/-) لقيمة رقمية واحدة —
+/// بطلب صاحب المشروع "مقدار القراءة مش هيك ثابت خليه اتحكم فيه ازيد
+/// وانقص زي عداد" (كانت شرائح ثابتة بلا +/- بوضع "مقدار القراءة"، صار
+/// [_PresetStepper] هذا مستخدَماً بكلا الوضعين الآن). [labelBuilder]
+/// اختياري لتنسيق نص غير خطي (مثلاً "حزب ونصف" بدل رقم خام) — لو غاب
+/// يُستخدَم `'$value $presetSuffix'` العادي.
+class _PresetStepper extends StatelessWidget {
+  const _PresetStepper({
+    required this.presets,
+    this.presetSuffix = '',
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.onChanged,
+    required this.summary,
+    this.labelBuilder,
+  });
+  final List<int> presets;
+  final String presetSuffix;
+  final int value;
+  final int min;
+  final int max;
+  final ValueChanged<int> onChanged;
+  final String summary;
+  final String Function(int)? labelBuilder;
+
+  String _label(int v) => labelBuilder?.call(v) ?? '$v $presetSuffix';
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // بلا شرائح إطلاقاً لو `presets` فارغة — عدّاد +/- بحت (راجع توثيق
+        // موقع الاستدعاء بوضع "مقدار القراءة").
+        if (presets.isNotEmpty) ...[
+          Wrap(
+            spacing: 8,
+            alignment: WrapAlignment.center,
+            children: presets.map((p) {
+              return ChoiceChip(
+                label: Text(_label(p)),
+                selected: value == p,
+                onSelected: (_) => onChanged(p),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
+        ],
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.remove_circle_outline),
+              onPressed: value > min ? () => onChanged(value - 1) : null,
+            ),
+            SizedBox(
+              width: 110,
+              child: Text(
+                _label(value),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline),
+              onPressed: value < max ? () => onChanged(value + 1) : null,
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          summary,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: AppColors.inkSoft, fontSize: 13),
+        ),
+      ],
+    );
+  }
+}
+
 class _ActivePlanView extends StatelessWidget {
-  const _ActivePlanView({required this.plan, required this.currentPage, required this.streakDays, required this.onCancel});
+  const _ActivePlanView({
+    required this.plan,
+    required this.streakDays,
+    required this.onCancel,
+  });
   final KhatmaPlan plan;
-  final int currentPage;
   final int streakDays;
   final VoidCallback onCancel;
 
   @override
   Widget build(BuildContext context) {
-    final progress = (currentPage / 604).clamp(0.0, 1.0);
-    final onTrack = currentPage >= plan.expectedPageByNow;
+    final onTrack = plan.currentPage >= plan.expectedPageByNow;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
 
-    return Padding(
-      padding: const EdgeInsets.all(20),
+    // بطاقة واحدة موحَّدة (بدل بطاقة متداخلة بإطار خارجي مضاعف) — بطلب
+    // صاحب المشروع "لو تحسّن شكلها"، بنفس لغة التصميم المعتمدة بباقي
+    // الشاشات (حلقة تقدّم دائرية، شبكة إحصاءات مصغّرة، بطاقة حالة ملوّنة).
+    return AppCard(
+      padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  Text('${(progress * 100).round()}٪', style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w800, color: AppColors.gold)),
-                  const SizedBox(height: 4),
-                  Text('صفحة $currentPage من 604', style: const TextStyle(color: AppColors.inkSoft, fontSize: 13)),
-                  const SizedBox(height: 16),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: LinearProgressIndicator(value: progress, minHeight: 10, backgroundColor: AppColors.line),
-                  ),
-                ],
+          Row(
+            children: [
+              SizedBox(
+                width: 76,
+                height: 76,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox.expand(
+                      child: CircularProgressIndicator(
+                        value: plan.progress.clamp(0.0, 1.0),
+                        strokeWidth: 8,
+                        strokeCap: StrokeCap.round,
+                        backgroundColor: themeAccent(
+                          context,
+                        ).withValues(alpha: 0.13),
+                        valueColor: AlwaysStoppedAnimation(
+                          themeAccent(context),
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '${(plan.progress * 100).round()}٪',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: themeAccent(context),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'صفحة ${plan.currentPage} من ٦٠٤',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      onTrack
+                          ? 'ملتزم بالورد 👍'
+                          : 'متأخّر — الصفحة ${plan.expectedPageByNow} متوقّعة اليوم',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: onTrack
+                            ? AppColors.tealDeep
+                            : const Color(0xFFB3261E),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
-          _InfoRow(label: 'سلسلة أيام القراءة', value: '$streakDays 🔥'),
-          _InfoRow(label: 'الورد اليومي', value: '${plan.dailyPages} صفحة'),
-          _InfoRow(label: 'تاريخ البدء', value: _formatDate(plan.startDate)),
-          _InfoRow(label: 'الانتهاء المتوقّع', value: _formatDate(plan.expectedEndDate)),
-          _InfoRow(
-            label: 'الحالة',
-            value: onTrack ? 'ملتزم بالورد 👍' : 'متأخّر عن الورد — الصفحة ${plan.expectedPageByNow} متوقّعة اليوم',
-            valueColor: onTrack ? AppColors.teal : const Color(0xFFB3261E),
-          ),
-          const SizedBox(height: 24),
-          OutlinedButton(
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MushafScreen())),
-            child: const Text('تابع القراءة'),
+          // شبكة إحصاءات مصغّرة (بدل قائمة تسمية/قيمة مسطّحة طويلة).
+          Row(
+            children: [
+              Expanded(
+                child: _StatChip(
+                  icon: Icons.local_fire_department_outlined,
+                  label: 'سلسلة القراءة',
+                  value: '$streakDays 🔥',
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _StatChip(
+                  icon: Icons.menu_book_outlined,
+                  label: 'الورد اليومي',
+                  value: '${plan.dailyPages} صفحة',
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
-          TextButton(onPressed: onCancel, child: const Text('إلغاء الخطة')),
+          Row(
+            children: [
+              Expanded(
+                child: _StatChip(
+                  icon: Icons.flag_outlined,
+                  label: 'نقطة البداية',
+                  value: plan.startPage == 1
+                      ? 'صفحة ١'
+                      : 'صفحة ${plan.startPage}',
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _StatChip(
+                  icon: Icons.event_available_outlined,
+                  label: 'الانتهاء المتوقّع',
+                  value: _formatDate(plan.expectedEndDate),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton(
+                  // تابع من موضع **هذه الخطة تحديداً** (`plan.currentPage`)، لا
+                  // آخر صفحة قراءة عامة — بطلب صاحب المشروع: "التقدم يكون
+                  // مختلف عن التقدم الحالي". راجع `MushafScreen.khatmaPracticeMode`.
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => MushafScreen(
+                        initialPage: plan.currentPage,
+                        khatmaPracticeMode: true,
+                        khatmaPlanId: plan.id,
+                      ),
+                    ),
+                  ),
+                  child: const Text('تابع القراءة'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: onCancel,
+                icon: const Icon(Icons.delete_outline),
+                tooltip: 'إلغاء الخطة',
+                color: _textSoft(context),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.label, required this.value, this.valueColor});
+/// إحصاء مصغَّر بأيقونة — يعرض تسمية/قيمة داخل صندوق خفيف الصبغة، مطابق
+/// لأسلوب "شبكة الإحصاءات" باقي الشاشات المُعاد تصميمها (بدل قائمة
+/// تسمية/قيمة نصية طويلة `_InfoRow` سابقاً).
+class _StatChip extends StatelessWidget {
+  const _StatChip({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+  final IconData icon;
   final String label;
   final String value;
-  final Color? valueColor;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: onSurface.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: AppColors.inkSoft, fontSize: 13)),
-          Text(value, style: TextStyle(fontWeight: FontWeight.w700, color: valueColor)),
+          Icon(icon, size: 16, color: _textSoft(context)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(fontSize: 9.5, color: _textSoft(context)),
+                ),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

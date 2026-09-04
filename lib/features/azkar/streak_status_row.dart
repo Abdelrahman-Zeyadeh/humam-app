@@ -23,17 +23,27 @@ class StreakStatusRow extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
       child: Row(
         children: [
-          const Icon(Icons.local_fire_department_outlined, size: 16, color: AppColors.gold),
+          Icon(
+            Icons.local_fire_department_outlined,
+            size: 16,
+            color: themeAccent(context),
+          ),
           const SizedBox(width: 4),
           Text(
             '$days يوم متتالي بهذه الخانة',
-            style: TextStyle(fontSize: 12, color: onSurface.withValues(alpha: 0.6), fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontSize: 12,
+              color: onSurface.withValues(alpha: 0.6),
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const Spacer(),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
             decoration: BoxDecoration(
-              color: (doneToday ? AppColors.teal : onSurface).withValues(alpha: 0.12),
+              color: (doneToday ? AppColors.teal : onSurface).withValues(
+                alpha: 0.12,
+              ),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
@@ -42,7 +52,9 @@ class StreakStatusRow extends ConsumerWidget {
                 Icon(
                   doneToday ? Icons.check_circle : Icons.radio_button_unchecked,
                   size: 13,
-                  color: doneToday ? AppColors.teal : onSurface.withValues(alpha: 0.5),
+                  color: doneToday
+                      ? AppColors.tealDeep
+                      : onSurface.withValues(alpha: 0.5),
                 ),
                 const SizedBox(width: 4),
                 Text(
@@ -50,7 +62,9 @@ class StreakStatusRow extends ConsumerWidget {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: doneToday ? AppColors.teal : onSurface.withValues(alpha: 0.55),
+                    color: doneToday
+                        ? AppColors.tealDeep
+                        : onSurface.withValues(alpha: 0.55),
                   ),
                 ),
               ],

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/data/hadith/hadith_chapter_arabic_map.dart';
 import '../../core/data/hadith/hadith_providers.dart';
 import '../../core/data/hadith/hadith_repository.dart';
+import '../../core/theme/app_card.dart';
 import '../../core/theme/app_colors.dart';
 import 'hadith_chapter_screen.dart';
 
@@ -27,33 +29,59 @@ class HadithBookScreen extends ConsumerWidget {
       appBar: AppBar(title: Text(bookNameAr)),
       body: chaptersAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => const Center(child: Text('تعذّر تحميل الأبواب')),
-        data: (chapters) => ListView.separated(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+        error: (e, _) => Center(
+          child: Text(e is HadithBookNotDownloadedException ? e.toString() : 'تعذّر تحميل الأبواب'),
+        ),
+        data: (chapters) => ListView.builder(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
           itemCount: chapters.length,
-          separatorBuilder: (_, _) => const Divider(height: 1),
           itemBuilder: (context, i) {
             final c = chapters[i];
-            return ListTile(
-              leading: CircleAvatar(
-                backgroundColor: AppColors.gold.withValues(alpha: 0.15),
-                foregroundColor: AppColors.gold,
-                child: Text('${c.hadithCount}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-              ),
-              title: Text(
-                c.chapter.nameAr ?? c.chapter.nameEn,
-                textDirection: TextDirection.rtl,
-                style: TextStyle(color: onSurface, fontWeight: FontWeight.w600),
-              ),
-              trailing: const Icon(Icons.chevron_left),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => HadithChapterScreen(
-                    chapterId: c.chapter.id,
-                    chapterTitle: c.chapter.nameAr ?? c.chapter.nameEn,
+            return AppCard(
+              margin: const EdgeInsets.symmetric(vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              onTap: () {
+                final title = HadithChapterArabicMap.resolveChapterName(
+                  c.chapter.nameAr,
+                  c.chapter.nameEn,
+                  c.chapter.chapterNumber,
+                );
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => HadithChapterScreen(
+                      bookId: bookId,
+                      chapterId: c.chapter.id,
+                      chapterTitle: title,
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
+              child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: themeAccent(context).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text('${c.hadithCount}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: themeAccent(context))),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            HadithChapterArabicMap.resolveChapterName(
+                              c.chapter.nameAr,
+                              c.chapter.nameEn,
+                              c.chapter.chapterNumber,
+                            ),
+                            textAlign: TextAlign.right,
+                            textDirection: TextDirection.rtl,
+                            style: TextStyle(color: onSurface, fontWeight: FontWeight.w700, fontSize: 14.5),
+                          ),
+                        ),
+                        Icon(Icons.chevron_left, color: onSurface.withValues(alpha: 0.5)),
+                      ],
+                    ),
             );
           },
         ),

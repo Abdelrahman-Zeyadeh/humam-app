@@ -1,154 +1,251 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/data/user/location_prefs.dart';
 import '../../core/data/user/user_prefs.dart';
 import '../../core/data/user/user_repository.dart' show UserCategories;
+import '../../core/theme/app_card.dart';
 import '../../core/theme/app_colors.dart';
-import '../qiyam/qiyam_screen.dart';
-import 'azkar_full_repository.dart';
-import 'azkar_library_progress.dart';
+import '../prayer/prayer_times_service.dart'
+    show PrayerMoment, hasMomentArrivedToday;
+import 'azkar_dhikr_frame.dart';
 import 'azkar_progress.dart';
 import 'azkar_repository.dart';
 import 'streak_status_row.dart';
-import 'tasbih_screen.dart';
 
-/// خانة الأذكار المعروضة بشاشة `AzkarScreen` الرئيسية — منفصلة عن
-/// `AzkarPeriod` (نموذج بيانات الصباح/المساء فقط بـ`azkar_repository.dart`)
-/// لأن "النوم" مصدرها مختلف (قسم من مكتبة حصن المسلم الكاملة، لا ملف
-/// azkar.json المخصَّص). كل خانة مربوطة بفئة سلسلة استمرار مستقلة
-/// (`UserCategories`).
-enum _Segment {
-  morning(UserCategories.morningAzkar),
-  evening(UserCategories.eveningAzkar),
-  night(UserCategories.nightAzkar);
+Color _cardBorder(BuildContext c) => Theme.of(c).brightness == Brightness.dark
+    ? AppColors.lineDark
+    : AppColors.line;
 
-  const _Segment(this.category);
-  final String category;
-}
-
-class _SegmentNotifier extends Notifier<_Segment> {
-  @override
-  _Segment build() => _Segment.morning;
-
-  void set(_Segment s) => state = s;
-}
-
-final _segmentProvider = NotifierProvider<_SegmentNotifier, _Segment>(_SegmentNotifier.new);
-
-/// أذكار الصباح والمساء والنوم: قائمة قابلة للضغط، كل ذكر يُعدّ تنازلياً
-/// بالضغط عليه — نفس نمط تطبيقات الأذكار المعروفة. إكمال كل أذكار خانة
-/// بيوم تقويمي واحد يزيد سلسلة استمرارها (`UserRepository.
-/// bumpCategoryStreakIfNewDay`) — معروضة أعلى القائمة وبالداشبورد. راجع
-/// `azkar_repository.dart`/`azkar_full_repository.dart` لمصدر البيانات وقيوده.
+/// أذكار فترة واحدة فقط (صباح **أو** مساء — لا مقطع مدمج بعد الآن). كانتا
+/// شاشة واحدة بـ`SegmentedButton` يبدّل بين ثلاثة مقاطع (صباح/مساء/نوم)؛
+/// فُصلتا بناءً على طلب صاحب المشروع، وأذكار النوم أصلاً لها مسار مستقل
+/// شغّال (`AzkarLibraryCategoryScreen` عبر شريحة "أذكار النوم" بمكتبة
+/// الأذكار) فلا داعي لتكرارها هون. راجع `azkar_repository.dart` لمصدر
+/// البيانات وقيوده.
+///
+/// **هيدر بتدرّج كحلي** بدل `AppBar` الافتراضي — مطابق لأسلوب لوحة
+/// التصميم المعتمدة (راجع `Azkar.dc.html` بالكانفاس)، مع بطاقة ملخّص
+/// تقدّم (حلقة دائرية) أعلى القائمة بدل الاكتفاء بشريط السلسلة فقط.
 class AzkarScreen extends ConsumerWidget {
-  const AzkarScreen({super.key});
+  const AzkarScreen({super.key, required this.period});
+  final AzkarPeriod period;
+
+  String get _title =>
+      period == AzkarPeriod.morning ? 'أذكار الصباح' : 'أذكار المساء';
+  String get _category => period == AzkarPeriod.morning
+      ? UserCategories.morningAzkar
+      : UserCategories.eveningAzkar;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final segment = ref.watch(_segmentProvider);
     final userPrefs = ref.watch(userPrefsProvider);
+    final category = _category;
 
-    // إكمال أذكار الصباح/المساء (`azkarProgressProvider` بمفاتيح `order`
-    // رقمية من azkar.json) — نستمع بدل نحسب أثناء البناء لتفادي كتابة
-    // بقاعدة البيانات كجزء من عملية بناء الودجت نفسها.
-    ref.listen<Map<int, int>>(azkarProgressProvider, (prev, next) {
-      if (segment == _Segment.night) return;
+    // إكمال كل أذكار الفترة (`azkarProgressProvider` بمفاتيح `(period,
+    // order)` — راجع توثيق `AzkarProgressNotifier` لسبب وجود `period`
+    // بالمفتاح) — نستمع بدل نحسب أثناء البناء لتفادي كتابة بقاعدة
+    // البيانات كجزء من عملية بناء الودجت نفسها.
+    ref.listen(azkarProgressProvider, (prev, next) {
       final list = ref.read(azkarListProvider).value;
       if (list == null) return;
-      final relevant = list.where((d) => d.appliesTo(segment == _Segment.morning ? AzkarPeriod.morning : AzkarPeriod.evening));
+      final relevant = list.where((d) => d.appliesTo(period));
       if (relevant.isEmpty) return;
-      final allDone = relevant.every((d) => (next[d.order] ?? d.count) <= 0);
+      final allDone = relevant.every(
+        (d) => (next[(period, d.order)] ?? d.count) <= 0,
+      );
       if (allDone) {
-        userPrefs.bumpCategoryStreakIfNewDay(segment.category).then((_) {
-          ref.read(categoryStreakVersionProvider.notifier).bump();
-        });
-      }
-    });
-
-    // إكمال أذكار النوم (`azkarLibraryProgressProvider` بمفاتيح نصية
-    // `categoryId:itemIndex` من مكتبة حصن المسلم — قسم ٢٨ فقط هون).
-    ref.listen<Map<String, int>>(azkarLibraryProgressProvider, (prev, next) {
-      if (segment != _Segment.night) return;
-      final category = ref.read(sleepAzkarProvider).value;
-      if (category == null) return;
-      final allDone = category.items.asMap().entries.every((e) {
-        final key = AzkarLibraryProgressNotifier.keyFor(category.id, e.key);
-        return (next[key] ?? e.value.count) <= 0;
-      });
-      if (allDone) {
-        userPrefs.bumpCategoryStreakIfNewDay(segment.category).then((_) {
+        userPrefs.bumpCategoryStreakIfNewDay(category).then((_) {
           ref.read(categoryStreakVersionProvider.notifier).bump();
         });
       }
     });
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('أذكار الصباح والمساء'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.auto_stories_outlined),
-            tooltip: 'مكتبة الأذكار الكاملة',
-            // تُفتح دائماً بالدفع من مكتبة الأذكار (تبويب "الأذكار" الرئيسي)
-            // الآن — رجوع بدل دفع نسخة ثانية فوقها.
-            onPressed: () => Navigator.of(context).maybePop(),
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'إعادة ضبط العدّ',
-            onPressed: () {
-              if (segment == _Segment.night) {
-                ref.read(azkarLibraryProgressProvider.notifier).resetAll();
-              } else {
-                ref.read(azkarProgressProvider.notifier).resetAll();
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.fingerprint),
-            tooltip: 'المسبحة',
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TasbihScreen())),
-          ),
-          IconButton(
-            icon: const Icon(Icons.dark_mode_outlined),
-            tooltip: 'قيام الليل',
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const QiyamScreen())),
-          ),
-        ],
-      ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-            child: SegmentedButton<_Segment>(
-              segments: const [
-                ButtonSegment(value: _Segment.morning, label: Text('الصباح'), icon: Icon(Icons.wb_sunny_outlined)),
-                ButtonSegment(value: _Segment.evening, label: Text('المساء'), icon: Icon(Icons.nights_stay_outlined)),
-                ButtonSegment(value: _Segment.night, label: Text('النوم'), icon: Icon(Icons.bedtime_outlined)),
-              ],
-              selected: {segment},
-              onSelectionChanged: (s) => ref.read(_segmentProvider.notifier).set(s.first),
-            ),
-          ),
-          StreakStatusRow(category: segment.category),
-          Expanded(
-            child: segment == _Segment.night ? const _NightAzkarList() : _PeriodAzkarList(segment: segment),
-          ),
+          _AzkarHeader(title: _title, period: period),
+          StreakStatusRow(category: category),
+          _ProgressSummaryCard(period: period),
+          Expanded(child: _PeriodAzkarList(period: period)),
         ],
       ),
     );
   }
 }
 
+/// هيدر بتدرّج كحلي (زرقاء→كحلي) — بدل `AppBar` الأبيض الافتراضي، مطابق
+/// لهيدر شاشة الأذكار بلوحة التصميم المعتمدة.
+class _AzkarHeader extends ConsumerWidget {
+  const _AzkarHeader({required this.title, required this.period});
+  final String title;
+  final AzkarPeriod period;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.fromLTRB(
+          16,
+          MediaQuery.of(context).padding.top + 14,
+          16,
+          18,
+        ),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [AppColors.blue, AppColors.navy],
+          ),
+        ),
+        child: Row(
+          children: [
+            IconButton(
+              onPressed: () => Navigator.of(context).maybePop(),
+              icon: const Icon(Icons.arrow_forward, color: Colors.white),
+            ),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            InkWell(
+              borderRadius: BorderRadius.circular(17),
+              onTap: () =>
+                  ref.read(azkarProgressProvider.notifier).resetPeriod(period),
+              child: Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.14),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: const Icon(Icons.refresh, color: Colors.white, size: 18),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// بطاقة ملخّص التقدّم أعلى القائمة — حلقة دائرية + "أتممت X من Y أذكار"،
+/// مطابقة لبطاقة "progress summary" بلوحة التصميم المعتمدة.
+class _ProgressSummaryCard extends ConsumerWidget {
+  const _ProgressSummaryCard({required this.period});
+  final AzkarPeriod period;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final azkarAsync = ref.watch(azkarListProvider);
+    final progress = ref.watch(azkarProgressProvider);
+
+    return azkarAsync.maybeWhen(
+      data: (all) {
+        final list = all.where((d) => d.appliesTo(period)).toList();
+        if (list.isEmpty) return const SizedBox.shrink();
+        final total = list.length;
+        final done = list
+            .where((d) => (progress[(period, d.order)] ?? d.count) <= 0)
+            .length;
+        final ratio = total > 0 ? done / total : 0.0;
+
+        return AppCard(
+          margin: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 44,
+                height: 44,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox.expand(
+                      child: CircularProgressIndicator(
+                        value: ratio,
+                        strokeWidth: 4.5,
+                        strokeCap: StrokeCap.round,
+                        backgroundColor: AppColors.gold.withValues(alpha: 0.16),
+                        valueColor: const AlwaysStoppedAnimation(
+                          AppColors.goldDeep,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      list.first.content,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: _textStrong(context),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'أتممت $done من $total أذكار هذه الفترة',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: _textSoft(context),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+      orElse: () => const SizedBox.shrink(),
+    );
+  }
+}
+
+Color _textStrong(BuildContext c) => Theme.of(c).brightness == Brightness.dark
+    ? AppColors.inkOnDark
+    : AppColors.navy;
+Color _textSoft(BuildContext c) => Theme.of(c).brightness == Brightness.dark
+    ? AppColors.inkSoftOnDark
+    : AppColors.inkSoft;
+
 class _PeriodAzkarList extends ConsumerWidget {
-  const _PeriodAzkarList({required this.segment});
-  final _Segment segment;
+  const _PeriodAzkarList({required this.period});
+  final AzkarPeriod period;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final azkarAsync = ref.watch(azkarListProvider);
     final onSurface = Theme.of(context).colorScheme.onSurface;
-    final period = segment == _Segment.morning ? AzkarPeriod.morning : AzkarPeriod.evening;
+    final loc = ref.watch(locationPrefsProvider);
+    // بطلب صاحب المشروع: "اذكار المسا عليها قفل... مش الصبح" — الصباح
+    // يُفتح بدخول وقت الفجر، المساء بدخول وقت العصر (بداية "المساء"
+    // تقليدياً بجدول أوقات المسلمين، لا الغروب). راجع `hasMomentArrivedToday`.
+    final locked = !hasMomentArrivedToday(
+      lat: loc.lat,
+      lon: loc.lon,
+      methodKey: loc.calculationMethod,
+      moment: period == AzkarPeriod.morning
+          ? PrayerMoment.fajr
+          : PrayerMoment.asr,
+    );
 
     return azkarAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -156,145 +253,180 @@ class _PeriodAzkarList extends ConsumerWidget {
       data: (all) {
         final list = all.where((d) => d.appliesTo(period)).toList();
         return ListView.builder(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
           itemCount: list.length,
-          itemBuilder: (context, i) => _DhikrCard(dhikr: list[i], onSurface: onSurface),
+          itemBuilder: (context, i) => _DhikrCard(
+            dhikr: list[i],
+            period: period,
+            onSurface: onSurface,
+            locked: locked,
+          ),
         );
       },
     );
   }
 }
 
-class _NightAzkarList extends ConsumerWidget {
-  const _NightAzkarList();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final categoryAsync = ref.watch(sleepAzkarProvider);
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-
-    return categoryAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => const Center(child: Text('تعذّر تحميل أذكار النوم')),
-      data: (category) => ListView.builder(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
-        itemCount: category.items.length,
-        itemBuilder: (context, i) => _LibraryDhikrCard(categoryId: category.id, itemIndex: i, item: category.items[i], onSurface: onSurface),
-      ),
-    );
-  }
-}
-
 class _DhikrCard extends ConsumerWidget {
-  const _DhikrCard({required this.dhikr, required this.onSurface});
+  const _DhikrCard({
+    required this.dhikr,
+    required this.period,
+    required this.onSurface,
+    this.locked = false,
+  });
   final Dhikr dhikr;
+  final AzkarPeriod period;
   final Color onSurface;
+
+  /// `true` = لسا ما جا وقت هذه الفترة (صباح/مساء) — بطلب صاحب المشروع
+  /// "اذكار المسا عليها قفل ما بقدر احط تم غير ليجي وقتها". يمنع الضغط،
+  /// لا يخفي المحتوى (يبقى المستخدم يقرأ الذكر، فقط لا يُعدّ "منجَز").
+  final bool locked;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final remaining = ref.watch(azkarProgressProvider.select((m) => m[dhikr.order] ?? dhikr.count));
+    final remaining = ref.watch(
+      azkarProgressProvider.select(
+        (m) => m[(period, dhikr.order)] ?? dhikr.count,
+      ),
+    );
     final done = remaining <= 0;
+    final notStarted = remaining == dhikr.count;
 
-    return Card(
-      color: done ? AppColors.teal.withValues(alpha: 0.08) : null,
+    final String countLabel = dhikr.count <= 1
+        ? 'مرة واحدة'
+        : notStarted
+        ? '${dhikr.count} مرات'
+        : '$remaining من ${dhikr.count} مرة';
+
+    return AppCard(
       margin: const EdgeInsets.symmetric(vertical: 6),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => ref.read(azkarProgressProvider.notifier).tap(dhikr.order, dhikr.count),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+      padding: const EdgeInsets.all(16),
+      onTap: locked && !done
+          ? null
+          : () => ref
+                .read(azkarProgressProvider.notifier)
+                .tap(period, dhikr.order, dhikr.count),
+      child: Opacity(
+        opacity: locked && !done ? 0.55 : (notStarted ? 0.9 : 1),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // نص الذكر بإطار داخلي أنيق ومحاذاة وسط — بطلب صاحب
+            // المشروع "النص مكانه بالنص وبطاقات الأذكار تكون باطار
+            // جميل وأنيق".
+            DhikrTextFrame(text: dhikr.content, done: done),
+            if (dhikr.fadl != null) ...[
+              const SizedBox(height: 8),
               Text(
-                dhikr.content,
-                textAlign: TextAlign.right,
-                textDirection: TextDirection.rtl,
-                style: TextStyle(color: done ? onSurface.withValues(alpha: 0.45) : onSurface, fontSize: 16, height: 1.8),
-              ),
-              if (dhikr.fadl != null) ...[
-                const SizedBox(height: 8),
-                Text(dhikr.fadl!, style: TextStyle(color: onSurface.withValues(alpha: 0.55), fontSize: 12, height: 1.6)),
-              ],
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Icon(
-                    done ? Icons.check_circle : Icons.radio_button_unchecked,
-                    size: 18,
-                    color: done ? AppColors.teal : AppColors.gold,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    done ? 'تمّ' : '$remaining من ${dhikr.count}',
-                    style: TextStyle(color: done ? AppColors.teal : AppColors.gold, fontWeight: FontWeight.w700, fontSize: 13),
-                  ),
-                ],
+                dhikr.fadl!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: onSurface.withValues(alpha: 0.55),
+                  fontSize: 12,
+                  height: 1.6,
+                ),
               ),
             ],
-          ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  locked && !done ? 'لسا ما جا وقت هذه الفترة' : countLabel,
+                  style: TextStyle(
+                    color: onSurface.withValues(alpha: 0.5),
+                    fontSize: 10.5,
+                  ),
+                ),
+                if (locked && !done)
+                  Icon(
+                    Icons.lock_outline,
+                    size: 16,
+                    color: onSurface.withValues(alpha: 0.4),
+                  )
+                else
+                  _CountBadge(done: done, remaining: remaining, total: dhikr.count),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-/// نفس نمط `_DhikrCard` لكن فوق `AzkarLibraryItem`/`azkarLibraryProgressProvider`
-/// (مصدر بيانات مختلف — راجع `_NightAzkarList`).
-class _LibraryDhikrCard extends ConsumerWidget {
-  const _LibraryDhikrCard({required this.categoryId, required this.itemIndex, required this.item, required this.onSurface});
-  final int categoryId;
-  final int itemIndex;
-  final AzkarLibraryItem item;
-  final Color onSurface;
+/// شارة حالة الذكر — ثلاث حالات مطابقة للوحة التصميم المعتمدة: دائرة
+/// خضراء بعلامة صح (اكتمل)، حلقة تقدّم ملوّنة بالمتبقّي بمركزها (جارٍ)،
+/// أو دائرة بحدّ فارغة (لم يبدأ بعد).
+class _CountBadge extends StatelessWidget {
+  const _CountBadge({
+    required this.done,
+    required this.remaining,
+    required this.total,
+  });
+  final bool done;
+  final int remaining;
+  final int total;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final key = AzkarLibraryProgressNotifier.keyFor(categoryId, itemIndex);
-    final remaining = ref.watch(azkarLibraryProgressProvider.select((m) => m[key] ?? item.count));
-    final done = remaining <= 0;
+  Widget build(BuildContext context) {
+    if (done) {
+      return Container(
+        width: 28,
+        height: 28,
+        decoration: const BoxDecoration(
+          color: AppColors.teal,
+          shape: BoxShape.circle,
+        ),
+        alignment: Alignment.center,
+        child: const Icon(Icons.check, size: 15, color: Colors.white),
+      );
+    }
 
-    return Card(
-      color: done ? AppColors.teal.withValues(alpha: 0.08) : null,
-      margin: const EdgeInsets.symmetric(vertical: 6),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => ref.read(azkarLibraryProgressProvider.notifier).tap(key, item.count),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                item.text,
-                textAlign: TextAlign.right,
-                textDirection: TextDirection.rtl,
-                style: TextStyle(color: done ? onSurface.withValues(alpha: 0.45) : onSurface, fontSize: 16, height: 1.8),
-              ),
-              if (item.reference != null) ...[
-                const SizedBox(height: 8),
-                Text(item.reference!, textDirection: TextDirection.rtl, style: TextStyle(color: onSurface.withValues(alpha: 0.55), fontSize: 11, height: 1.5)),
-              ],
-              if (item.count > 1) ...[
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Icon(
-                      done ? Icons.check_circle : Icons.radio_button_unchecked,
-                      size: 18,
-                      color: done ? AppColors.teal : AppColors.gold,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      done ? 'تمّ' : '$remaining من ${item.count}',
-                      style: TextStyle(color: done ? AppColors.teal : AppColors.gold, fontWeight: FontWeight.w700, fontSize: 13),
-                    ),
-                  ],
-                ),
-              ],
-            ],
+    final notStarted = remaining == total;
+    if (notStarted) {
+      return Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: _cardBorder(context).withValues(alpha: 0.9),
+            width: 1.6,
           ),
         ),
+      );
+    }
+
+    final color = themeAccent(context);
+    final progress = total > 0
+        ? ((total - remaining) / total).clamp(0.0, 1.0)
+        : 0.0;
+    return SizedBox(
+      width: 32,
+      height: 32,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox.expand(
+            child: CircularProgressIndicator(
+              value: progress,
+              strokeWidth: 3.5,
+              strokeCap: StrokeCap.round,
+              backgroundColor: color.withValues(alpha: 0.15),
+              valueColor: AlwaysStoppedAnimation(color),
+            ),
+          ),
+          Text(
+            '$remaining',
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w800,
+              fontSize: 10.5,
+            ),
+          ),
+        ],
       ),
     );
   }
