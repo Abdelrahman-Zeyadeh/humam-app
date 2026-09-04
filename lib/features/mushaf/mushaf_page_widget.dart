@@ -5,8 +5,8 @@ import 'package:flutter/gestures.dart'
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/data/quran/quran_database.dart';
 import '../../core/data/quran/quran_providers.dart';
+import '../../core/data/quran/quran_repository.dart' show MushafPageLineInfo, MushafWord;
 import '../../core/data/user/user_prefs.dart';
 import '../../core/text/arabic_normalizer.dart'
     show sanitizeSurahNameForDisplay;
@@ -173,8 +173,8 @@ class _PageLineWidget extends ConsumerWidget {
     this.pickingHifz = false,
     this.noteAyahIds = const {},
   });
-  final PageLine line;
-  final List<Word> words;
+  final MushafPageLineInfo line;
+  final List<MushafWord> words;
   final String fontFamily;
   final bool pickingHifz;
 
@@ -220,7 +220,11 @@ class _PageLineWidget extends ConsumerWidget {
         final fg = palette.fg(isDark);
         final edition = ref.watch(mushafFontEditionProvider);
         final p1FontAsync = ref.watch(pageFontFamilyProvider(1));
-        final p1FontFamily = p1FontAsync.value;
+        // V4 Tajweed: لا رمز glyph معروف لبسملة مستقلة بهذه الطبعة (سطر
+        // البسملة بلا كلمات بتخطيط V4 نفسه — لا مصدر بيانات نستنتج منه
+        // الرمز الصحيح، بخلاف V1/V2 يلي رموزهما معروفة يدوياً). نستخدم
+        // نص AmiriQuran العادي دايماً بدل تخمين رمز خاطئ.
+        final p1FontFamily = edition == MushafFontEdition.v4Tajweed ? null : p1FontAsync.value;
         final basmallahText = p1FontFamily != null
             ? (edition == MushafFontEdition.v1
                 ? '\ufb51 \ufb52 \ufb53 \ufb54'
@@ -318,7 +322,7 @@ class _TappableAyahLine extends ConsumerStatefulWidget {
     this.noteAyahIds = const {},
     this.noteMarkerColor,
   });
-  final List<Word> words;
+  final List<MushafWord> words;
   final TextStyle style;
 
   /// معرّفات آيات عليها ملاحظة — تُرسَم علامة صغيرة عند رمز نهاية الآية
@@ -377,8 +381,6 @@ class _TappableAyahLineState extends ConsumerState<_TappableAyahLine> {
     final pendingColor = AppColors.teal.withValues(alpha: 0.28);
     final spans = <InlineSpan>[];
 
-    final edition = ref.watch(mushafFontEditionProvider);
-
     for (var i = 0; i < widget.words.length; i++) {
       final word = widget.words[i];
       final isHighlighted =
@@ -388,9 +390,10 @@ class _TappableAyahLineState extends ConsumerState<_TappableAyahLine> {
       final isHidden =
           widget.memorizationOn && !widget.revealedAyahs.contains(word.ayahId);
 
-      final glyphText = (edition == MushafFontEdition.v1 && word.glyphV1 != null)
-          ? word.glyphV1!
-          : word.glyph;
+      // اختيار glyph الطبعة الصحيحة (glyph_v1 لو V1 ومُعبَّأ، وإلا V2) صار
+      // مسؤولية `QuranRepository.pageLayout`/`pageLayoutV4` — `word.glyph`
+      // هون دايماً الرمز النهائي الجاهز للرسم مباشرة، بلا فرع طبعة هون.
+      final glyphText = word.glyph;
 
       InlineSpan buildWordSpan(GestureRecognizer? recognizer) {
         return TextSpan(

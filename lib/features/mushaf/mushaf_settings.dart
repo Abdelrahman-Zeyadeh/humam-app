@@ -44,9 +44,15 @@ const _kMushafFontEditionKey = 'mushaf_font_edition';
 /// نوع خط صفحة المصحف / الطبعة:
 /// - `v2`: مصحف المدينة الحديث (QCF V2 - الافتراضي)
 /// - `v1`: مصحف المدينة الكلاسيكي (QCF V1 طبعة 1405هـ من fadihittih repo)
+/// - `v4Tajweed`: مصحف المدينة طبعة ١٤٤١هـ (خط عثمان طه) بألوان تجويد
+///   مدمجة داخل الglyph نفسه من مصدر QUL (Tarteel AI، ترخيص SIL OFL) —
+///   راجع `PageLinesV4`/`WordsV4` بـ`quran_tables.dart` وتوثيق
+///   `tools/add_qcf_v4_tajweed.py`. تخطيط صفحات/أسطر **مستقل تماماً** عن
+///   V1/V2 (طبعة مطبوعة مختلفة)، فلا يشارك ترقيمها إطلاقاً.
 enum MushafFontEdition {
   v2(label: 'مصحف المدينة (الحديث V2)'),
-  v1(label: 'مصحف المدينة (الكلاسيكي 1405هـ V1)');
+  v1(label: 'مصحف المدينة (الكلاسيكي 1405هـ V1)'),
+  v4Tajweed(label: 'مصحف المدينة الملوّن (تجويد V4)');
 
   const MushafFontEdition({required this.label});
   final String label;
@@ -384,14 +390,43 @@ const _kRasterMushafEditionKey = 'raster_mushaf_edition';
 /// لعرضه بشاشة التنزيل قبل البدء — **تقديري بناءً على حجم PDF المصدر**،
 /// يُصحَّح لاحقاً بعد التحويل الفعلي لصور WebP إن اختلف كثيراً.
 enum RasterMushafEdition {
-  normal(id: 'normal', label: 'الحجم العادي', approxSizeMb: 150),
-  jawamie(id: 'jawamie', label: 'حجم الجوامعي', approxSizeMb: 110),
-  premium(id: 'premium', label: 'إصدار ممتاز', approxSizeMb: 220);
+  normal(
+    id: 'normal',
+    label: 'الحجم العادي',
+    approxSizeMb: 150,
+    previewAsset: 'assets/images/mushaf_editions/normal.webp',
+  ),
+  jawamie(
+    id: 'jawamie',
+    label: 'حجم الجوامعي',
+    approxSizeMb: 110,
+    previewAsset: 'assets/images/mushaf_editions/jawamie.webp',
+  ),
+  // معاينة "إصدار ممتاز" **ليست** سكاناً فعلياً لهالطبعة (لسا غير جاهز) —
+  // بطلب صاحب المشروع مؤقتاً صورة الخط الحديث المضمَّن أصلاً بالتطبيق
+  // (أول ٥٠ صفحة، `assets/quran/fonts/pages/`) بدلها لحد ما تتوفر صورة
+  // حقيقية لطبعة "ممتاز" نفسها — استبدلها وقتها بـpremium_049.webp
+  // الموجود فعلاً بـ`tools/mushaf/upload/`.
+  premium(
+    id: 'premium',
+    label: 'إصدار ممتاز',
+    approxSizeMb: 220,
+    previewAsset: 'assets/images/mushaf_editions/premium.jpg',
+  );
 
-  const RasterMushafEdition({required this.id, required this.label, required this.approxSizeMb});
+  const RasterMushafEdition({
+    required this.id,
+    required this.label,
+    required this.approxSizeMb,
+    required this.previewAsset,
+  });
   final String id;
   final String label;
   final int approxSizeMb;
+
+  /// معاينة شكل صفحة هذه الطبعة — تُعرَض بقائمة اختيار الطبعة
+  /// (`_RasterEditionPickerSheet` بـ`settings_screen.dart`).
+  final String previewAsset;
 }
 
 class RasterMushafEditionNotifier extends Notifier<RasterMushafEdition> {

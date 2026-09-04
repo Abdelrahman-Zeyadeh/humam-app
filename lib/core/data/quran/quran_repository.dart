@@ -28,13 +28,53 @@ class RubDetail {
   final int startPage;
 }
 
-/// تخطيط صفحة مصحف كامل جاهز للعرض: سطورها بالترتيب، وكلمات كل سطر
-/// (بغليف خط QCF V2 الخاص بهذه الصفحة تحديداً — `p{page}.ttf`).
+/// سطر واحد من سطور صفحة مصحف — تجريد موحّد فوق [PageLine]/[PageLinesV4Data]
+/// (الجدولان متطابقا الأعمدة اسماً ونوعاً، بس درift بيولّد صنفاً منفصلاً
+/// لكل جدول) ليتعامل [MushafPage] وواجهة العرض مع طبعة واحدة بغض النظر عن
+/// مصدرها الفعلي — راجع [QuranRepository.pageLayout]/[pageLayoutV4].
+class MushafPageLineInfo {
+  const MushafPageLineInfo({
+    required this.page,
+    required this.lineNo,
+    required this.lineType,
+    required this.isCentered,
+    this.surahRef,
+  });
+  final int page;
+  final int lineNo;
+  final String lineType;
+  final int isCentered;
+  final int? surahRef;
+}
+
+/// كلمة واحدة جاهزة للرسم — تجريد موحّد فوق [Word]/[WordsV4Data] بنفس
+/// فكرة [MushafPageLineInfo]. [glyph] هو **الرمز النهائي المطلوب رسمه
+/// فعلياً** بالطبعة المطلوبة (اختيار glyph/glyphV1 لطبعتَي V1/V2
+/// يُحسَم هنا بـ[QuranRepository.pageLayout]، لا بواجهة العرض).
+class MushafWord {
+  const MushafWord({
+    required this.id,
+    required this.ayahId,
+    required this.lineNo,
+    required this.charType,
+    required this.glyph,
+  });
+
+  /// معرّف الكلمة العام (تسلسل بكل المصحف) — الترتيب الصحيح داخل السطر،
+  /// **ليس** `position` (رقم الكلمة داخل آيتها فقط، يرجع لـ١ بكل آية).
+  final int id;
+  final int ayahId;
+  final int lineNo;
+  final String charType; // word | ayah_marker
+  final String glyph;
+}
+
+/// تخطيط صفحة مصحف كامل جاهز للعرض: سطورها بالترتيب، وكلمات كل سطر.
 class MushafPage {
   const MushafPage({required this.page, required this.lines, required this.wordsByLine});
   final int page;
-  final List<PageLine> lines;
-  final Map<int, List<Word>> wordsByLine; // lineNo -> كلماته بالترتيب
+  final List<MushafPageLineInfo> lines;
+  final Map<int, List<MushafWord>> wordsByLine; // lineNo -> كلماته بالترتيب
 }
 
 /// طبقة الوصول لقاعدة `quran.db`. كل الاستعلامات تُنفَّذ على isolate drift
@@ -171,8 +211,12 @@ class QuranRepository {
     return result;
   }
 
-  /// تخطيط صفحة كاملة: سطورها وكلماتها، جاهزة للرسم بخط `p{page}.ttf`.
-  Future<MushafPage> pageLayout(int page) async {
+  /// تخطيط صفحة كاملة (طبعتَي V1/V2 — يتشاركان نفس ترقيم `page_lines`/
+  /// `words`، راجع توثيق [Words.glyphV1]): سطورها وكلماتها، جاهزة للرسم
+  /// بخط `p{page}.ttf`. [preferV1] يختار عمود `glyph_v1` لكل كلمة (بدل
+  /// `glyph` الافتراضي لـV2) إن كان مُعبّأً، وإلا يسقط تلقائياً لـV2 لتلك
+  /// الكلمة تحديداً (V1 لسا غير مكتمل التعبئة — راجع `tools/quran_layout.py`).
+  Future<MushafPage> pageLayout(int page, {bool preferV1 = false}) async {
     final lines = await (_db.select(_db.pageLines)
           ..where((l) => l.page.equals(page))
           ..orderBy([(l) => OrderingTerm.asc(l.lineNo)]))
@@ -186,12 +230,65 @@ class QuranRepository {
           ..orderBy([(w) => OrderingTerm.asc(w.id)]))
         .get();
 
-    final wordsByLine = <int, List<Word>>{};
+    final wordsByLine = <int, List<MushafWord>>{};
     for (final w in words) {
-      wordsByLine.putIfAbsent(w.lineNo, () => []).add(w);
+      final glyph = (preferV1 && w.glyphV1 != null) ? w.glyphV1! : w.glyph;
+      wordsByLine.putIfAbsent(w.lineNo, () => []).add(
+            MushafWord(id: w.id, ayahId: w.ayahId, lineNo: w.lineNo, charType: w.charType, glyph: glyph),
+          );
     }
 
-    return MushafPage(page: page, lines: lines, wordsByLine: wordsByLine);
+    return MushafPage(
+      page: page,
+      lines: [
+        for (final l in lines)
+          MushafPageLineInfo(
+            page: l.page,
+            lineNo: l.lineNo,
+            lineType: l.lineType,
+            isCentered: l.isCentered,
+            surahRef: l.surahRef,
+          ),
+      ],
+      wordsByLine: wordsByLine,
+    );
+  }
+
+  /// تخطيط صفحة كاملة بطبعة **V4 Tajweed** (١٤٤١هـ، ألوان تجويد مدمجة
+  /// بالglyph) — جدول مستقل تماماً (`page_lines_v4`/`words_v4`)، لا علاقة
+  /// له بترقيم [pageLayout] (V1/V2). راجع توثيق [PageLinesV4]/[WordsV4].
+  Future<MushafPage> pageLayoutV4(int page) async {
+    final lines = await (_db.select(_db.pageLinesV4)
+          ..where((l) => l.page.equals(page))
+          ..orderBy([(l) => OrderingTerm.asc(l.lineNo)]))
+        .get();
+
+    final words = await (_db.select(_db.wordsV4)
+          ..where((w) => w.page.equals(page))
+          ..orderBy([(w) => OrderingTerm.asc(w.id)]))
+        .get();
+
+    final wordsByLine = <int, List<MushafWord>>{};
+    for (final w in words) {
+      wordsByLine.putIfAbsent(w.lineNo, () => []).add(
+            MushafWord(id: w.id, ayahId: w.ayahId, lineNo: w.lineNo, charType: w.charType, glyph: w.glyph),
+          );
+    }
+
+    return MushafPage(
+      page: page,
+      lines: [
+        for (final l in lines)
+          MushafPageLineInfo(
+            page: l.page,
+            lineNo: l.lineNo,
+            lineType: l.lineType,
+            isCentered: l.isCentered,
+            surahRef: l.surahRef,
+          ),
+      ],
+      wordsByLine: wordsByLine,
+    );
   }
 
   /// بحث نصي عبر فهرس FTS5 `fts_ayahs`. يطبّق نفس دالة التطبيع المستخدمة

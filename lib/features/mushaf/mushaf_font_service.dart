@@ -24,8 +24,11 @@ class MushafFontService {
 
   final Set<String> _loaded = {};
 
-  String familyFor(int page, [MushafFontEdition edition = MushafFontEdition.v2]) =>
-      edition == MushafFontEdition.v1 ? 'QCF_V1_P$page' : 'QCF_P$page';
+  String familyFor(int page, [MushafFontEdition edition = MushafFontEdition.v2]) => switch (edition) {
+        MushafFontEdition.v1 => 'QCF_V1_P$page',
+        MushafFontEdition.v4Tajweed => 'QCF_V4T_P$page',
+        MushafFontEdition.v2 => 'QCF_P$page',
+      };
 
   Future<String> ensureLoaded(int page, [MushafFontEdition edition = MushafFontEdition.v2]) async {
     final family = familyFor(page, edition);

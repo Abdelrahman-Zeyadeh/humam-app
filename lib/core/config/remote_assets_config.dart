@@ -25,6 +25,20 @@ String fontV1DownloadUrl(int page) {
   return '$kFontsV1BaseUrl/QCF_P$pad.TTF';
 }
 
+/// رابط استضافة خطوط صفحات مصحف QCF V4 Tajweed (طبعة ١٤٤١هـ، ألوان تجويد
+/// مدمجة بالglyph) — مباشرة من CDN المصدر الرسمي (Tarteel AI / QUL،
+/// `lib/exporter/export_font.rb` بمستودعهم يؤكد نفس نمط الرابط: تحقّق
+/// يدوي ٢٠٢٦-٠٩-٠٤ من نجاح تنزيل `p1.ttf`..`p604.ttf` (HTTP 200، حجم
+/// طبيعي)). **رابط طرف ثالث مباشر لا نسخة مستضافة عندنا** — نفس نمط
+/// [kFontsV1BaseUrl] بالضبط (رابط raw.githubusercontent مباشر)، لا سابقة
+/// جديدة بهالمشروع. لاحقاً: يُستحسن نسخها لـ`humam-app-assets` (GitHub
+/// Releases) لتفادي أي تعطيل/تغيير مفاجئ من الطرف الثالث — راجع تنويه
+/// توثيق QUL نفسه عن الخط "تحت التدقيق (proofreading)" وقت الكتابة.
+String kFontsV4TajweedBaseUrl =
+    'https://static-cdn.tarteel.ai/qul/fonts/quran_fonts/v4-tajweed/ttf';
+
+String fontV4TajweedDownloadUrl(int page) => '$kFontsV4TajweedBaseUrl/p$page.ttf';
+
 /// رابط استضافة كتب الأحاديث غير المضمَّنة (كل شيء عدا الأربعين النووية/
 /// القدسية — راجع `hadith_book_catalog.dart`). GitHub Releases، مستودع
 /// `humam-app-assets`، وسم `hadith-v1` — تحقّق ٢٠٢٦-٠٨-٢٢ من نجاح تنزيل
@@ -63,10 +77,10 @@ String tafsirEditionDownloadUrl(String editionKey) => '$kTafsirEditionsBaseUrl/t
 /// `normal_001.webp`) — هيك رُفعت فعلياً يدوياً، أبسط من إعادة تسمية
 /// ٦٠٤×٣ ملف محلياً بلا أي فائدة عملية إضافية.
 ///
-/// **لم تُرفع الإصدارات بعد** — تحويل ملفات PDF المصدرية لصور فعلية
-/// (`tools/build_mushaf_page_images.py`) عمل منفصل قيد التنفيذ بالتوازي.
-/// الرابط جاهز بنفس نمط `kFontsBaseUrl`/`kTafsirEditionsBaseUrl` تحسّباً؛
-/// لا تفترض نجاح التنزيل الفعلي قبل تحقّق مباشر من رفع الوسوم.
+/// **حالة الرفع (تحقّق مباشر عبر GitHub API ٢٠٢٦-٠٩-٠٤):** `normal` و
+/// `jawamie` مكتملتان (٦٠٤/٦٠٤ لكل منهما)، `premium` جزئية (٣٠٨/٦٠٤ فقط
+/// حتى الآن) — لا تفترض اكتمال أي نسخة بلا تحقّق مباشر جديد لو رجعت
+/// لهالموضوع لاحقاً، الرفع قد يكون قيد الاستمرار.
 ///
 /// تجاوز اختياري (افتراضياً `null`) — يسمح لاختبار
 /// `mushaf_image_download_test.dart` بإعادة توجيه كل النسخ مؤقّتاً لخادم
@@ -81,5 +95,11 @@ String mushafImagePageUrl(String editionId, int page) {
   final pad = page.toString().padLeft(3, '0');
   final base = kMushafImagesBaseUrlOverride ??
       'https://github.com/Abdelrahman-Zeyadeh/humam-app-assets/releases/download/mushaf-images-$editionId-v1';
-  return '$base/$pad.webp';
+  // **باج حقيقي مُصلَح هون**: كان الرابط يطلب `$pad.webp` (مثلاً
+  // `014.webp`) بينما أسماء الملفات الفعلية المرفوعة مسبوقة باسم النسخة
+  // (`jawamie_014.webp`، راجع التوثيق أعلى الملف) — يعني كل طلب تنزيل
+  // كان يرجع ٤٠٤ دائماً بلا استثناء (تحقّق مباشر عبر GitHub API)، وهذا
+  // بالضبط سبب بلاغ "تعذّر تنزيل بعض الصفحات" بشاشة `MushafImageDownloadScreen`
+  // — لم يكن خاصاً بصفحة معينة، كل الصفحات كانت تفشل بنفس السبب.
+  return '$base/${editionId}_$pad.webp';
 }

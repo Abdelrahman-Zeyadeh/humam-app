@@ -85,7 +85,11 @@ class FontDownloadController extends Notifier<FontDownloadState> {
 
   Future<Directory> _fontsDir([MushafFontEdition edition = MushafFontEdition.v2]) async {
     final dir = await getApplicationDocumentsDirectory();
-    final sub = edition == MushafFontEdition.v1 ? 'downloaded_fonts_v1' : 'downloaded_fonts';
+    final sub = switch (edition) {
+      MushafFontEdition.v1 => 'downloaded_fonts_v1',
+      MushafFontEdition.v4Tajweed => 'downloaded_fonts_v4_tajweed',
+      MushafFontEdition.v2 => 'downloaded_fonts',
+    };
     final fontsDir = Directory(p.join(dir.path, sub));
     if (!await fontsDir.exists()) await fontsDir.create(recursive: true);
     return fontsDir;
@@ -129,9 +133,11 @@ class FontDownloadController extends Notifier<FontDownloadState> {
       }
       return;
     }
-    final url = edition == MushafFontEdition.v1
-        ? fontV1DownloadUrl(page)
-        : fontDownloadUrl(page);
+    final url = switch (edition) {
+      MushafFontEdition.v1 => fontV1DownloadUrl(page),
+      MushafFontEdition.v4Tajweed => fontV4TajweedDownloadUrl(page),
+      MushafFontEdition.v2 => fontDownloadUrl(page),
+    };
     final result = await downloadResumable(
       dio: Dio(),
       url: url,
