@@ -28,12 +28,14 @@ import 'tafsir_reading_screen.dart';
 
 const int kMushafPageCount = 604;
 
-/// مفتاح "تجاهل" شريط تنبيه تنزيل خطوط V2 الباقية — **محفوظ بين الجلسات**
+/// مفتاح "تجاهل" شريط تنبيه تنزيل الخطوط الباقية — **محفوظ بين الجلسات**
 /// (كان قبلاً `bool` محلي بالودجت فقط، يرجع يظهر كل فتح تطبيق جديد رغم
-/// ضغط "لاحقاً" — بلاغ صاحب المشروع "مزعج وماخذ مساحة"). لا حاجة لمفتاح
-/// منفصل لكل طبعة (V1/V4 Tajweed) — الشريط خاص بـV2 حصراً أصلاً (يعتمد
-/// `kFirstDownloadablePage`/`kLastDownloadablePage` تبع V2 تحديداً).
-const _kFontDownloadBannerDismissedKey = 'mushaf_font_download_banner_dismissed';
+/// ضغط "لاحقاً" — بلاغ صاحب المشروع "مزعج وماخذ مساحة"). **مستقل لكل طبعة**
+/// (`.name` مضافاً لاحقة) — الشريط هلق يتبع طبعة المصحف المختارة فعلياً
+/// (`fontDownloadedCountProvider`، لا V2 حصراً كالسابق)، فتجاهله لطبعة لا
+/// يخفيه تلقائياً عن طبعة أخرى بعد تبديل الخط.
+String _fontDownloadBannerDismissedKey(MushafFontEdition edition) =>
+    'mushaf_font_download_banner_dismissed_${edition.name}';
 
 const Duration _kChromeAnim = Duration(milliseconds: 200);
 
@@ -85,6 +87,13 @@ final _pageSurahNameProvider = FutureProvider.family<String, int>((
   final surah = await quran.surahById(ayahs.first.surah);
   if (surah.id == 5) return 'المائدة';
   return surahShortName(surah.nameAr);
+});
+
+/// رقم سورة الصفحة الحالية — لغليف `surah{NNN}` بشريط هوية الصفحة
+/// (`_PageIdentityBar`)، بدل الاكتفاء بالاسم النصي أعلاه.
+final _pageSurahIdProvider = FutureProvider.family<int, int>((ref, page) async {
+  final ayahs = await ref.watch(quranRepositoryProvider).ayahsForPage(page);
+  return ayahs.isEmpty ? 1 : ayahs.first.surah;
 });
 
 /// شاشة عرض المصحف: تقليب أفقي بين الصفحات (٦٠٤ صفحة)، كل صفحة تُبنى
@@ -166,7 +175,9 @@ class MushafScreen extends ConsumerStatefulWidget {
 class _MushafScreenState extends ConsumerState<MushafScreen> {
   late final PageController _controller;
   late int _currentPage;
-  bool _downloadBannerDismissed = false;
+  /// أسماء طبعات (`MushafFontEdition.name`) تجاهَل المستخدم شريط تنزيلها
+  /// — راجع توثيق [_fontDownloadBannerDismissedKey].
+  final Set<String> _dismissedFontDownloadBanners = {};
   Timer? _highlightClearTimer;
   // --- تعقّب "جلسة قراءة" لـ`reading_log` (راجع UserRepository.logReadingSession)
   // — لا نكتب صفاً بكل تصفّح صفحة (بحث/قفز فهرس يقلّب عدة صفحات بسرعة)، بل
@@ -191,8 +202,12 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
     _currentPage =
         widget.initialPage ?? ref.read(userPrefsProvider).lastReadPage ?? 1;
     _controller = PageController(initialPage: _currentPage - 1);
-    _downloadBannerDismissed =
-        ref.read(sharedPreferencesProvider).getBool(_kFontDownloadBannerDismissedKey) ?? false;
+    final prefs = ref.read(sharedPreferencesProvider);
+    for (final edition in MushafFontEdition.values) {
+      if (prefs.getBool(_fontDownloadBannerDismissedKey(edition)) ?? false) {
+        _dismissedFontDownloadBanners.add(edition.name);
+      }
+    }
     // **لا** تعديل حالة أي Notifier هون (`hifzPickerProvider.notifier.activate()`
     // كان هون سابقاً) — Riverpod يمنع صراحة تعديل حالة provider أثناء
     // `initState` (يرمي "Tried to modify a provider while the widget tree
@@ -437,11 +452,12 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
     ref.read(qiyamSessionProvider.notifier).recordAyahs(ayahs.map((a) => a.id));
   }
 
-  /// يخفي شريط "تنزيل الخطوط الباقية" **نهائياً** (لا لهالجلسة فقط) — راجع
-  /// توثيق [_kFontDownloadBannerDismissedKey] أعلى الملف.
-  void _dismissDownloadBannerPermanently() {
-    setState(() => _downloadBannerDismissed = true);
-    ref.read(sharedPreferencesProvider).setBool(_kFontDownloadBannerDismissedKey, true);
+  /// يخفي شريط "تنزيل الخطوط الباقية" **نهائياً لهذه الطبعة تحديداً** (لا
+  /// لهالجلسة فقط، ولا لبقية الطبعات) — راجع توثيق
+  /// [_fontDownloadBannerDismissedKey] أعلى الملف.
+  void _dismissDownloadBannerPermanently(MushafFontEdition edition) {
+    setState(() => _dismissedFontDownloadBanners.add(edition.name));
+    ref.read(sharedPreferencesProvider).setBool(_fontDownloadBannerDismissedKey(edition), true);
   }
 
   /// ينهي جلسة القيام: يحفظ عدد آياتها بـ`QiyamAyahLog` (تراكمي لليوم)،
@@ -568,13 +584,21 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
         hifzPickerProvider.select((s) => s.pendingFrom),
       );
     }
-    final totalDownloadable =
-        kLastDownloadablePage - kFirstDownloadablePage + 1;
-    final missingPages =
-        totalDownloadable - downloadState.downloadedPages.length;
+    // شريط "باقي X صفحة" **مستقل عن طبعة التنزيل النشطة بشاشة التنزيل**
+    // (`FontDownloadState.activeEdition`) — يتبع طبعة المصحف المختارة
+    // فعلياً حالياً (`mushafFontEditionProvider`) دايماً، ويتبدّل تلقائياً
+    // لعدّاد الطبعة الجديدة فور تبديلها بالإعدادات (بطلب صاحب المشروع).
+    final currentFontEdition = ref.watch(mushafFontEditionProvider);
+    final (downloadableFirst, downloadableLast) = downloadableRangeFor(currentFontEdition);
+    final totalDownloadable = downloadableLast - downloadableFirst + 1;
+    final downloadedCountAsync = ref.watch(fontDownloadedCountProvider(currentFontEdition));
+    final missingPages = totalDownloadable - (downloadedCountAsync.value ?? 0);
+    final bulkRunningForCurrentEdition =
+        downloadState.isBulkRunning && downloadState.activeEdition == currentFontEdition;
     final showDownloadBanner =
-        !_downloadBannerDismissed &&
-        !downloadState.isBulkRunning &&
+        !_dismissedFontDownloadBanners.contains(currentFontEdition.name) &&
+        !bulkRunningForCurrentEdition &&
+        downloadedCountAsync.hasValue &&
         missingPages > 0;
 
     return Scaffold(
@@ -651,9 +675,10 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
             ),
           // شريط رفيع سطر واحد (بدل `MaterialBanner` القديم الكبير بحشوة
           // ٨+صف أزرار كاملة) — بلاغ صاحب المشروع "مزعج وماخذ مساحة".
-          // "تجاهل" هلق **دائم** (`_kFontDownloadBannerDismissedKey`) لا
-          // جلسة واحدة فقط — يظهر مرّة، يختفي نهائياً بعد "لاحقاً" أو ×،
-          // المستخدم دايماً يقدر يفتح "تنزيل الخطوط" يدوياً من الإعدادات.
+          // "تجاهل" **دائم لكل طبعة على حدة** (`_fontDownloadBannerDismissedKey`)
+          // لا جلسة واحدة فقط — يظهر مرّة لكل طبعة، يختفي نهائياً بعد
+          // "لاحقاً" أو × **لتلك الطبعة تحديداً**، والعدّاد نفسه يتبع طبعة
+          // المصحف الحالية دايماً (`fontDownloadedCountProvider`).
           if (showDownloadBanner)
             SafeArea(
               bottom: false,
@@ -675,9 +700,9 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
                     ),
                     GestureDetector(
                       onTap: () async {
-                        _dismissDownloadBannerPermanently();
+                        _dismissDownloadBannerPermanently(currentFontEdition);
                         await Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const FontDownloadScreen()),
+                          MaterialPageRoute(builder: (_) => FontDownloadScreen(edition: currentFontEdition)),
                         );
                       },
                       child: Text(
@@ -695,7 +720,7 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
                       constraints: const BoxConstraints(),
                       visualDensity: VisualDensity.compact,
                       color: fg.withValues(alpha: 0.6),
-                      onPressed: _dismissDownloadBannerPermanently,
+                      onPressed: () => _dismissDownloadBannerPermanently(currentFontEdition),
                     ),
                   ],
                 ),
@@ -986,6 +1011,7 @@ class _PageIdentityBar extends ConsumerWidget {
     final hizbAsync = ref.watch(_pageHizbProvider(page));
     final rubAsync = ref.watch(_pageRubProvider(page));
     final surahAsync = ref.watch(_pageSurahNameProvider(page));
+    final surahIdAsync = ref.watch(_pageSurahIdProvider(page));
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final accent = themeAccent(context);
 
@@ -1007,9 +1033,9 @@ class _PageIdentityBar extends ConsumerWidget {
     // شريط هوية الصفحة — إطار **متصل** واحد (بدل شريحتين منفصلتين + خط
     // سفلي فقط سابقاً): حدّ كامل حول الشريط بأكمله + خط فاصل عمودي واحد
     // بالنص يقسمه لمنطقتَي الجزء/اسم السورة، فيُقرأ كقطعة واحدة متماسكة لا
-    // عنصرين طائفين. **حركة خفيفة واحدة** بطلب صاحب المشروع: تحوّل هادئ
-    // (تلاشٍ + انزلاق بسيط) لكل نص يتغيّر مع تصفّح الصفحات (`AnimatedSwitcher`
-    // بـ`_AnimatedIdentityText`) — لا شي أكتر (بلا نبض/دوران/إلخ).
+    // عنصرين طائفين. **بلا أي حركة/تحوّل** — كان فيه تلاشٍ+انزلاق بسيط مع
+    // كل تصفّح صفحة (`AnimatedSwitcher`)، أُزيل بطلب صاحب المشروع (مزعج
+    // مع التصفّح السريع المتكرر).
     return Material(
       color: bg,
       child: SafeArea(
@@ -1017,7 +1043,7 @@ class _PageIdentityBar extends ConsumerWidget {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
           child: Container(
-            height: 38,
+            height: 46,
             decoration: BoxDecoration(
               color: accent.withValues(alpha: isDark ? 0.08 : 0.05),
               borderRadius: BorderRadius.circular(10),
@@ -1031,49 +1057,45 @@ class _PageIdentityBar extends ConsumerWidget {
                     onTap: onJuzTap,
                     borderRadius: const BorderRadius.horizontal(left: Radius.circular(10)),
                     child: Center(
-                      child: _AnimatedIdentityText(
-                        valueKey: '$juzText|$hizbFraction',
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            juzText,
+                            style: TextStyle(
+                              color: fg.withValues(alpha: 0.9),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Cairo',
+                            ),
+                          ),
+                          if (hizbFraction.isNotEmpty) ...[
+                            Container(
+                              width: 3.5,
+                              height: 3.5,
+                              margin: const EdgeInsets.symmetric(horizontal: 6),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: accent.withValues(alpha: 0.8),
+                              ),
+                            ),
                             Text(
-                              juzText,
+                              hizbFraction,
                               style: TextStyle(
-                                color: fg.withValues(alpha: 0.9),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
+                                color: fg.withValues(alpha: 0.75),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
                                 fontFamily: 'Cairo',
                               ),
                             ),
-                            if (hizbFraction.isNotEmpty) ...[
-                              Container(
-                                width: 3.5,
-                                height: 3.5,
-                                margin: const EdgeInsets.symmetric(horizontal: 6),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: accent.withValues(alpha: 0.8),
-                                ),
-                              ),
-                              Text(
-                                hizbFraction,
-                                style: TextStyle(
-                                  color: fg.withValues(alpha: 0.75),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  fontFamily: 'Cairo',
-                                ),
-                              ),
-                            ],
                           ],
-                        ),
+                        ],
                       ),
                     ),
                   ),
                 ),
-
                 // الخط الفاصل — يوصل الإطارين ببعض بصرياً كقطعة واحدة
-                Container(width: 1, height: 18, color: accent.withValues(alpha: 0.28)),
+                Container(width: 1, height: 24, color: accent.withValues(alpha: 0.28)),
 
                 // لمسة اسم السورة
                 Expanded(
@@ -1081,29 +1103,47 @@ class _PageIdentityBar extends ConsumerWidget {
                     onTap: onSurahTap,
                     borderRadius: const BorderRadius.horizontal(right: Radius.circular(10)),
                     child: Center(
-                      child: _AnimatedIdentityText(
-                        valueKey: surahText,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              surahText,
-                              style: TextStyle(
-                                color: isDark
-                                    ? const Color(0xFFF3DA8E)
-                                    : const Color(0xFF1B3022),
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                fontFamily: 'AmiriQuran',
+                      child: Semantics(
+                        label: surahText,
+                        child: ExcludeSemantics(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // نفس غليف "سورة" + اسم السورة العثماني
+                              // (SurahNameV4) المستخدَم بصفحة المصحف
+                              // والفهرس — بدل نص AmiriQuran، بطلب صاحب
+                              // المشروع.
+                              Text(
+                                'surah-icon',
+                                style: TextStyle(
+                                  color: isDark
+                                      ? const Color(0xFFF3DA8E)
+                                      : const Color(0xFF1B3022),
+                                  fontSize: 19,
+                                  fontFamily: 'SurahNameV4',
+                                  fontFeatures: const [FontFeature.enable('liga')],
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 4),
-                            Icon(
-                              Icons.arrow_drop_down_rounded,
-                              size: 18,
-                              color: fg.withValues(alpha: 0.5),
-                            ),
-                          ],
+                              const SizedBox(width: 3),
+                              Text(
+                                'surah${(surahIdAsync.value ?? 1).toString().padLeft(3, '0')}',
+                                style: TextStyle(
+                                  color: isDark
+                                      ? const Color(0xFFF3DA8E)
+                                      : const Color(0xFF1B3022),
+                                  fontSize: 19,
+                                  fontFamily: 'SurahNameV4',
+                                  fontFeatures: const [FontFeature.enable('liga')],
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                Icons.arrow_drop_down_rounded,
+                                size: 18,
+                                color: fg.withValues(alpha: 0.5),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -1114,31 +1154,6 @@ class _PageIdentityBar extends ConsumerWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// تحوّل هادئ (تلاشٍ + انزلاق رأسي بسيط ٤px) لنص شريط هوية الصفحة كل ما
-/// تغيّرت قيمته (تصفّح لصفحة بجزء/سورة مختلفة) — [valueKey] يحدّد متى
-/// يُعاد تشغيل الحركة (`AnimatedSwitcher` يستبدل الودجت كاملاً لمّا يتغيّر
-/// مفتاحه). حركة واحدة خفيفة فقط بطلب صاحب المشروع، ٢٢٠مل ثانية.
-class _AnimatedIdentityText extends StatelessWidget {
-  const _AnimatedIdentityText({required this.valueKey, required this.child});
-  final String valueKey;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 220),
-      transitionBuilder: (widget, animation) => FadeTransition(
-        opacity: animation,
-        child: SlideTransition(
-          position: Tween<Offset>(begin: const Offset(0, 0.12), end: Offset.zero).animate(animation),
-          child: widget,
-        ),
-      ),
-      child: KeyedSubtree(key: ValueKey(valueKey), child: child),
     );
   }
 }

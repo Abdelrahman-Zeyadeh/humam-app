@@ -122,7 +122,12 @@ class FontDownloadController extends Notifier<FontDownloadState> {
     return File(p.join(dir.path, filename));
   }
 
-  Future<Set<int>> _scanDownloaded(MushafFontEdition edition) async {
+  /// مسح ملفات طبعة معيّنة محلياً — **للقراءة فقط، بلا لمس [state]**
+  /// (خلافاً لـ[_scanExisting]/[switchEdition] يلي بيغيّران `activeEdition`
+  /// المشترك). يسمح لأي مستهلك (شريط تنبيه "باقي X صفحة" بـ`mushaf_screen.dart`
+  /// مثلاً) يستعلم عن تقدّم أي طبعة **بغضّ النظر عن الطبعة النشطة حالياً**
+  /// بشاشة تنزيل الحزمة — راجع [fontDownloadedCountProvider].
+  Future<Set<int>> scanDownloadedPages(MushafFontEdition edition) async {
     final dir = await _fontsDir(edition);
     final pattern = edition == MushafFontEdition.v1
         ? RegExp(r'^QCF_P(\d+)\.TTF$', caseSensitive: false)
@@ -148,7 +153,7 @@ class FontDownloadController extends Notifier<FontDownloadState> {
   }
 
   Future<void> _scanExisting(MushafFontEdition edition) async {
-    final found = await _scanDownloaded(edition);
+    final found = await scanDownloadedPages(edition);
     final (first, last) = downloadableRangeFor(edition);
     state = state.copyWith(
       activeEdition: edition,
@@ -271,3 +276,16 @@ class FontDownloadController extends Notifier<FontDownloadState> {
 final fontDownloadControllerProvider = NotifierProvider<FontDownloadController, FontDownloadState>(
   FontDownloadController.new,
 );
+
+/// عدد صفحات طبعة معيّنة محمَّلة محلياً فعلاً — **مستقل تماماً عن الطبعة
+/// النشطة بشاشة التنزيل** (`FontDownloadState.activeEdition`)، فيسمح
+/// لشريط تنبيه "باقي X صفحة" (`mushaf_screen.dart`) يعرض تقدّم **طبعة
+/// المصحف المختارة فعلياً حالياً** دايماً — يتبدّل تلقائياً لعدّاد الطبعة
+/// الجديدة فور تغييرها بالإعدادات، بلا حاجة لفتح شاشة تنزيل تلك الطبعة
+/// أولاً. لا يُعيد الاستعلام (`autoDispose` الافتراضي لـ`FutureProvider`
+/// كافٍ) إلا عند تغيّر [edition] أو حدث آخر يُعيد بناء المستهلك.
+final fontDownloadedCountProvider = FutureProvider.family<int, MushafFontEdition>((ref, edition) async {
+  final controller = ref.watch(fontDownloadControllerProvider.notifier);
+  final found = await controller.scanDownloadedPages(edition);
+  return found.length;
+});

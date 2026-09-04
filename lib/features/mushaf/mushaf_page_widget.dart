@@ -176,8 +176,8 @@ class _SurahNameOrnament extends StatelessWidget {
     return Transform.rotate(
       angle: 0.785398, // ٤٥° — معيّن لا مربّع
       child: Container(
-        width: 6,
-        height: 6,
+        width: 8,
+        height: 8,
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.55),
           borderRadius: BorderRadius.circular(1.5),
@@ -227,7 +227,7 @@ class _PageLineWidget extends ConsumerWidget {
             // "كبير" زيادة رغم صغر ارتفاعه (بلاغ صاحب المشروع). هيك يتقلّص
             // لعرض محتواه فقط — شارة صغيرة موسّطة لا شريط بعرض الصفحة.
             child: Container(
-              height: 32,
+              height: 48,
               margin: const EdgeInsets.symmetric(vertical: 2),
               padding: const EdgeInsets.symmetric(horizontal: 14),
               alignment: Alignment.center,
@@ -255,7 +255,8 @@ class _PageLineWidget extends ConsumerWidget {
                           'surah-icon',
                           style: TextStyle(
                             color: isDark ? const Color(0xFFF3DA8E) : const Color(0xFF1E1A16),
-                            fontSize: 16,
+                            fontSize: 27,
+                            height: 1.1,
                             fontFamily: 'SurahNameV4',
                             fontFeatures: const [FontFeature.enable('liga')],
                           ),
@@ -265,7 +266,7 @@ class _PageLineWidget extends ConsumerWidget {
                           'surah${(line.surahRef ?? 1).toString().padLeft(3, '0')}',
                           style: TextStyle(
                             color: isDark ? const Color(0xFFF3DA8E) : const Color(0xFF1E1A16),
-                            fontSize: 19,
+                            fontSize: 27,
                             height: 1.1,
                             fontFamily: 'SurahNameV4',
                             fontFeatures: const [FontFeature.enable('liga')],

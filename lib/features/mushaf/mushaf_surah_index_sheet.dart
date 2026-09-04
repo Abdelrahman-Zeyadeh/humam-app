@@ -178,7 +178,7 @@ Widget _surahTitleWidget(
             'surah-icon',
             style: TextStyle(
               color: color,
-              fontSize: 14,
+              fontSize: 23,
               fontFamily: 'SurahNameV4',
               fontFeatures: const [FontFeature.enable('liga')],
             ),
@@ -188,7 +188,7 @@ Widget _surahTitleWidget(
             'surah${surahId.toString().padLeft(3, '0')}',
             style: TextStyle(
               color: color,
-              fontSize: 18,
+              fontSize: 23,
               fontFamily: 'SurahNameV4',
               fontFeatures: const [FontFeature.enable('liga')],
             ),

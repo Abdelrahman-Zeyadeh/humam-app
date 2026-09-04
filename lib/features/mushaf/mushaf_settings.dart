@@ -37,7 +37,9 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
   }
 }
 
-final themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(ThemeModeNotifier.new);
+final themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(
+  ThemeModeNotifier.new,
+);
 
 const _kMushafFontEditionKey = 'mushaf_font_edition';
 
@@ -55,9 +57,9 @@ enum MushafFontEdition {
   // `MushafFontEdition.values` مباشرة) — v1 ثم v2 ثم v4Tajweed بطلب صاحب
   // المشروع، لا علاقة له بـ`.name` المخزَّن بـSharedPreferences (يعتمد
   // اسم الحالة نفسه لا ترتيبها، فإعادة الترتيب هون آمنة بلا أي هجرة).
-  v1(label: 'مصحف المدينة (الكلاسيكي 1405هـ V1)'),
-  v2(label: 'مصحف المدينة (الحديث V2)'),
-  v4Tajweed(label: 'مصحف المدينة الملوّن (تجويد V4)');
+  v1(label: 'مصحف المدينة (الكلاسيكي 1405هـ)'),
+  v2(label: 'مصحف المدينة (الحديث 1422هـ)'),
+  v4Tajweed(label: 'مصحف المدينة الملوّن (تجويد 1441هـ)');
 
   const MushafFontEdition({required this.label});
   final String label;
@@ -66,7 +68,9 @@ enum MushafFontEdition {
 class MushafFontEditionNotifier extends Notifier<MushafFontEdition> {
   @override
   MushafFontEdition build() {
-    final raw = ref.watch(sharedPreferencesProvider).getString(_kMushafFontEditionKey);
+    final raw = ref
+        .watch(sharedPreferencesProvider)
+        .getString(_kMushafFontEditionKey);
     return switch (raw) {
       'v1' => MushafFontEdition.v1,
       _ => MushafFontEdition.v2,
@@ -75,12 +79,16 @@ class MushafFontEditionNotifier extends Notifier<MushafFontEdition> {
 
   void set(MushafFontEdition edition) {
     state = edition;
-    ref.read(sharedPreferencesProvider).setString(_kMushafFontEditionKey, edition.name);
+    ref
+        .read(sharedPreferencesProvider)
+        .setString(_kMushafFontEditionKey, edition.name);
   }
 }
 
 final mushafFontEditionProvider =
-    NotifierProvider<MushafFontEditionNotifier, MushafFontEdition>(MushafFontEditionNotifier.new);
+    NotifierProvider<MushafFontEditionNotifier, MushafFontEdition>(
+      MushafFontEditionNotifier.new,
+    );
 
 /// درجات حجم خط المصحف. التخطيط بخط QCF يملأ عرض السطر دايماً (`FittedBox`
 /// بـ `fitWidth`) فلا معنى لرقم بكسل مباشر؛ نتحكم بالحجم عبر الهامش الجانبي
@@ -114,7 +122,9 @@ class MushafTextSizeNotifier extends Notifier<MushafTextSize> {
 }
 
 final mushafTextSizeProvider =
-    NotifierProvider<MushafTextSizeNotifier, MushafTextSize>(MushafTextSizeNotifier.new);
+    NotifierProvider<MushafTextSizeNotifier, MushafTextSize>(
+      MushafTextSizeNotifier.new,
+    );
 
 /// وضع الحفظ: يخفي كل سطور الآيات خلف غطاء، وتُكشَف آية واحدة بالضغط
 /// عليها (نفس الغليفات الحقيقية المرسومة أصلاً — لا نص بديل ولا تخمين).
@@ -129,9 +139,10 @@ class MemorizationModeNotifier extends Notifier<bool> {
   }
 }
 
-final memorizationModeProvider = NotifierProvider<MemorizationModeNotifier, bool>(
-  MemorizationModeNotifier.new,
-);
+final memorizationModeProvider =
+    NotifierProvider<MemorizationModeNotifier, bool>(
+      MemorizationModeNotifier.new,
+    );
 
 /// معرّفات الآيات المكشوفة حالياً بوضع الحفظ (تُصفَّر عند إيقاف الوضع أو
 /// عند الضغط على "إخفاء الكل").
@@ -158,7 +169,12 @@ final revealedAyahsProvider = NotifierProvider<RevealedAyahsNotifier, Set<int>>(
 /// الضغط) — `MushafScreen` يستمع لهما (`ref.listen`) ليُرجِعهما عبر
 /// `Navigator.pop`.
 class HifzPickerState {
-  const HifzPickerState({this.active = false, this.pendingFrom, this.completedFrom, this.completedTo});
+  const HifzPickerState({
+    this.active = false,
+    this.pendingFrom,
+    this.completedFrom,
+    this.completedTo,
+  });
   final bool active;
   final int? pendingFrom;
   final int? completedFrom;
@@ -180,13 +196,19 @@ class HifzPickerNotifier extends Notifier<HifzPickerState> {
     }
     final from = pending <= ayahId ? pending : ayahId;
     final to = pending <= ayahId ? ayahId : pending;
-    state = HifzPickerState(active: true, pendingFrom: pending, completedFrom: from, completedTo: to);
+    state = HifzPickerState(
+      active: true,
+      pendingFrom: pending,
+      completedFrom: from,
+      completedTo: to,
+    );
   }
 }
 
-final hifzPickerProvider = NotifierProvider<HifzPickerNotifier, HifzPickerState>(
-  HifzPickerNotifier.new,
-);
+final hifzPickerProvider =
+    NotifierProvider<HifzPickerNotifier, HifzPickerState>(
+      HifzPickerNotifier.new,
+    );
 
 /// رؤية شريطَي المصحف العائمين (`_TopChromeBar`/`_BottomChromeBar` بـ
 /// `mushaf_screen.dart`) — **مرفوعة هون** (لا حالة محلية بالشاشة) لأن
@@ -203,9 +225,10 @@ class MushafChromeVisibleNotifier extends Notifier<bool> {
   void toggle() => state = !state;
 }
 
-final mushafChromeVisibleProvider = NotifierProvider<MushafChromeVisibleNotifier, bool>(
-  MushafChromeVisibleNotifier.new,
-);
+final mushafChromeVisibleProvider =
+    NotifierProvider<MushafChromeVisibleNotifier, bool>(
+      MushafChromeVisibleNotifier.new,
+    );
 
 /// طلب قفز لصفحة/آية معيّنة من مكان لا يملك مرجعاً مباشراً لـ`MushafScreen`
 /// المفتوحة أصلاً (شيت إجراءات آية، شيت متشابهات...) — نفس فكرة
@@ -228,9 +251,10 @@ class MushafJumpRequestNotifier extends Notifier<MushafJumpRequest?> {
   }
 }
 
-final mushafJumpRequestProvider = NotifierProvider<MushafJumpRequestNotifier, MushafJumpRequest?>(
-  MushafJumpRequestNotifier.new,
-);
+final mushafJumpRequestProvider =
+    NotifierProvider<MushafJumpRequestNotifier, MushafJumpRequest?>(
+      MushafJumpRequestNotifier.new,
+    );
 
 /// تظليل مؤقّت لآية وصلناها بقفز يدوي (متشابهات مثلاً) — مستقل تماماً عن
 /// تظليل التلاوة الصوتية (`quranAudioControllerProvider.currentAyahId`).
@@ -272,7 +296,10 @@ class QiyamSessionNotifier extends Notifier<QiyamSessionState> {
   /// تراكمي بسيط، فإعادة زيارة نفس الصفحة (تصفّح للخلف مثلاً) لا تُحتسَب مرتين.
   void recordAyahs(Iterable<int> ayahIds) {
     if (!state.active) return;
-    state = QiyamSessionState(active: true, seenAyahIds: {...state.seenAyahIds, ...ayahIds});
+    state = QiyamSessionState(
+      active: true,
+      seenAyahIds: {...state.seenAyahIds, ...ayahIds},
+    );
   }
 
   /// ينهي الجلسة ويعيد عدد الآيات النهائي — لا يُصفِّر الحالة فوراً
@@ -282,9 +309,10 @@ class QiyamSessionNotifier extends Notifier<QiyamSessionState> {
   void reset() => state = const QiyamSessionState();
 }
 
-final qiyamSessionProvider = NotifierProvider<QiyamSessionNotifier, QiyamSessionState>(
-  QiyamSessionNotifier.new,
-);
+final qiyamSessionProvider =
+    NotifierProvider<QiyamSessionNotifier, QiyamSessionState>(
+      QiyamSessionNotifier.new,
+    );
 
 // ملاحظة: `tajweedModeProvider`/`TajweedModeNotifier` (سويتش "تلوين أحكام
 // التجويد تلقائياً" القديم) حُذف — كان مرتبطاً بمحرك تلوين حرفي وقت
@@ -309,8 +337,9 @@ class TafsirFontSizeNotifier extends Notifier<double> {
   }
 }
 
-final tafsirFontSizeProvider =
-    NotifierProvider<TafsirFontSizeNotifier, double>(TafsirFontSizeNotifier.new);
+final tafsirFontSizeProvider = NotifierProvider<TafsirFontSizeNotifier, double>(
+  TafsirFontSizeNotifier.new,
+);
 
 const _kReadingTafsirEditionKey = 'reading_tafsir_edition';
 
@@ -327,12 +356,16 @@ class ReadingTafsirEditionNotifier extends Notifier<String> {
 
   void set(String edition) {
     state = edition;
-    ref.read(sharedPreferencesProvider).setString(_kReadingTafsirEditionKey, edition);
+    ref
+        .read(sharedPreferencesProvider)
+        .setString(_kReadingTafsirEditionKey, edition);
   }
 }
 
 final readingTafsirEditionProvider =
-    NotifierProvider<ReadingTafsirEditionNotifier, String>(ReadingTafsirEditionNotifier.new);
+    NotifierProvider<ReadingTafsirEditionNotifier, String>(
+      ReadingTafsirEditionNotifier.new,
+    );
 
 const _kMushafDisplayModeKey = 'mushaf_display_mode';
 
@@ -353,18 +386,26 @@ enum MushafDisplayMode {
 class MushafDisplayModeNotifier extends Notifier<MushafDisplayMode> {
   @override
   MushafDisplayMode build() {
-    final raw = ref.watch(sharedPreferencesProvider).getString(_kMushafDisplayModeKey);
-    return raw == 'rasterImage' ? MushafDisplayMode.rasterImage : MushafDisplayMode.liveText;
+    final raw = ref
+        .watch(sharedPreferencesProvider)
+        .getString(_kMushafDisplayModeKey);
+    return raw == 'rasterImage'
+        ? MushafDisplayMode.rasterImage
+        : MushafDisplayMode.liveText;
   }
 
   void set(MushafDisplayMode mode) {
     state = mode;
-    ref.read(sharedPreferencesProvider).setString(_kMushafDisplayModeKey, mode.name);
+    ref
+        .read(sharedPreferencesProvider)
+        .setString(_kMushafDisplayModeKey, mode.name);
   }
 }
 
 final mushafDisplayModeProvider =
-    NotifierProvider<MushafDisplayModeNotifier, MushafDisplayMode>(MushafDisplayModeNotifier.new);
+    NotifierProvider<MushafDisplayModeNotifier, MushafDisplayMode>(
+      MushafDisplayModeNotifier.new,
+    );
 
 const _kRasterMushafEditionKey = 'raster_mushaf_edition';
 
@@ -419,7 +460,9 @@ enum RasterMushafEdition {
 class RasterMushafEditionNotifier extends Notifier<RasterMushafEdition> {
   @override
   RasterMushafEdition build() {
-    final raw = ref.watch(sharedPreferencesProvider).getString(_kRasterMushafEditionKey);
+    final raw = ref
+        .watch(sharedPreferencesProvider)
+        .getString(_kRasterMushafEditionKey);
     return RasterMushafEdition.values.firstWhere(
       (e) => e.id == raw,
       orElse: () => RasterMushafEdition.normal,
@@ -428,10 +471,13 @@ class RasterMushafEditionNotifier extends Notifier<RasterMushafEdition> {
 
   void set(RasterMushafEdition edition) {
     state = edition;
-    ref.read(sharedPreferencesProvider).setString(_kRasterMushafEditionKey, edition.id);
+    ref
+        .read(sharedPreferencesProvider)
+        .setString(_kRasterMushafEditionKey, edition.id);
   }
 }
 
 final rasterMushafEditionProvider =
-    NotifierProvider<RasterMushafEditionNotifier, RasterMushafEdition>(RasterMushafEditionNotifier.new);
-
+    NotifierProvider<RasterMushafEditionNotifier, RasterMushafEdition>(
+      RasterMushafEditionNotifier.new,
+    );
