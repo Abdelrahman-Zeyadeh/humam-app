@@ -125,8 +125,8 @@ class _EditionDownloadCard extends ConsumerWidget {
                       else if (state.isBulkRunning)
                         Expanded(
                           child: OutlinedButton.icon(
-                            icon: const Icon(Icons.stop_circle_outlined),
-                            label: const Text('إيقاف'),
+                            icon: const Icon(Icons.pause_circle_outlined),
+                            label: const Text('إيقاف مؤقت'),
                             onPressed: () => controller.cancelBulk(edition.id),
                           ),
                         )

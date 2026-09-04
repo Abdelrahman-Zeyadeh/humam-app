@@ -28,6 +28,13 @@ import 'tafsir_reading_screen.dart';
 
 const int kMushafPageCount = 604;
 
+/// مفتاح "تجاهل" شريط تنبيه تنزيل خطوط V2 الباقية — **محفوظ بين الجلسات**
+/// (كان قبلاً `bool` محلي بالودجت فقط، يرجع يظهر كل فتح تطبيق جديد رغم
+/// ضغط "لاحقاً" — بلاغ صاحب المشروع "مزعج وماخذ مساحة"). لا حاجة لمفتاح
+/// منفصل لكل طبعة (V1/V4 Tajweed) — الشريط خاص بـV2 حصراً أصلاً (يعتمد
+/// `kFirstDownloadablePage`/`kLastDownloadablePage` تبع V2 تحديداً).
+const _kFontDownloadBannerDismissedKey = 'mushaf_font_download_banner_dismissed';
+
 const Duration _kChromeAnim = Duration(milliseconds: 200);
 
 /// جزء الصفحة الحالية — أول آية بالصفحة تكفي (الجزء لا يتغيّر داخل نفس
@@ -184,6 +191,8 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
     _currentPage =
         widget.initialPage ?? ref.read(userPrefsProvider).lastReadPage ?? 1;
     _controller = PageController(initialPage: _currentPage - 1);
+    _downloadBannerDismissed =
+        ref.read(sharedPreferencesProvider).getBool(_kFontDownloadBannerDismissedKey) ?? false;
     // **لا** تعديل حالة أي Notifier هون (`hifzPickerProvider.notifier.activate()`
     // كان هون سابقاً) — Riverpod يمنع صراحة تعديل حالة provider أثناء
     // `initState` (يرمي "Tried to modify a provider while the widget tree
@@ -428,6 +437,13 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
     ref.read(qiyamSessionProvider.notifier).recordAyahs(ayahs.map((a) => a.id));
   }
 
+  /// يخفي شريط "تنزيل الخطوط الباقية" **نهائياً** (لا لهالجلسة فقط) — راجع
+  /// توثيق [_kFontDownloadBannerDismissedKey] أعلى الملف.
+  void _dismissDownloadBannerPermanently() {
+    setState(() => _downloadBannerDismissed = true);
+    ref.read(sharedPreferencesProvider).setBool(_kFontDownloadBannerDismissedKey, true);
+  }
+
   /// ينهي جلسة القيام: يحفظ عدد آياتها بـ`QiyamAyahLog` (تراكمي لليوم)،
   /// يسجّل "تمّ قيام الليل اليوم" (نفس زر "سجّل قيامك الليلة" اليدوي
   /// بـ`qiyam_screen.dart`)، ثم يعرض ملخّصاً ويعيد المستخدم للشاشة السابقة.
@@ -633,41 +649,56 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
                 ),
               ),
             ),
+          // شريط رفيع سطر واحد (بدل `MaterialBanner` القديم الكبير بحشوة
+          // ٨+صف أزرار كاملة) — بلاغ صاحب المشروع "مزعج وماخذ مساحة".
+          // "تجاهل" هلق **دائم** (`_kFontDownloadBannerDismissedKey`) لا
+          // جلسة واحدة فقط — يظهر مرّة، يختفي نهائياً بعد "لاحقاً" أو ×،
+          // المستخدم دايماً يقدر يفتح "تنزيل الخطوط" يدوياً من الإعدادات.
           if (showDownloadBanner)
             SafeArea(
               bottom: false,
-              child: MaterialBanner(
-                backgroundColor: themeAccent(context).withValues(alpha: 0.12),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                leading: Icon(
-                  Icons.cloud_download_outlined,
-                  color: themeAccent(context),
-                ),
-                content: Text(
-                  'موارد مطلوبة: باقي $missingPages صفحة من المصحف تحتاج تنزيلاً لعرضها بلا إنترنت لاحقاً',
-                  style: TextStyle(color: fg, fontSize: 13),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () =>
-                        setState(() => _downloadBannerDismissed = true),
-                    child: const Text('لاحقاً'),
-                  ),
-                  FilledButton(
-                    onPressed: () async {
-                      setState(() => _downloadBannerDismissed = true);
-                      await Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const FontDownloadScreen(),
+              child: Container(
+                height: 34,
+                color: themeAccent(context).withValues(alpha: 0.12),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Row(
+                  children: [
+                    Icon(Icons.cloud_download_outlined, size: 15, color: themeAccent(context)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'باقي $missingPages صفحة تحتاج تنزيلاً للعمل بلا إنترنت',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: fg, fontSize: 11.5),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () async {
+                        _dismissDownloadBannerPermanently();
+                        await Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const FontDownloadScreen()),
+                        );
+                      },
+                      child: Text(
+                        'تنزيل',
+                        style: TextStyle(
+                          color: themeAccent(context),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
                         ),
-                      );
-                    },
-                    child: const Text('تنزيل'),
-                  ),
-                ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 15),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      visualDensity: VisualDensity.compact,
+                      color: fg.withValues(alpha: 0.6),
+                      onPressed: _dismissDownloadBannerPermanently,
+                    ),
+                  ],
+                ),
               ),
             ),
           _PageIdentityBar(

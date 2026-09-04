@@ -49,31 +49,37 @@ class RasterWordBox {
 /// — `try/catch` يرجع خريطة فاضية لو الملف مفقود عشان الودجت ما تكسر
 /// أثناء التطوير، تعرض حالة "بلا صناديق كلمات" (الصورة فقط بلا تفاعل)
 /// بدل كراش.
-final _rasterLayoutProvider = FutureProvider.family<Map<int, List<RasterWordBox>>, String>((
-  ref,
-  editionId,
-) async {
-  try {
-    final raw = await rootBundle.loadString('assets/quran/mushaf_images/$editionId/layout.json');
-    final decoded = jsonDecode(raw) as Map<String, dynamic>;
-    return {
-      for (final entry in decoded.entries)
-        int.parse(entry.key): [
-          for (final item in entry.value as List<dynamic>)
-            RasterWordBox.fromJson(item as Map<String, dynamic>),
-        ],
-    };
-  } catch (_) {
-    return const {};
-  }
-});
+final _rasterLayoutProvider =
+    FutureProvider.family<Map<int, List<RasterWordBox>>, String>((
+      ref,
+      editionId,
+    ) async {
+      try {
+        final raw = await rootBundle.loadString(
+          'assets/quran/mushaf_images/$editionId/layout.json',
+        );
+        final decoded = jsonDecode(raw) as Map<String, dynamic>;
+        return {
+          for (final entry in decoded.entries)
+            int.parse(entry.key): [
+              for (final item in entry.value as List<dynamic>)
+                RasterWordBox.fromJson(item as Map<String, dynamic>),
+            ],
+        };
+      } catch (_) {
+        return const {};
+      }
+    });
 
 typedef _RasterPageKey = ({String editionId, int page});
 
 /// ملف صورة صفحة منزَّل محلياً فعلاً — `null` لو غير منزَّل بعد. يراقب
 /// [MushafImageDownloadController] عشان يتحدّث تلقائياً فور اكتمال تنزيل
 /// هذه الصفحة بالذات بلا حاجة لإعادة فتح الصفحة يدوياً.
-final _rasterPageFileProvider = FutureProvider.family<File?, _RasterPageKey>((ref, key) async {
+final _rasterPageFileProvider = FutureProvider.family<File?, _RasterPageKey>((
+  ref,
+  key,
+) async {
   final downloaded = ref.watch(
     mushafImageDownloadControllerProvider.select(
       (s) => s.forEdition(key.editionId).downloadedPages.contains(key.page),
@@ -89,28 +95,40 @@ final _rasterPageFileProvider = FutureProvider.family<File?, _RasterPageKey>((re
 /// أبعاد صورة الصفحة الحقيقية (عرض×ارتفاع بالبكسل) — تُحسَب مرّة واحدة
 /// بفكّ ترميز الصورة، لتحويل صناديق [RasterWordBox] النسبية لموضع دقيق
 /// داخل `AspectRatio` مطابق تماماً لأبعاد الصورة الأصلية.
-final _rasterImageSizeProvider = FutureProvider.family<Size, String>((ref, path) async {
+final _rasterImageSizeProvider = FutureProvider.family<Size, String>((
+  ref,
+  path,
+) async {
   final bytes = await File(path).readAsBytes();
   final codec = await ui.instantiateImageCodec(bytes);
   final frame = await codec.getNextFrame();
-  final size = Size(frame.image.width.toDouble(), frame.image.height.toDouble());
+  final size = Size(
+    frame.image.width.toDouble(),
+    frame.image.height.toDouble(),
+  );
   frame.image.dispose();
   return size;
 });
 
 /// ودجت شقيقة لـ`MushafPageWidget` — ترسم صفحة من طبعة مصورة (سكان) بدل
 /// النص الحي بخط QCF. **بلا تلوين تجويد** بهذا الوضع (قرار مستخدم صريح،
-/// راجع خطة `golden-cuddling-tiger.md`) — لا تستهلك `tajweedModeProvider`
-/// إطلاقاً.
+/// راجع خطة `golden-cuddling-tiger.md`) — صورة سكان فعلية لا نص، فلا معنى
+/// أصلاً لأي طبعة خط (V1/V2/V4 Tajweed) هون.
 class MushafRasterPageWidget extends ConsumerWidget {
-  const MushafRasterPageWidget({super.key, required this.page, required this.edition});
+  const MushafRasterPageWidget({
+    super.key,
+    required this.page,
+    required this.edition,
+  });
 
   final int page;
   final RasterMushafEdition edition;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final fileAsync = ref.watch(_rasterPageFileProvider((editionId: edition.id, page: page)));
+    final fileAsync = ref.watch(
+      _rasterPageFileProvider((editionId: edition.id, page: page)),
+    );
 
     if (fileAsync.isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -126,7 +144,11 @@ class MushafRasterPageWidget extends ConsumerWidget {
 }
 
 class _RasterPageImage extends ConsumerWidget {
-  const _RasterPageImage({required this.file, required this.edition, required this.page});
+  const _RasterPageImage({
+    required this.file,
+    required this.edition,
+    required this.page,
+  });
 
   final File file;
   final RasterMushafEdition edition;
@@ -143,7 +165,8 @@ class _RasterPageImage extends ConsumerWidget {
       return const Center(child: Text('تعذّر قراءة صورة هذه الصفحة'));
     }
 
-    final layout = ref.watch(_rasterLayoutProvider(edition.id)).value ?? const {};
+    final layout =
+        ref.watch(_rasterLayoutProvider(edition.id)).value ?? const {};
     final wordsForPage = layout[page] ?? const <RasterWordBox>[];
     final byAyah = <int, List<RasterWordBox>>{};
     for (final word in wordsForPage) {
@@ -156,28 +179,36 @@ class _RasterPageImage extends ConsumerWidget {
     return InteractiveViewer(
       minScale: 1,
       maxScale: 5,
-      child: AspectRatio(
-        aspectRatio: intrinsicSize.width / intrinsicSize.height,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth;
-            final height = constraints.maxHeight;
-            return Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.file(file, fit: BoxFit.fill),
-                for (final entry in byAyah.entries)
-                  _AyahOverlay(
-                    ayahId: entry.key,
-                    boxes: entry.value,
-                    canvasWidth: width,
-                    canvasHeight: height,
-                    revealed: !memorizationOn || revealedAyahs.contains(entry.key),
-                    memorizationOn: memorizationOn,
-                  ),
-              ],
-            );
-          },
+      // **باج حقيقي مُصلَح هون**: بلا `Center` هون، `InteractiveViewer`
+      // كان يثبّت `AspectRatio` بزاوية الحاوية (يسار/أعلى) بدل توسيطها كل
+      // ما تختلف نسبة أبعاد صورة الصفحة عن نسبة أبعاد شاشة القراءة —
+      // بالضبط "الإزاحة" اللي وصفها صاحب المشروع بالسكرين شوت (هامش فاضٍ
+      // من جهة واحدة فقط بدل توسيط متماثل).
+      child: Center(
+        child: AspectRatio(
+          aspectRatio: intrinsicSize.width / intrinsicSize.height,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              final height = constraints.maxHeight;
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.file(file, fit: BoxFit.fill),
+                  for (final entry in byAyah.entries)
+                    _AyahOverlay(
+                      ayahId: entry.key,
+                      boxes: entry.value,
+                      canvasWidth: width,
+                      canvasHeight: height,
+                      revealed:
+                          !memorizationOn || revealedAyahs.contains(entry.key),
+                      memorizationOn: memorizationOn,
+                    ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -227,8 +258,12 @@ class _AyahOverlay extends ConsumerWidget {
       rect: rect,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onLongPress: revealed ? () => AyahActionsSheet.show(context, ayahId) : null,
-        onTap: !revealed ? () => ref.read(revealedAyahsProvider.notifier).reveal(ayahId) : null,
+        onLongPress: revealed
+            ? () => AyahActionsSheet.show(context, ayahId)
+            : null,
+        onTap: !revealed
+            ? () => ref.read(revealedAyahsProvider.notifier).reveal(ayahId)
+            : null,
         child: !revealed
             ? Container(
                 decoration: BoxDecoration(
@@ -252,7 +287,9 @@ class _RasterPageDownloadPrompt extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final editionState = ref.watch(mushafImageDownloadControllerProvider).forEdition(edition.id);
+    final editionState = ref
+        .watch(mushafImageDownloadControllerProvider)
+        .forEdition(edition.id);
     final busy = editionState.isBulkRunning;
 
     return Center(
@@ -261,7 +298,11 @@ class _RasterPageDownloadPrompt extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.download_outlined, size: 32, color: AppColors.inkSoft),
+            const Icon(
+              Icons.download_outlined,
+              size: 32,
+              color: AppColors.inkSoft,
+            ),
             const SizedBox(height: 8),
             const Text(
               'صورة هذه الصفحة تحتاج تنزيلاً',
@@ -274,7 +315,9 @@ class _RasterPageDownloadPrompt extends ConsumerWidget {
               label: const Text('تنزيل هذه الصفحة'),
               onPressed: busy
                   ? null
-                  : () => ref.read(mushafImageDownloadControllerProvider.notifier).downloadPage(edition.id, page),
+                  : () => ref
+                        .read(mushafImageDownloadControllerProvider.notifier)
+                        .downloadPage(edition.id, page),
             ),
           ],
         ),

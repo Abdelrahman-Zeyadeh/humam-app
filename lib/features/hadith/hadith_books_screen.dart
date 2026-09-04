@@ -356,8 +356,12 @@ class HadithBooksScreen extends ConsumerWidget {
                                       minHeight: 44,
                                     ),
                                     iconSize: 16,
-                                    icon: const Icon(Icons.close),
-                                    tooltip: 'إلغاء',
+                                    // "إيقاف مؤقت" لا إلغاء حقيقي — استئناف
+                                    // بمستوى البايت (`downloadResumable`)،
+                                    // إعادة الضغط على تنزيل الكتاب لاحقاً
+                                    // يكمل من حيث توقّف.
+                                    icon: const Icon(Icons.pause),
+                                    tooltip: 'إيقاف مؤقت',
                                     onPressed: controller.cancelDownload,
                                   ),
                                 )

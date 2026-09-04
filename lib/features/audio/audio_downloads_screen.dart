@@ -96,9 +96,12 @@ class AudioDownloadsScreen extends ConsumerWidget {
                   ),
                 ),
                 if (state.isBulkRunning)
+                  // "إيقاف مؤقت" لا "إلغاء" — استئناف حقيقي بمستوى البايت
+                  // (`downloadResumable`)، الضغط على "تنزيل الكل" لاحقاً
+                  // يكمل من حيث توقّف بالضبط لا يعيد من الصفر.
                   TextButton(
                     onPressed: controller.cancelBulk,
-                    child: const Text('إلغاء'),
+                    child: const Text('إيقاف مؤقت'),
                   )
                 else ...[
                   TextButton(

@@ -50,8 +50,13 @@ const _kMushafFontEditionKey = 'mushaf_font_edition';
 ///   `tools/add_qcf_v4_tajweed.py`. تخطيط صفحات/أسطر **مستقل تماماً** عن
 ///   V1/V2 (طبعة مطبوعة مختلفة)، فلا يشارك ترقيمها إطلاقاً.
 enum MushafFontEdition {
-  v2(label: 'مصحف المدينة (الحديث V2)'),
+  // ترتيب الإعلان هون هو ترتيب ظهورها فعلياً بـ`SegmentedButton` بشاشة
+  // الإعدادات (`_MushafFontEditionSection` بـ`settings_screen.dart` تكرّر
+  // `MushafFontEdition.values` مباشرة) — v1 ثم v2 ثم v4Tajweed بطلب صاحب
+  // المشروع، لا علاقة له بـ`.name` المخزَّن بـSharedPreferences (يعتمد
+  // اسم الحالة نفسه لا ترتيبها، فإعادة الترتيب هون آمنة بلا أي هجرة).
   v1(label: 'مصحف المدينة (الكلاسيكي 1405هـ V1)'),
+  v2(label: 'مصحف المدينة (الحديث V2)'),
   v4Tajweed(label: 'مصحف المدينة الملوّن (تجويد V4)');
 
   const MushafFontEdition({required this.label});
@@ -281,29 +286,11 @@ final qiyamSessionProvider = NotifierProvider<QiyamSessionNotifier, QiyamSession
   QiyamSessionNotifier.new,
 );
 
-const _kTajweedModeKey = 'mushaf_tajweed_color_mode';
-
-/// وضع تلوين أحكام التجويد
-class TajweedModeNotifier extends Notifier<bool> {
-  @override
-  bool build() {
-    final prefs = ref.watch(sharedPreferencesProvider);
-    return prefs.getBool(_kTajweedModeKey) ?? true;
-  }
-
-  void toggle() {
-    state = !state;
-    ref.read(sharedPreferencesProvider).setBool(_kTajweedModeKey, state);
-  }
-
-  void set(bool enabled) {
-    state = enabled;
-    ref.read(sharedPreferencesProvider).setBool(_kTajweedModeKey, state);
-  }
-}
-
-final tajweedModeProvider =
-    NotifierProvider<TajweedModeNotifier, bool>(TajweedModeNotifier.new);
+// ملاحظة: `tajweedModeProvider`/`TajweedModeNotifier` (سويتش "تلوين أحكام
+// التجويد تلقائياً" القديم) حُذف — كان مرتبطاً بمحرك تلوين حرفي وقت
+// التشغيل (`TajweedTextParser`، محذوف أيضاً) لم يكن مربوطاً أصلاً بصفحة
+// المصحف الحية. التلوين الفعلي الآن عبر طبعة خط V4 Tajweed (ألوان مدمجة
+// بالglyph نفسه، لا سويتش — راجع `MushafFontEdition.v4Tajweed`).
 
 const _kTafsirFontSizeKey = 'tafsir_font_size_sp';
 

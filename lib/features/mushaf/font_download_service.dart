@@ -13,8 +13,17 @@ import 'mushaf_settings.dart' show MushafFontEdition;
 const int kFirstDownloadablePage = 51;
 const int kLastDownloadablePage = 604;
 
+/// أول/آخر صفحة **تحتاج تنزيلاً** لطبعة معيّنة — V2 وحدها أول ٥٠ صفحة
+/// مضمّنة أصلاً بالتطبيق ([kFirstDownloadablePage]=٥١)، بينما V1 وV4
+/// Tajweed بلا أي صفحة مضمَّنة إطلاقاً (تبدأ من ١).
+(int first, int last) downloadableRangeFor(MushafFontEdition edition) => switch (edition) {
+      MushafFontEdition.v2 => (kFirstDownloadablePage, kLastDownloadablePage),
+      MushafFontEdition.v1 || MushafFontEdition.v4Tajweed => (1, kLastDownloadablePage),
+    };
+
 class FontDownloadState {
   const FontDownloadState({
+    this.activeEdition = MushafFontEdition.v2,
     this.downloadedPages = const {},
     this.inFlightPages = const {},
     this.isBulkRunning = false,
@@ -24,9 +33,15 @@ class FontDownloadState {
     this.errorMessage,
   });
 
-  /// صفحات (٥١-٦٠٤) محمَّلة محلياً فعلاً — مصدر الحقيقة ملفات فعلية
-  /// بمجلد التطبيق، لا علامة SharedPreferences منفصلة قد تكذب لو حُذف
-  /// الملف يدوياً.
+  /// الطبعة يلي [downloadedPages]/[bulkTotal]/[isBulkRunning] بتوصّفها
+  /// حالياً — تتحدَّث بـ[FontDownloadController.switchEdition] أو
+  /// [FontDownloadController.downloadRemaining]. حالة واحدة مشتركة (لا
+  /// خريطة لكل طبعة) بما إنه شاشة تنزيل واحدة تُعرض بمرّة — أبسط بما يكفي.
+  final MushafFontEdition activeEdition;
+
+  /// صفحات [activeEdition] محمَّلة محلياً فعلاً — مصدر الحقيقة ملفات
+  /// فعلية بمجلد التطبيق، لا علامة SharedPreferences منفصلة قد تكذب لو
+  /// حُذف الملف يدوياً.
   final Set<int> downloadedPages;
 
   /// صفحات قيد تنزيل تلقائي (أولوية) الآن — تغذّي مؤشر التقدّم الخافت
@@ -40,6 +55,7 @@ class FontDownloadState {
   final String? errorMessage;
 
   FontDownloadState copyWith({
+    MushafFontEdition? activeEdition,
     Set<int>? downloadedPages,
     Set<int>? inFlightPages,
     bool? isBulkRunning,
@@ -49,6 +65,7 @@ class FontDownloadState {
     Object? errorMessage = _sentinel,
   }) {
     return FontDownloadState(
+      activeEdition: activeEdition ?? this.activeEdition,
       downloadedPages: downloadedPages ?? this.downloadedPages,
       inFlightPages: inFlightPages ?? this.inFlightPages,
       isBulkRunning: isBulkRunning ?? this.isBulkRunning,
@@ -62,21 +79,23 @@ class FontDownloadState {
 
 const _sentinel = Object();
 
-/// مدير تنزيل خطوط صفحات المصحف غير المضمَّنة (٥١-٦٠٤، راجع pubspec.yaml).
-/// كل صفحة ملف TTF صغير مستقل (~٢٧٠ كيلوبايت بالمتوسط) يُنزَّل من
-/// `kFontsBaseUrl/p{page}.ttf` — راجع `remote_assets_config.dart`
-/// و`tools/raw/README.md` لخطوات الاستضافة (**لم تُهيَّأ بعد**).
+/// مدير تنزيل خطوط صفحات المصحف غير المضمَّنة — **الطبعات الثلاث** (V1/V2/
+/// V4 Tajweed، راجع [downloadableRangeFor]). كل صفحة ملف TTF صغير مستقل
+/// يُنزَّل حسب رابط الطبعة (`remote_assets_config.dart`).
 ///
-/// الاستئناف هون على مستوى الطابور لا البايت: كل صفحة صغيرة بما يكفي إنه
-/// إعادة تنزيلها من الصفر عند فشلها رخيصة، لكن **تنزيل الحزمة الكاملة**
-/// (٥٥٤ صفحة) يستأنف من حيث توقّف فعلياً — يتخطّى أي صفحة ملفها موجود
-/// محلياً أصلاً، فإغلاق التطبيق منتصف التنزيل الجماعي لا يعيد من الصفر.
+/// الاستئناف على **مستويين معاً**: كل ملف صفحة نفسه بمستوى البايت
+/// (`downloadResumable` بـ`download_helper.dart` — استئناف HTTP Range
+/// حقيقي، يبقى الجزء المُنزَّل صالحاً حتى لو أُغلق التطبيق أو ضُغط "إيقاف"
+/// منتصف صفحة وحدة)، **و**تنزيل الحزمة الكاملة بمستوى الطابور (يتخطّى أي
+/// صفحة ملفها موجود محلياً أصلاً بالكامل). يعني ضغط "إيقاف" ثم "بدء
+/// التنزيل" لاحقاً **يكمل من حيث توقّف بالضبط** — لا إعادة من الصفر بأي
+/// من المستويين.
 class FontDownloadController extends Notifier<FontDownloadState> {
   CancelToken? _cancelToken;
 
   @override
   FontDownloadState build() {
-    unawaited(_scanExisting());
+    unawaited(_scanExisting(MushafFontEdition.v2));
     ref.onDispose(() {
       _cancelToken?.cancel();
     });
@@ -103,12 +122,15 @@ class FontDownloadController extends Notifier<FontDownloadState> {
     return File(p.join(dir.path, filename));
   }
 
-  Future<void> _scanExisting() async {
-    final dir = await _fontsDir(MushafFontEdition.v2);
+  Future<Set<int>> _scanDownloaded(MushafFontEdition edition) async {
+    final dir = await _fontsDir(edition);
+    final pattern = edition == MushafFontEdition.v1
+        ? RegExp(r'^QCF_P(\d+)\.TTF$', caseSensitive: false)
+        : RegExp(r'^p(\d+)\.ttf$');
     final found = <int>{};
     await for (final entity in dir.list()) {
       if (entity is File) {
-        final match = RegExp(r'^p(\d+)\.ttf$').firstMatch(p.basename(entity.path));
+        final match = pattern.firstMatch(p.basename(entity.path));
         if (match != null) {
           final page = int.parse(match.group(1)!);
           if (await entity.length() > 0) {
@@ -122,13 +144,35 @@ class FontDownloadController extends Notifier<FontDownloadState> {
         }
       }
     }
-    state = state.copyWith(downloadedPages: found);
+    return found;
+  }
+
+  Future<void> _scanExisting(MushafFontEdition edition) async {
+    final found = await _scanDownloaded(edition);
+    final (first, last) = downloadableRangeFor(edition);
+    state = state.copyWith(
+      activeEdition: edition,
+      downloadedPages: found,
+      bulkTotal: last - first + 1,
+    );
+  }
+
+  /// يُستدعى عند فتح شاشة تنزيل طبعة معيّنة (`FontDownloadScreen`) —
+  /// يُحدِّث [FontDownloadState.activeEdition] ويعيد مسح الملفات المحلية
+  /// لتلك الطبعة تحديداً (لا شي إن كانت أصلاً الطبعة النشطة).
+  Future<void> switchEdition(MushafFontEdition edition) async {
+    if (state.activeEdition == edition && !state.isBulkRunning) {
+      await _scanExisting(edition);
+      return;
+    }
+    if (state.isBulkRunning) return; // لا تبديل أثناء تنزيل جماعي جارٍ
+    await _scanExisting(edition);
   }
 
   Future<void> downloadPage(int page, [MushafFontEdition edition = MushafFontEdition.v2]) async {
     final file = await localFontFile(page, edition);
     if (await file.exists() && (await file.length()) > 0) {
-      if (edition == MushafFontEdition.v2) {
+      if (edition == state.activeEdition) {
         state = state.copyWith(downloadedPages: {...state.downloadedPages, page});
       }
       return;
@@ -144,7 +188,7 @@ class FontDownloadController extends Notifier<FontDownloadState> {
       destination: file,
     );
     if (result.success) {
-      if (edition == MushafFontEdition.v2) {
+      if (edition == state.activeEdition) {
         state = state.copyWith(downloadedPages: {...state.downloadedPages, page}, errorMessage: null);
       }
     } else if (!result.cancelled) {
@@ -152,17 +196,19 @@ class FontDownloadController extends Notifier<FontDownloadState> {
     }
   }
 
-  Future<void> downloadRemaining() async {
+  Future<void> downloadRemaining([MushafFontEdition edition = MushafFontEdition.v2]) async {
     if (state.isBulkRunning) return;
 
+    await _scanExisting(edition); // يضمن downloadedPages مطابقة لهذه الطبعة تحديداً قبل حساب الناقص
+    final (first, last) = downloadableRangeFor(edition);
     final missing = [
-      for (var page = kFirstDownloadablePage; page <= kLastDownloadablePage; page++) page,
+      for (var page = first; page <= last; page++) page,
     ].where((page) => !state.downloadedPages.contains(page)).toList();
 
     _cancelToken = CancelToken();
     state = state.copyWith(
       isBulkRunning: true,
-      bulkTotal: kLastDownloadablePage - kFirstDownloadablePage + 1,
+      bulkTotal: last - first + 1,
       bulkCompleted: state.downloadedPages.length,
       errorMessage: null,
     );
@@ -171,10 +217,15 @@ class FontDownloadController extends Notifier<FontDownloadState> {
     try {
       for (final page in missing) {
         if (_cancelToken?.isCancelled ?? false) break;
-        final file = await localFontFile(page);
+        final file = await localFontFile(page, edition);
+        final url = switch (edition) {
+          MushafFontEdition.v1 => fontV1DownloadUrl(page),
+          MushafFontEdition.v4Tajweed => fontV4TajweedDownloadUrl(page),
+          MushafFontEdition.v2 => fontDownloadUrl(page),
+        };
         final result = await downloadResumable(
           dio: dio,
-          url: fontDownloadUrl(page),
+          url: url,
           destination: file,
           cancelToken: _cancelToken,
         );
@@ -200,6 +251,10 @@ class FontDownloadController extends Notifier<FontDownloadState> {
     }
   }
 
+  /// **إيقاف مؤقت** لا إلغاء حقيقي — الجزء المُنزَّل (كامل الصفحات
+  /// المكتملة + جزء البايتات من صفحة قيد التنزيل حالياً) يبقى محفوظاً
+  /// بالكامل، و[downloadRemaining] القادم يكمل من حيث توقّف بالضبط
+  /// (راجع توثيق الصنف أعلاه).
   void cancelBulk() => _cancelToken?.cancel();
 
   /// يُستدعى عند فتح/تصفّح صفحة `currentPage` بالمصحف — يُنزِّل هذه

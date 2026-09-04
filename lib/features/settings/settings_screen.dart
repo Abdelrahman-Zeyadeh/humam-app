@@ -13,8 +13,8 @@ import '../../core/theme/mushaf_palettes.dart';
 import '../audio/audio_downloads_screen.dart';
 import '../audio/quran_audio_controller.dart';
 import '../audio/reciters.dart';
-import '../mushaf/mushaf_image_download_screen.dart';
-import '../mushaf/mushaf_image_download_service.dart';
+import '../mushaf/font_download_screen.dart';
+import '../mushaf/mushaf_page_provider.dart';
 import '../mushaf/mushaf_settings.dart';
 import '../notifications/adhan_notification_prefs.dart';
 import '../notifications/adhan_notification_service.dart';
@@ -44,13 +44,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final themeMode = ref.watch(themeModeProvider);
-    final isTajweed = ref.watch(tajweedModeProvider);
     final audio = ref.watch(quranAudioControllerProvider);
-    // بوضع "طبعة مصورة" — طبعة الخط/تلوين التجويد/حجم الخط كلها بلا معنى
-    // (المصحف يُعرَض بصورة سكان ثابتة عبر `MushafRasterPageWidget`، لا نص
-    // حي مرسوم بخط QCF). نعطّل إعداداتها بصرياً بدل إخفائها كلياً — تبقى
-    // مرئية (تشرح ليه معطّلة) وتفعل تلقائياً فور الرجوع لـ"نص حي".
-    final rasterActive = ref.watch(mushafDisplayModeProvider) == MushafDisplayMode.rasterImage;
 
     return Scaffold(
       appBar: AppBar(title: const Text('الإعدادات')),
@@ -86,20 +80,10 @@ class SettingsScreen extends ConsumerWidget {
                   const _MushafColorSection(),
                   const SizedBox(height: 16),
                   _SubHeader('طبعة خط المصحف'),
-                  _DisableWhenRaster(
-                    disabled: rasterActive,
-                    child: const _MushafFontEditionSection(),
-                  ),
-                  const SizedBox(height: 16),
-                  _SubHeader('نسخة عرض المصحف'),
-                  const _MushafDisplayModeSection(),
+                  const _MushafFontEditionSection(),
                   const SizedBox(height: 16),
                   _SubHeader('حجم خط صفحة المصحف والتخطيط'),
-                  _DisableWhenRaster(
-                    disabled: rasterActive,
-                    note: 'التكبير بالطبعة المصورة عبر القرص/التمرير مباشرة على الصورة',
-                    child: const _TextSizeSlider(),
-                  ),
+                  const _TextSizeSlider(),
                 ],
               ),
             ),
@@ -191,21 +175,6 @@ class SettingsScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('تلوين أحكام التجويد تلقائياً'),
-                        subtitle: Text(
-                          rasterActive
-                              ? 'غير متاح بوضع الطبعة المصورة (صورة سكان ثابتة، بلا تلوين)'
-                              : 'تمييز المدود، القلقلة، الغنن، والإخفاء بالألوان الاصطلاحية',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                        value: isTajweed,
-                        activeThumbColor: themeAccent(context),
-                        onChanged: rasterActive
-                            ? null
-                            : (v) => ref.read(tajweedModeProvider.notifier).set(v),
-                      ),
                       Wrap(
                         spacing: 8,
                         runSpacing: 4,
@@ -984,129 +953,101 @@ class _MushafFontEditionSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final current = ref.watch(mushafFontEditionProvider);
 
-    return SegmentedButton<MushafFontEdition>(
-      segments: [
-        for (final edition in MushafFontEdition.values)
-          ButtonSegment(
-            value: edition,
-            label: Text(
-              edition.label,
-              style: const TextStyle(fontSize: 12),
-            ),
-          ),
-      ],
-      selected: {current},
-      onSelectionChanged: (s) =>
-          ref.read(mushafFontEditionProvider.notifier).set(s.first),
-    );
-  }
-}
-
-/// يعطّل بصرياً (تعتيم + تجاهل لمس) إعداداً لا معنى له بوضع "طبعة مصورة"
-/// (طبعة الخط/حجم الخط — الصورة الثابتة لا تستهلكها) بدل إخفائه كلياً،
-/// مع ملاحظة توضيحية اختيارية أسفله. راجع خطة `golden-cuddling-tiger.md`.
-class _DisableWhenRaster extends StatelessWidget {
-  const _DisableWhenRaster({required this.disabled, required this.child, this.note});
-
-  final bool disabled;
-  final Widget child;
-  final String? note;
-
-  @override
-  Widget build(BuildContext context) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        IgnorePointer(
-          ignoring: disabled,
-          child: AnimatedOpacity(
-            opacity: disabled ? 0.4 : 1.0,
-            duration: const Duration(milliseconds: 150),
-            child: child,
+        SegmentedButton<MushafFontEdition>(
+          segments: [
+            for (final edition in MushafFontEdition.values)
+              ButtonSegment(
+                value: edition,
+                label: Text(edition.label, style: const TextStyle(fontSize: 12)),
+              ),
+          ],
+          selected: {current},
+          onSelectionChanged: (s) =>
+              ref.read(mushafFontEditionProvider.notifier).set(s.first),
+        ),
+        const SizedBox(height: 10),
+        // معاينة شكل كل طبعة جنب بعض (نفس آية الفاتحة الأولى بكل طبعة) —
+        // لV1/V4 غير المضمَّنتين هذا يُنزِّل خط صفحة ١ فقط مرّة واحدة
+        // بالخلفية (راجع توثيق `mushafEditionPreviewProvider`).
+        Row(
+          children: [
+            for (final edition in MushafFontEdition.values)
+              Expanded(child: _FontEditionPreviewCard(edition: edition)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            icon: const Icon(Icons.download_outlined, size: 16),
+            label: const Text('تنزيل كل صفحات هذه الطبعة', style: TextStyle(fontSize: 12)),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => FontDownloadScreen(edition: current)),
+            ),
           ),
         ),
-        if (disabled)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              note ?? 'غير متاح بوضع الطبعة المصورة',
-              style: TextStyle(fontSize: 11, color: onSurface.withValues(alpha: 0.5)),
-            ),
-          ),
       ],
     );
   }
 }
 
-/// اختيار طريقة عرض المصحف (نص حي / طبعة مصورة) — نفس نمط
-/// `_MushafFontEditionSection` بالضبط. عند اختيار "مصورة" يظهر تحتها
-/// اختيار أي نسخة مصورة (`RasterMushafEdition`)؛ لو النسخة المختارة غير
-/// منزَّلة بعد، فتح `MushafImageDownloadScreen` مباشرة بدل تفعيل وضع لا
-/// صور له محلياً. راجع خطة `golden-cuddling-tiger.md` — الرسم الفعلي
-/// بشاشة المصحف (خطوة ٤) عمل منفصل قيد التنفيذ بالتوازي، هذا القسم
-/// يهيّئ الإعداد فقط بلا ربط استهلاك بعد.
-class _MushafDisplayModeSection extends ConsumerWidget {
-  const _MushafDisplayModeSection();
+class _FontEditionPreviewCard extends ConsumerWidget {
+  const _FontEditionPreviewCard({required this.edition});
+  final MushafFontEdition edition;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final mode = ref.watch(mushafDisplayModeProvider);
-    final rasterEdition = ref.watch(rasterMushafEditionProvider);
-    final imageState = ref.watch(mushafImageDownloadControllerProvider).forEdition(rasterEdition.id);
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    final isDownloaded = imageState.downloadedPages.length >= kMushafImageTotalPages;
+    final previewAsync = ref.watch(mushafEditionPreviewProvider(edition));
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SegmentedButton<MushafDisplayMode>(
-          segments: [
-            for (final m in MushafDisplayMode.values)
-              ButtonSegment(value: m, label: Text(m.label, style: const TextStyle(fontSize: 12))),
-          ],
-          selected: {mode},
-          onSelectionChanged: (s) => ref.read(mushafDisplayModeProvider.notifier).set(s.first),
-        ),
-        if (mode == MushafDisplayMode.rasterImage) ...[
-          const SizedBox(height: 12),
-          Text(
-            'اختر النسخة المصورة',
-            style: TextStyle(fontSize: 12, color: onSurface.withValues(alpha: 0.6)),
-          ),
-          const SizedBox(height: 6),
-          SegmentedButton<RasterMushafEdition>(
-            segments: [
-              for (final e in RasterMushafEdition.values)
-                ButtonSegment(value: e, label: Text(e.label, style: const TextStyle(fontSize: 12))),
-            ],
-            selected: {rasterEdition},
-            onSelectionChanged: (s) {
-              ref.read(rasterMushafEditionProvider.notifier).set(s.first);
-              final newState = ref.read(mushafImageDownloadControllerProvider).forEdition(s.first.id);
-              if (newState.downloadedPages.length < kMushafImageTotalPages) {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => MushafImageDownloadScreen(initialEdition: s.first),
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+      decoration: BoxDecoration(
+        border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 44,
+            child: Center(
+              child: previewAsync.when(
+                data: (p) => FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    p.text,
+                    textDirection: TextDirection.rtl,
+                    style: TextStyle(fontFamily: p.fontFamily, fontSize: 22),
                   ),
-                );
-              }
-            },
-          ),
-          if (!isDownloaded) ...[
-            const SizedBox(height: 8),
-            TextButton.icon(
-              icon: const Icon(Icons.download, size: 18),
-              label: const Text('تنزيل النسخة المصورة', style: TextStyle(fontSize: 12)),
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => MushafImageDownloadScreen(initialEdition: rasterEdition),
+                ),
+                loading: () => const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                error: (_, __) => Icon(
+                  Icons.cloud_off_outlined,
+                  size: 18,
+                  color: isDark ? Colors.white38 : Colors.black38,
                 ),
               ),
             ),
-          ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            switch (edition) {
+              MushafFontEdition.v1 => 'V1',
+              MushafFontEdition.v2 => 'V2',
+              MushafFontEdition.v4Tajweed => 'V4 Tajweed',
+            },
+            style: TextStyle(fontSize: 10, color: isDark ? Colors.white54 : Colors.black45),
+          ),
         ],
-      ],
+      ),
     );
   }
 }

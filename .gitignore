@@ -64,3 +64,4 @@ macos/.symlinks/
 
 # نسخ PDF خام لمصحف مجمع الملك فهد (ملفات ضخمة، مصدر بيانات وسيط فقط)
 tools/mushaf/
+tools/v4_tajweed_fonts_for_release/
