@@ -26,16 +26,15 @@ String fontV1DownloadUrl(int page) {
 }
 
 /// رابط استضافة خطوط صفحات مصحف QCF V4 Tajweed (طبعة ١٤٤١هـ، ألوان تجويد
-/// مدمجة بالglyph) — مباشرة من CDN المصدر الرسمي (Tarteel AI / QUL،
-/// `lib/exporter/export_font.rb` بمستودعهم يؤكد نفس نمط الرابط: تحقّق
-/// يدوي ٢٠٢٦-٠٩-٠٤ من نجاح تنزيل `p1.ttf`..`p604.ttf` (HTTP 200، حجم
-/// طبيعي)). **رابط طرف ثالث مباشر لا نسخة مستضافة عندنا** — نفس نمط
-/// [kFontsV1BaseUrl] بالضبط (رابط raw.githubusercontent مباشر)، لا سابقة
-/// جديدة بهالمشروع. لاحقاً: يُستحسن نسخها لـ`humam-app-assets` (GitHub
-/// Releases) لتفادي أي تعطيل/تغيير مفاجئ من الطرف الثالث — راجع تنويه
-/// توثيق QUL نفسه عن الخط "تحت التدقيق (proofreading)" وقت الكتابة.
+/// مدمجة بالglyph) — **نسخة مستضافة عندنا** (GitHub Releases، مستودع
+/// `humam-app-assets`، وسم `mushaf-fonts-v4-tajweed-v1`)، لا الاعتماد
+/// المباشر على CDN تارتيل/QUL كما كان سابقاً (تفادياً لأي تعطيل/تغيير
+/// مفاجئ من الطرف الثالث — الخط لسا "تحت التدقيق" حسب توثيق QUL نفسه وقت
+/// الكتابة). تحقّق مباشر ٢٠٢٦-٠٩-٠٤ عبر GitHub API: **٦٠٤/٦٠٤ ملف مرفوع
+/// فعلياً**، وتنزيل عيّنة (p1/p300/p604) رجع HTTP 200 بنفس الأحجام
+/// الأصلية بالضبط (مطابقة لتنزيل تارتيل المباشر السابق).
 String kFontsV4TajweedBaseUrl =
-    'https://static-cdn.tarteel.ai/qul/fonts/quran_fonts/v4-tajweed/ttf';
+    'https://github.com/Abdelrahman-Zeyadeh/humam-app-assets/releases/download/mushaf-fonts-v4-tajweed-v1';
 
 String fontV4TajweedDownloadUrl(int page) => '$kFontsV4TajweedBaseUrl/p$page.ttf';
 

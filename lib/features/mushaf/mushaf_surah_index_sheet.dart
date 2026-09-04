@@ -153,6 +153,52 @@ class _TabSegment extends StatelessWidget {
   }
 }
 
+/// عنوان بطاقة سورة بفهرس السور — "سُورَةُ" نصاً عادياً (AmiriQuran) +
+/// غليف اسم السورة الزخرفي (SurahNameV4، نفس خط بانر اسم السورة بصفحة
+/// المصحف — راجع `mushaf_page_widget.dart`) بدل النص العثماني العادي،
+/// لمطابقة بصرية بين الفهرس والمصحف (بطلب صاحب المشروع). [name] الحقيقي
+/// يبقى Semantics label لقارئ الشاشة (الغليف نفسه بلا معنى نصي حقيقي).
+Widget _surahTitleWidget(
+  BuildContext context, {
+  required int surahId,
+  required String name,
+  required bool highlighted,
+}) {
+  final color = highlighted ? Colors.white : Theme.of(context).colorScheme.onSurface;
+  return Semantics(
+    label: name,
+    child: ExcludeSemantics(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // `surah-icon` من نفس خط SurahNameV4 — نفس الرسم العثماني الأصيل
+          // لغليف "سورة" بدل نص AmiriQuran (بطلب صاحب المشروع، راجع
+          // توثيق `mushaf_page_widget.dart`).
+          Text(
+            'surah-icon',
+            style: TextStyle(
+              color: color,
+              fontSize: 14,
+              fontFamily: 'SurahNameV4',
+              fontFeatures: const [FontFeature.enable('liga')],
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            'surah${surahId.toString().padLeft(3, '0')}',
+            style: TextStyle(
+              color: color,
+              fontSize: 18,
+              fontFamily: 'SurahNameV4',
+              fontFeatures: const [FontFeature.enable('liga')],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 /// بطاقة صف موحَّدة للتبويبات الثلاثة — شارة دائرية ملوَّنة + عنوان/عنوان
 /// فرعي + طرف اختياري، حاوية مدوّرة بظل ناعم بدل `ListTile`+`Divider`
 /// (بطلب صاحب المشروع "تعديل شكل فهرس المصحف... تصميم البطاقات الجديد").
@@ -163,6 +209,7 @@ class _IndexCard extends StatelessWidget {
     this.badgeColor,
     this.badgeWidget,
     required this.title,
+    this.titleWidget,
     this.subtitle,
     this.trailing,
     this.titleFontFamily,
@@ -175,6 +222,11 @@ class _IndexCard extends StatelessWidget {
   /// `_QuarterCircleBadge` بـ`_RubList` لمثال (دائرة كسرية بدل رقم).
   final Widget? badgeWidget;
   final String title;
+  /// بديل اختياري لعرض [title] الافتراضي (`Text` بخط [titleFontFamily]) —
+  /// تستخدمه بطاقات السور لعرض خط "سُورَةُ" الزخرفي V4 (راجع
+  /// `_surahTitleWidget` بالأسفل)؛ [title] يبقى مُمرَّراً دايماً كـSemantics
+  /// label بغضّ النظر (قارئ الشاشة يقرأ الاسم الحقيقي دايماً).
+  final Widget? titleWidget;
   final String? subtitle;
   final String? trailing;
   /// `true` = هذه البطاقة تطابق الموقع الحالي بالمصحف (السورة/الجزء
@@ -230,19 +282,20 @@ class _IndexCard extends StatelessWidget {
                     // فوق نفس الحرف أحياناً) — بلا ارتفاع سطر إضافي كانت
                     // الحركات العلوية تُقصّ بصرياً لأن صندوق النص لا يترك
                     // مساحة كافية فوق الحرف الأساسي.
-                    Text(
-                      title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: titleColor,
-                        fontWeight: titleFontFamily == 'AmiriQuran' ? FontWeight.normal : FontWeight.w700,
-                        fontSize: titleFontFamily == 'AmiriQuran' ? 17.5 : 14.5,
-                        height: 1.35,
-                        fontFamily: titleFontFamily,
-                      ),
-                      textDirection: TextDirection.rtl,
-                    ),
+                    titleWidget ??
+                        Text(
+                          title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: titleColor,
+                            fontWeight: titleFontFamily == 'AmiriQuran' ? FontWeight.normal : FontWeight.w700,
+                            fontSize: titleFontFamily == 'AmiriQuran' ? 17.5 : 14.5,
+                            height: 1.35,
+                            fontFamily: titleFontFamily,
+                          ),
+                          textDirection: TextDirection.rtl,
+                        ),
                     if (subtitle != null) ...[
                       const SizedBox(height: 2),
                       Text(subtitle!, style: TextStyle(fontSize: 12, color: subtitleColor, height: 1.4), textDirection: TextDirection.rtl),
@@ -359,7 +412,12 @@ class _SurahsTabState extends ConsumerState<_SurahsTab> {
                           badgeText: '${s.id}',
                           badgeColor: themeAccent(context),
                           title: sanitizeSurahNameForDisplay(s.nameAr),
-                          titleFontFamily: 'AmiriQuran',
+                          titleWidget: _surahTitleWidget(
+                            context,
+                            surahId: s.id,
+                            name: sanitizeSurahNameForDisplay(s.nameAr),
+                            highlighted: isCurrent,
+                          ),
                           subtitle: '${s.revelationPlace == 'makkah' ? 'مكية' : 'مدنية'} · ${s.ayahCount} آية',
                           trailing: 'ص ${s.startPage}',
                           onTap: () => Navigator.of(context).pop(s.startPage),

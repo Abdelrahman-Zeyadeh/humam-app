@@ -112,6 +112,9 @@ flutter:
     # duroos_screen.dart لخريطة كل مصدر لصورته. الباقي (بلا صورة بعد) يعرض
     # أيقونة احتياطية تلقائياً.
     - assets/images/scholars/
+    # معاينات شكل صفحة كل طبعة مصورة بقائمة اختيار الإعدادات — راجع
+    # `RasterMushafEdition.previewAsset` بـ`mushaf_settings.dart`.
+    - assets/images/mushaf_editions/
     # أول ٥٠ صفحة فقط مضمّنة كـ asset (~١٨ ميجا) — الباقي (٥١-٦٠٤) يُنزَّل
     # عند الطلب عبر FontDownloadService. راجع lib/features/mushaf/
     # font_download_service.dart وlib/core/config/remote_assets_config.dart
@@ -161,6 +164,18 @@ flutter:
     - family: AmiriQuran
       fonts:
         - asset: assets/fonts/AmiriQuran.ttf
+    # خط زخرفي لاسم السورة (شريط "سُورَةُ البقرة" داخل صفحة المصحف) — من
+    # نفس عائلة خطوط QUL/QCF V4 (Tarteel AI، `resources/font/457`)، بلا
+    # ملف ترخيص منفصل مرفَق هون لنفس السبب يلي خطوط QCF الصفحات
+    # (assets/quran/fonts/pages/) بلا ملف ترخيص مستقل أيضاً — عائلة خطوط
+    # مجمع الملك فهد نفسها، لا مصدر عام (Google Fonts) منفصل كـCairo/
+    # AmiriQuran. **خط ligature لا حروف عادية**: النص المطلوب حرفياً
+    # `surah{001-114}` (٣ أرقام، بلا شرطة) لا اسم السورة العربي — الخط
+    # يستبدل هالنص برسمة زخرفية عبر GSUB 'liga' (تحقّقنا يدوياً من الملف
+    # نفسه، ١١٤ ligature مطابقة بالضبط). راجع `mushaf_page_widget.dart`.
+    - family: SurahNameV4
+      fonts:
+        - asset: assets/fonts/SurahNameV4.ttf
 
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package

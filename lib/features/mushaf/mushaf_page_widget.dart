@@ -165,6 +165,28 @@ bool _effectivePaletteIsDark(BuildContext context, UserPrefs userPrefs) {
   return themeDark && !nightModeActive;
 }
 
+/// زخرفة معينيّة صغيرة — لمسة واحدة متكرّرة على جانبَي اسم السورة، بلا أي
+/// حركة أو تدرّج (راجع توثيق استخدامها بـ`_PageLineWidget`).
+class _SurahNameOrnament extends StatelessWidget {
+  const _SurahNameOrnament({required this.color});
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.rotate(
+      angle: 0.785398, // ٤٥° — معيّن لا مربّع
+      child: Container(
+        width: 6,
+        height: 6,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(1.5),
+        ),
+      ),
+    );
+  }
+}
+
 class _PageLineWidget extends ConsumerWidget {
   const _PageLineWidget({
     required this.line,
@@ -192,19 +214,70 @@ class _PageLineWidget extends ConsumerWidget {
         final accent = themeAccent(context);
         final nameAsync = ref.watch(_surahNameProvider(line.surahRef ?? 1));
 
-        return Container(
-          height: 38,
-          width: double.infinity,
-          margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-          alignment: Alignment.center,
-          child: Text(
-            nameAsync.value ?? '',
-            style: TextStyle(
-              color: isDark ? const Color(0xFFF3DA8E) : const Color(0xFF1E1A16),
-              fontSize: 20,
-              height: 1.1,
-              fontWeight: FontWeight.w700,
-              fontFamily: 'AmiriQuran',
+        // إطار خفيف حول اسم السورة — لمسة زخرفية بسيطة بلون التمييز
+        // المختار (تلقائياً بلون كل باقة/ثيم)، بدل النص العاري بلا حدود
+        // سابقاً. حدّ شعري رفيع + خلفية بشفافية خافتة جداً + زخرفتان
+        // صغيرتان معينيّتان على الجانبين — بلا ظل ولا تدرّج ولا حركة
+        // (بطلب صاحب المشروع "خفيف لطيف بدون حركات كثيرة مريح للعين").
+        return Semantics(
+          label: nameAsync.value,
+          child: Center(
+            // `Center` عمداً — بدونه الصندوق كان يتمطّط لعرض الصفحة كامل
+            // (السطر الأب `Column` بـcrossAxisAlignment.stretch)، فبان
+            // "كبير" زيادة رغم صغر ارتفاعه (بلاغ صاحب المشروع). هيك يتقلّص
+            // لعرض محتواه فقط — شارة صغيرة موسّطة لا شريط بعرض الصفحة.
+            child: Container(
+              height: 32,
+              margin: const EdgeInsets.symmetric(vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: isDark ? 0.09 : 0.05),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: accent.withValues(alpha: 0.22)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _SurahNameOrnament(color: accent),
+                  const SizedBox(width: 6),
+                  ExcludeSemantics(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // غليف `surah{NNN}` يرسم اسم السورة وحده بلا كلمة
+                        // "سورة" (تحقّقنا: هيك مصمَّم الخط نفسه) — نضيفها
+                        // بغليف `surah-icon` من **نفس الخط** (تحقّقنا من
+                        // GSUB: موجود فعلاً)، لا نص AmiriQuran عادي — رسم
+                        // عثماني أصيل متطابق تماماً مع غليف الاسم، لا خط
+                        // واجهة مختلف الطراز (بطلب صاحب المشروع).
+                        Text(
+                          'surah-icon',
+                          style: TextStyle(
+                            color: isDark ? const Color(0xFFF3DA8E) : const Color(0xFF1E1A16),
+                            fontSize: 16,
+                            fontFamily: 'SurahNameV4',
+                            fontFeatures: const [FontFeature.enable('liga')],
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'surah${(line.surahRef ?? 1).toString().padLeft(3, '0')}',
+                          style: TextStyle(
+                            color: isDark ? const Color(0xFFF3DA8E) : const Color(0xFF1E1A16),
+                            fontSize: 19,
+                            height: 1.1,
+                            fontFamily: 'SurahNameV4',
+                            fontFeatures: const [FontFeature.enable('liga')],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  _SurahNameOrnament(color: accent),
+                ],
+              ),
             ),
           ),
         );

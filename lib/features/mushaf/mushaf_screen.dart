@@ -1004,87 +1004,108 @@ class _PageIdentityBar extends ConsumerWidget {
       orElse: () => '',
     );
 
+    // شريط هوية الصفحة — إطار **متصل** واحد (بدل شريحتين منفصلتين + خط
+    // سفلي فقط سابقاً): حدّ كامل حول الشريط بأكمله + خط فاصل عمودي واحد
+    // بالنص يقسمه لمنطقتَي الجزء/اسم السورة، فيُقرأ كقطعة واحدة متماسكة لا
+    // عنصرين طائفين. **حركة خفيفة واحدة** بطلب صاحب المشروع: تحوّل هادئ
+    // (تلاشٍ + انزلاق بسيط) لكل نص يتغيّر مع تصفّح الصفحات (`AnimatedSwitcher`
+    // بـ`_AnimatedIdentityText`) — لا شي أكتر (بلا نبض/دوران/إلخ).
     return Material(
       color: bg,
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: SizedBox(
-            height: 32,
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+          child: Container(
+            height: 38,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: isDark ? 0.08 : 0.05),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: accent.withValues(alpha: 0.28)),
+            ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 // لمسة الجزء / الحزب
-                InkWell(
-                  onTap: onJuzTap,
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          juzText,
-                          style: TextStyle(
-                            color: fg.withValues(alpha: 0.9),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            fontFamily: 'Cairo',
-                          ),
+                Expanded(
+                  child: InkWell(
+                    onTap: onJuzTap,
+                    borderRadius: const BorderRadius.horizontal(left: Radius.circular(10)),
+                    child: Center(
+                      child: _AnimatedIdentityText(
+                        valueKey: '$juzText|$hizbFraction',
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              juzText,
+                              style: TextStyle(
+                                color: fg.withValues(alpha: 0.9),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'Cairo',
+                              ),
+                            ),
+                            if (hizbFraction.isNotEmpty) ...[
+                              Container(
+                                width: 3.5,
+                                height: 3.5,
+                                margin: const EdgeInsets.symmetric(horizontal: 6),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: accent.withValues(alpha: 0.8),
+                                ),
+                              ),
+                              Text(
+                                hizbFraction,
+                                style: TextStyle(
+                                  color: fg.withValues(alpha: 0.75),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  fontFamily: 'Cairo',
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
-                        if (hizbFraction.isNotEmpty) ...[
-                          Container(
-                            width: 3.5,
-                            height: 3.5,
-                            margin: const EdgeInsets.symmetric(horizontal: 6),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: accent.withValues(alpha: 0.8),
-                            ),
-                          ),
-                          Text(
-                            hizbFraction,
-                            style: TextStyle(
-                              color: fg.withValues(alpha: 0.75),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              fontFamily: 'Cairo',
-                            ),
-                          ),
-                        ],
-                      ],
+                      ),
                     ),
                   ),
                 ),
 
+                // الخط الفاصل — يوصل الإطارين ببعض بصرياً كقطعة واحدة
+                Container(width: 1, height: 18, color: accent.withValues(alpha: 0.28)),
+
                 // لمسة اسم السورة
-                InkWell(
-                  onTap: onSurahTap,
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          surahText,
-                          style: TextStyle(
-                            color: isDark
-                                ? const Color(0xFFF3DA8E)
-                                : const Color(0xFF1B3022),
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            fontFamily: 'AmiriQuran',
-                          ),
+                Expanded(
+                  child: InkWell(
+                    onTap: onSurahTap,
+                    borderRadius: const BorderRadius.horizontal(right: Radius.circular(10)),
+                    child: Center(
+                      child: _AnimatedIdentityText(
+                        valueKey: surahText,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              surahText,
+                              style: TextStyle(
+                                color: isDark
+                                    ? const Color(0xFFF3DA8E)
+                                    : const Color(0xFF1B3022),
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'AmiriQuran',
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.arrow_drop_down_rounded,
+                              size: 18,
+                              color: fg.withValues(alpha: 0.5),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.arrow_drop_down_rounded,
-                          size: 18,
-                          color: fg.withValues(alpha: 0.5),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
@@ -1093,6 +1114,31 @@ class _PageIdentityBar extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// تحوّل هادئ (تلاشٍ + انزلاق رأسي بسيط ٤px) لنص شريط هوية الصفحة كل ما
+/// تغيّرت قيمته (تصفّح لصفحة بجزء/سورة مختلفة) — [valueKey] يحدّد متى
+/// يُعاد تشغيل الحركة (`AnimatedSwitcher` يستبدل الودجت كاملاً لمّا يتغيّر
+/// مفتاحه). حركة واحدة خفيفة فقط بطلب صاحب المشروع، ٢٢٠مل ثانية.
+class _AnimatedIdentityText extends StatelessWidget {
+  const _AnimatedIdentityText({required this.valueKey, required this.child});
+  final String valueKey;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 220),
+      transitionBuilder: (widget, animation) => FadeTransition(
+        opacity: animation,
+        child: SlideTransition(
+          position: Tween<Offset>(begin: const Offset(0, 0.12), end: Offset.zero).animate(animation),
+          child: widget,
+        ),
+      ),
+      child: KeyedSubtree(key: ValueKey(valueKey), child: child),
     );
   }
 }
