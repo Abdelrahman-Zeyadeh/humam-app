@@ -9,12 +9,14 @@ part 'quran_database.g.dart';
 
 /// يطابق `PRAGMA user_version` الذي يضعه سكربت البناء — راجع توثيق
 /// `schemaVersion` بالأسفل و[syncAssetSqliteDatabase].
-const _kSchemaVersion = 4;
+const _kSchemaVersion = 5;
 
 /// قاعدة بيانات المصحف — **للقراءة فقط**. تُنسخ من الـ asset المضمّن إلى
 /// مجلد التطبيق عند أول تشغيل فقط، ثم تُفتح من هناك مباشرة (لا تُنشأ ولا
 /// تُهاجَر عبر drift؛ المخطط جاهز مسبقاً بواسطة `tools/build_quran_db.py`).
-@DriftDatabase(tables: [Surahs, Ayahs, PageLines, Words, Tafsirs, Translations, Mutashabihat])
+@DriftDatabase(
+  tables: [Surahs, Ayahs, PageLines, Words, PageLinesV4, WordsV4, Tafsirs, Translations, Mutashabihat],
+)
 class QuranDatabase extends _$QuranDatabase {
   QuranDatabase() : super(_openConnection());
 
@@ -25,7 +27,8 @@ class QuranDatabase extends _$QuranDatabase {
 
   /// يطابق `PRAGMA user_version` الذي يضعه سكربت البناء — يمنع drift من
   /// محاولة تشغيل `onCreate` على قاعدة منشأة مسبقاً وممتلئة بالبيانات.
-  /// رُفعت لـ٤ عند إضافة عمود `glyph_v1` بجدول `words`.
+  /// رُفعت لـ٥ عند إضافة جدولي `page_lines_v4`/`words_v4` (طبعة V4 Tajweed
+  /// — راجع `tools/add_qcf_v4_tajweed.py`).
   @override
   int get schemaVersion => _kSchemaVersion;
 

@@ -51,6 +51,42 @@ class Words extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// سطر واحد من سطور صفحة **طبعة V4 Tajweed** (١٤٤١هـ، خط عثمان طه، ألوان
+/// التجويد مدمجة بالglyph نفسه — راجع `mushaf_settings.dart` توثيق
+/// `MushafFontEdition.v4Tajweed`). تخطيط صفحات/أسطر **مستقل تماماً** عن
+/// `PageLines` (V2) — طبعة مطبوعة مختلفة، لا تتشارك ترقيم الصفحات/الأسطر
+/// إطلاقاً، بعكس V1 يلي بيتشارك مع V2 (راجع `Words.glyphV1`). أُضيف عبر
+/// `tools/add_qcf_v4_tajweed.py` (`PRAGMA user_version = 5`).
+class PageLinesV4 extends Table {
+  IntColumn get page => integer()();
+  IntColumn get lineNo => integer().named('line_no')();
+  TextColumn get lineType => text().named('line_type')(); // ayah | surah_name | basmallah
+  IntColumn get isCentered => integer().named('is_centered')();
+  IntColumn get firstWordId => integer().named('first_word_id').nullable()();
+  IntColumn get lastWordId => integer().named('last_word_id').nullable()();
+  IntColumn get surahRef => integer().named('surah_ref').nullable()();
+
+  @override
+  Set<Column> get primaryKey => {page, lineNo};
+}
+
+/// كلمة واحدة برمز غليف خط QCF V4 Tajweed — نفس بنية [Words] لكن معرّفات
+/// `id`/`ayahId` **مستقلة بمساحتها الخاصة** (لا تطابق `Words.id` رقمياً
+/// رغم تطابق العدد الإجمالي صدفة: ٨٣٦٦٨ كلمة بكلا الطبعتين). راجع توثيق
+/// [PageLinesV4].
+class WordsV4 extends Table {
+  IntColumn get id => integer()();
+  IntColumn get ayahId => integer().named('ayah_id')();
+  IntColumn get position => integer()();
+  IntColumn get page => integer()();
+  IntColumn get lineNo => integer().named('line_no')();
+  TextColumn get glyph => text()();
+  TextColumn get charType => text().named('char_type')(); // word | ayah_marker
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// تفسير آية واحدة من كتاب معيّن. `edition` مفتاح ثابت (`jalalayn` حالياً)
 /// لا رقم — يسمح بإضافة كتب تفسير أخرى لاحقاً بلا تغيير المخطط. المصدر:
 /// نسخة نصية من تفسير الجلالين، راجع `tools/raw/README.md`.

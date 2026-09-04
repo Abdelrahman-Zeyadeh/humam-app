@@ -2162,6 +2162,920 @@ class WordsCompanion extends UpdateCompanion<Word> {
   }
 }
 
+class $PageLinesV4Table extends PageLinesV4
+    with TableInfo<$PageLinesV4Table, PageLinesV4Data> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PageLinesV4Table(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _pageMeta = const VerificationMeta('page');
+  @override
+  late final GeneratedColumn<int> page = GeneratedColumn<int>(
+    'page',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lineNoMeta = const VerificationMeta('lineNo');
+  @override
+  late final GeneratedColumn<int> lineNo = GeneratedColumn<int>(
+    'line_no',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lineTypeMeta = const VerificationMeta(
+    'lineType',
+  );
+  @override
+  late final GeneratedColumn<String> lineType = GeneratedColumn<String>(
+    'line_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _isCenteredMeta = const VerificationMeta(
+    'isCentered',
+  );
+  @override
+  late final GeneratedColumn<int> isCentered = GeneratedColumn<int>(
+    'is_centered',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _firstWordIdMeta = const VerificationMeta(
+    'firstWordId',
+  );
+  @override
+  late final GeneratedColumn<int> firstWordId = GeneratedColumn<int>(
+    'first_word_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastWordIdMeta = const VerificationMeta(
+    'lastWordId',
+  );
+  @override
+  late final GeneratedColumn<int> lastWordId = GeneratedColumn<int>(
+    'last_word_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _surahRefMeta = const VerificationMeta(
+    'surahRef',
+  );
+  @override
+  late final GeneratedColumn<int> surahRef = GeneratedColumn<int>(
+    'surah_ref',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    page,
+    lineNo,
+    lineType,
+    isCentered,
+    firstWordId,
+    lastWordId,
+    surahRef,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'page_lines_v4';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PageLinesV4Data> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('page')) {
+      context.handle(
+        _pageMeta,
+        page.isAcceptableOrUnknown(data['page']!, _pageMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_pageMeta);
+    }
+    if (data.containsKey('line_no')) {
+      context.handle(
+        _lineNoMeta,
+        lineNo.isAcceptableOrUnknown(data['line_no']!, _lineNoMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_lineNoMeta);
+    }
+    if (data.containsKey('line_type')) {
+      context.handle(
+        _lineTypeMeta,
+        lineType.isAcceptableOrUnknown(data['line_type']!, _lineTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_lineTypeMeta);
+    }
+    if (data.containsKey('is_centered')) {
+      context.handle(
+        _isCenteredMeta,
+        isCentered.isAcceptableOrUnknown(data['is_centered']!, _isCenteredMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_isCenteredMeta);
+    }
+    if (data.containsKey('first_word_id')) {
+      context.handle(
+        _firstWordIdMeta,
+        firstWordId.isAcceptableOrUnknown(
+          data['first_word_id']!,
+          _firstWordIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_word_id')) {
+      context.handle(
+        _lastWordIdMeta,
+        lastWordId.isAcceptableOrUnknown(
+          data['last_word_id']!,
+          _lastWordIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('surah_ref')) {
+      context.handle(
+        _surahRefMeta,
+        surahRef.isAcceptableOrUnknown(data['surah_ref']!, _surahRefMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {page, lineNo};
+  @override
+  PageLinesV4Data map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PageLinesV4Data(
+      page: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}page'],
+      )!,
+      lineNo: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}line_no'],
+      )!,
+      lineType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}line_type'],
+      )!,
+      isCentered: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}is_centered'],
+      )!,
+      firstWordId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}first_word_id'],
+      ),
+      lastWordId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_word_id'],
+      ),
+      surahRef: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}surah_ref'],
+      ),
+    );
+  }
+
+  @override
+  $PageLinesV4Table createAlias(String alias) {
+    return $PageLinesV4Table(attachedDatabase, alias);
+  }
+}
+
+class PageLinesV4Data extends DataClass implements Insertable<PageLinesV4Data> {
+  final int page;
+  final int lineNo;
+  final String lineType;
+  final int isCentered;
+  final int? firstWordId;
+  final int? lastWordId;
+  final int? surahRef;
+  const PageLinesV4Data({
+    required this.page,
+    required this.lineNo,
+    required this.lineType,
+    required this.isCentered,
+    this.firstWordId,
+    this.lastWordId,
+    this.surahRef,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['page'] = Variable<int>(page);
+    map['line_no'] = Variable<int>(lineNo);
+    map['line_type'] = Variable<String>(lineType);
+    map['is_centered'] = Variable<int>(isCentered);
+    if (!nullToAbsent || firstWordId != null) {
+      map['first_word_id'] = Variable<int>(firstWordId);
+    }
+    if (!nullToAbsent || lastWordId != null) {
+      map['last_word_id'] = Variable<int>(lastWordId);
+    }
+    if (!nullToAbsent || surahRef != null) {
+      map['surah_ref'] = Variable<int>(surahRef);
+    }
+    return map;
+  }
+
+  PageLinesV4Companion toCompanion(bool nullToAbsent) {
+    return PageLinesV4Companion(
+      page: Value(page),
+      lineNo: Value(lineNo),
+      lineType: Value(lineType),
+      isCentered: Value(isCentered),
+      firstWordId: firstWordId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(firstWordId),
+      lastWordId: lastWordId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastWordId),
+      surahRef: surahRef == null && nullToAbsent
+          ? const Value.absent()
+          : Value(surahRef),
+    );
+  }
+
+  factory PageLinesV4Data.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PageLinesV4Data(
+      page: serializer.fromJson<int>(json['page']),
+      lineNo: serializer.fromJson<int>(json['lineNo']),
+      lineType: serializer.fromJson<String>(json['lineType']),
+      isCentered: serializer.fromJson<int>(json['isCentered']),
+      firstWordId: serializer.fromJson<int?>(json['firstWordId']),
+      lastWordId: serializer.fromJson<int?>(json['lastWordId']),
+      surahRef: serializer.fromJson<int?>(json['surahRef']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'page': serializer.toJson<int>(page),
+      'lineNo': serializer.toJson<int>(lineNo),
+      'lineType': serializer.toJson<String>(lineType),
+      'isCentered': serializer.toJson<int>(isCentered),
+      'firstWordId': serializer.toJson<int?>(firstWordId),
+      'lastWordId': serializer.toJson<int?>(lastWordId),
+      'surahRef': serializer.toJson<int?>(surahRef),
+    };
+  }
+
+  PageLinesV4Data copyWith({
+    int? page,
+    int? lineNo,
+    String? lineType,
+    int? isCentered,
+    Value<int?> firstWordId = const Value.absent(),
+    Value<int?> lastWordId = const Value.absent(),
+    Value<int?> surahRef = const Value.absent(),
+  }) => PageLinesV4Data(
+    page: page ?? this.page,
+    lineNo: lineNo ?? this.lineNo,
+    lineType: lineType ?? this.lineType,
+    isCentered: isCentered ?? this.isCentered,
+    firstWordId: firstWordId.present ? firstWordId.value : this.firstWordId,
+    lastWordId: lastWordId.present ? lastWordId.value : this.lastWordId,
+    surahRef: surahRef.present ? surahRef.value : this.surahRef,
+  );
+  PageLinesV4Data copyWithCompanion(PageLinesV4Companion data) {
+    return PageLinesV4Data(
+      page: data.page.present ? data.page.value : this.page,
+      lineNo: data.lineNo.present ? data.lineNo.value : this.lineNo,
+      lineType: data.lineType.present ? data.lineType.value : this.lineType,
+      isCentered: data.isCentered.present
+          ? data.isCentered.value
+          : this.isCentered,
+      firstWordId: data.firstWordId.present
+          ? data.firstWordId.value
+          : this.firstWordId,
+      lastWordId: data.lastWordId.present
+          ? data.lastWordId.value
+          : this.lastWordId,
+      surahRef: data.surahRef.present ? data.surahRef.value : this.surahRef,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PageLinesV4Data(')
+          ..write('page: $page, ')
+          ..write('lineNo: $lineNo, ')
+          ..write('lineType: $lineType, ')
+          ..write('isCentered: $isCentered, ')
+          ..write('firstWordId: $firstWordId, ')
+          ..write('lastWordId: $lastWordId, ')
+          ..write('surahRef: $surahRef')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    page,
+    lineNo,
+    lineType,
+    isCentered,
+    firstWordId,
+    lastWordId,
+    surahRef,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PageLinesV4Data &&
+          other.page == this.page &&
+          other.lineNo == this.lineNo &&
+          other.lineType == this.lineType &&
+          other.isCentered == this.isCentered &&
+          other.firstWordId == this.firstWordId &&
+          other.lastWordId == this.lastWordId &&
+          other.surahRef == this.surahRef);
+}
+
+class PageLinesV4Companion extends UpdateCompanion<PageLinesV4Data> {
+  final Value<int> page;
+  final Value<int> lineNo;
+  final Value<String> lineType;
+  final Value<int> isCentered;
+  final Value<int?> firstWordId;
+  final Value<int?> lastWordId;
+  final Value<int?> surahRef;
+  final Value<int> rowid;
+  const PageLinesV4Companion({
+    this.page = const Value.absent(),
+    this.lineNo = const Value.absent(),
+    this.lineType = const Value.absent(),
+    this.isCentered = const Value.absent(),
+    this.firstWordId = const Value.absent(),
+    this.lastWordId = const Value.absent(),
+    this.surahRef = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PageLinesV4Companion.insert({
+    required int page,
+    required int lineNo,
+    required String lineType,
+    required int isCentered,
+    this.firstWordId = const Value.absent(),
+    this.lastWordId = const Value.absent(),
+    this.surahRef = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : page = Value(page),
+       lineNo = Value(lineNo),
+       lineType = Value(lineType),
+       isCentered = Value(isCentered);
+  static Insertable<PageLinesV4Data> custom({
+    Expression<int>? page,
+    Expression<int>? lineNo,
+    Expression<String>? lineType,
+    Expression<int>? isCentered,
+    Expression<int>? firstWordId,
+    Expression<int>? lastWordId,
+    Expression<int>? surahRef,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (page != null) 'page': page,
+      if (lineNo != null) 'line_no': lineNo,
+      if (lineType != null) 'line_type': lineType,
+      if (isCentered != null) 'is_centered': isCentered,
+      if (firstWordId != null) 'first_word_id': firstWordId,
+      if (lastWordId != null) 'last_word_id': lastWordId,
+      if (surahRef != null) 'surah_ref': surahRef,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PageLinesV4Companion copyWith({
+    Value<int>? page,
+    Value<int>? lineNo,
+    Value<String>? lineType,
+    Value<int>? isCentered,
+    Value<int?>? firstWordId,
+    Value<int?>? lastWordId,
+    Value<int?>? surahRef,
+    Value<int>? rowid,
+  }) {
+    return PageLinesV4Companion(
+      page: page ?? this.page,
+      lineNo: lineNo ?? this.lineNo,
+      lineType: lineType ?? this.lineType,
+      isCentered: isCentered ?? this.isCentered,
+      firstWordId: firstWordId ?? this.firstWordId,
+      lastWordId: lastWordId ?? this.lastWordId,
+      surahRef: surahRef ?? this.surahRef,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (page.present) {
+      map['page'] = Variable<int>(page.value);
+    }
+    if (lineNo.present) {
+      map['line_no'] = Variable<int>(lineNo.value);
+    }
+    if (lineType.present) {
+      map['line_type'] = Variable<String>(lineType.value);
+    }
+    if (isCentered.present) {
+      map['is_centered'] = Variable<int>(isCentered.value);
+    }
+    if (firstWordId.present) {
+      map['first_word_id'] = Variable<int>(firstWordId.value);
+    }
+    if (lastWordId.present) {
+      map['last_word_id'] = Variable<int>(lastWordId.value);
+    }
+    if (surahRef.present) {
+      map['surah_ref'] = Variable<int>(surahRef.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PageLinesV4Companion(')
+          ..write('page: $page, ')
+          ..write('lineNo: $lineNo, ')
+          ..write('lineType: $lineType, ')
+          ..write('isCentered: $isCentered, ')
+          ..write('firstWordId: $firstWordId, ')
+          ..write('lastWordId: $lastWordId, ')
+          ..write('surahRef: $surahRef, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $WordsV4Table extends WordsV4 with TableInfo<$WordsV4Table, WordsV4Data> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $WordsV4Table(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _ayahIdMeta = const VerificationMeta('ayahId');
+  @override
+  late final GeneratedColumn<int> ayahId = GeneratedColumn<int>(
+    'ayah_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _positionMeta = const VerificationMeta(
+    'position',
+  );
+  @override
+  late final GeneratedColumn<int> position = GeneratedColumn<int>(
+    'position',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _pageMeta = const VerificationMeta('page');
+  @override
+  late final GeneratedColumn<int> page = GeneratedColumn<int>(
+    'page',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lineNoMeta = const VerificationMeta('lineNo');
+  @override
+  late final GeneratedColumn<int> lineNo = GeneratedColumn<int>(
+    'line_no',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _glyphMeta = const VerificationMeta('glyph');
+  @override
+  late final GeneratedColumn<String> glyph = GeneratedColumn<String>(
+    'glyph',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _charTypeMeta = const VerificationMeta(
+    'charType',
+  );
+  @override
+  late final GeneratedColumn<String> charType = GeneratedColumn<String>(
+    'char_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    ayahId,
+    position,
+    page,
+    lineNo,
+    glyph,
+    charType,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'words_v4';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<WordsV4Data> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('ayah_id')) {
+      context.handle(
+        _ayahIdMeta,
+        ayahId.isAcceptableOrUnknown(data['ayah_id']!, _ayahIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_ayahIdMeta);
+    }
+    if (data.containsKey('position')) {
+      context.handle(
+        _positionMeta,
+        position.isAcceptableOrUnknown(data['position']!, _positionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_positionMeta);
+    }
+    if (data.containsKey('page')) {
+      context.handle(
+        _pageMeta,
+        page.isAcceptableOrUnknown(data['page']!, _pageMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_pageMeta);
+    }
+    if (data.containsKey('line_no')) {
+      context.handle(
+        _lineNoMeta,
+        lineNo.isAcceptableOrUnknown(data['line_no']!, _lineNoMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_lineNoMeta);
+    }
+    if (data.containsKey('glyph')) {
+      context.handle(
+        _glyphMeta,
+        glyph.isAcceptableOrUnknown(data['glyph']!, _glyphMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_glyphMeta);
+    }
+    if (data.containsKey('char_type')) {
+      context.handle(
+        _charTypeMeta,
+        charType.isAcceptableOrUnknown(data['char_type']!, _charTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_charTypeMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  WordsV4Data map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return WordsV4Data(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      ayahId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}ayah_id'],
+      )!,
+      position: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}position'],
+      )!,
+      page: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}page'],
+      )!,
+      lineNo: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}line_no'],
+      )!,
+      glyph: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}glyph'],
+      )!,
+      charType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}char_type'],
+      )!,
+    );
+  }
+
+  @override
+  $WordsV4Table createAlias(String alias) {
+    return $WordsV4Table(attachedDatabase, alias);
+  }
+}
+
+class WordsV4Data extends DataClass implements Insertable<WordsV4Data> {
+  final int id;
+  final int ayahId;
+  final int position;
+  final int page;
+  final int lineNo;
+  final String glyph;
+  final String charType;
+  const WordsV4Data({
+    required this.id,
+    required this.ayahId,
+    required this.position,
+    required this.page,
+    required this.lineNo,
+    required this.glyph,
+    required this.charType,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['ayah_id'] = Variable<int>(ayahId);
+    map['position'] = Variable<int>(position);
+    map['page'] = Variable<int>(page);
+    map['line_no'] = Variable<int>(lineNo);
+    map['glyph'] = Variable<String>(glyph);
+    map['char_type'] = Variable<String>(charType);
+    return map;
+  }
+
+  WordsV4Companion toCompanion(bool nullToAbsent) {
+    return WordsV4Companion(
+      id: Value(id),
+      ayahId: Value(ayahId),
+      position: Value(position),
+      page: Value(page),
+      lineNo: Value(lineNo),
+      glyph: Value(glyph),
+      charType: Value(charType),
+    );
+  }
+
+  factory WordsV4Data.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return WordsV4Data(
+      id: serializer.fromJson<int>(json['id']),
+      ayahId: serializer.fromJson<int>(json['ayahId']),
+      position: serializer.fromJson<int>(json['position']),
+      page: serializer.fromJson<int>(json['page']),
+      lineNo: serializer.fromJson<int>(json['lineNo']),
+      glyph: serializer.fromJson<String>(json['glyph']),
+      charType: serializer.fromJson<String>(json['charType']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'ayahId': serializer.toJson<int>(ayahId),
+      'position': serializer.toJson<int>(position),
+      'page': serializer.toJson<int>(page),
+      'lineNo': serializer.toJson<int>(lineNo),
+      'glyph': serializer.toJson<String>(glyph),
+      'charType': serializer.toJson<String>(charType),
+    };
+  }
+
+  WordsV4Data copyWith({
+    int? id,
+    int? ayahId,
+    int? position,
+    int? page,
+    int? lineNo,
+    String? glyph,
+    String? charType,
+  }) => WordsV4Data(
+    id: id ?? this.id,
+    ayahId: ayahId ?? this.ayahId,
+    position: position ?? this.position,
+    page: page ?? this.page,
+    lineNo: lineNo ?? this.lineNo,
+    glyph: glyph ?? this.glyph,
+    charType: charType ?? this.charType,
+  );
+  WordsV4Data copyWithCompanion(WordsV4Companion data) {
+    return WordsV4Data(
+      id: data.id.present ? data.id.value : this.id,
+      ayahId: data.ayahId.present ? data.ayahId.value : this.ayahId,
+      position: data.position.present ? data.position.value : this.position,
+      page: data.page.present ? data.page.value : this.page,
+      lineNo: data.lineNo.present ? data.lineNo.value : this.lineNo,
+      glyph: data.glyph.present ? data.glyph.value : this.glyph,
+      charType: data.charType.present ? data.charType.value : this.charType,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('WordsV4Data(')
+          ..write('id: $id, ')
+          ..write('ayahId: $ayahId, ')
+          ..write('position: $position, ')
+          ..write('page: $page, ')
+          ..write('lineNo: $lineNo, ')
+          ..write('glyph: $glyph, ')
+          ..write('charType: $charType')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, ayahId, position, page, lineNo, glyph, charType);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is WordsV4Data &&
+          other.id == this.id &&
+          other.ayahId == this.ayahId &&
+          other.position == this.position &&
+          other.page == this.page &&
+          other.lineNo == this.lineNo &&
+          other.glyph == this.glyph &&
+          other.charType == this.charType);
+}
+
+class WordsV4Companion extends UpdateCompanion<WordsV4Data> {
+  final Value<int> id;
+  final Value<int> ayahId;
+  final Value<int> position;
+  final Value<int> page;
+  final Value<int> lineNo;
+  final Value<String> glyph;
+  final Value<String> charType;
+  const WordsV4Companion({
+    this.id = const Value.absent(),
+    this.ayahId = const Value.absent(),
+    this.position = const Value.absent(),
+    this.page = const Value.absent(),
+    this.lineNo = const Value.absent(),
+    this.glyph = const Value.absent(),
+    this.charType = const Value.absent(),
+  });
+  WordsV4Companion.insert({
+    this.id = const Value.absent(),
+    required int ayahId,
+    required int position,
+    required int page,
+    required int lineNo,
+    required String glyph,
+    required String charType,
+  }) : ayahId = Value(ayahId),
+       position = Value(position),
+       page = Value(page),
+       lineNo = Value(lineNo),
+       glyph = Value(glyph),
+       charType = Value(charType);
+  static Insertable<WordsV4Data> custom({
+    Expression<int>? id,
+    Expression<int>? ayahId,
+    Expression<int>? position,
+    Expression<int>? page,
+    Expression<int>? lineNo,
+    Expression<String>? glyph,
+    Expression<String>? charType,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (ayahId != null) 'ayah_id': ayahId,
+      if (position != null) 'position': position,
+      if (page != null) 'page': page,
+      if (lineNo != null) 'line_no': lineNo,
+      if (glyph != null) 'glyph': glyph,
+      if (charType != null) 'char_type': charType,
+    });
+  }
+
+  WordsV4Companion copyWith({
+    Value<int>? id,
+    Value<int>? ayahId,
+    Value<int>? position,
+    Value<int>? page,
+    Value<int>? lineNo,
+    Value<String>? glyph,
+    Value<String>? charType,
+  }) {
+    return WordsV4Companion(
+      id: id ?? this.id,
+      ayahId: ayahId ?? this.ayahId,
+      position: position ?? this.position,
+      page: page ?? this.page,
+      lineNo: lineNo ?? this.lineNo,
+      glyph: glyph ?? this.glyph,
+      charType: charType ?? this.charType,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (ayahId.present) {
+      map['ayah_id'] = Variable<int>(ayahId.value);
+    }
+    if (position.present) {
+      map['position'] = Variable<int>(position.value);
+    }
+    if (page.present) {
+      map['page'] = Variable<int>(page.value);
+    }
+    if (lineNo.present) {
+      map['line_no'] = Variable<int>(lineNo.value);
+    }
+    if (glyph.present) {
+      map['glyph'] = Variable<String>(glyph.value);
+    }
+    if (charType.present) {
+      map['char_type'] = Variable<String>(charType.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('WordsV4Companion(')
+          ..write('id: $id, ')
+          ..write('ayahId: $ayahId, ')
+          ..write('position: $position, ')
+          ..write('page: $page, ')
+          ..write('lineNo: $lineNo, ')
+          ..write('glyph: $glyph, ')
+          ..write('charType: $charType')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $TafsirsTable extends Tafsirs with TableInfo<$TafsirsTable, Tafsir> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -3081,6 +3995,8 @@ abstract class _$QuranDatabase extends GeneratedDatabase {
   late final $AyahsTable ayahs = $AyahsTable(this);
   late final $PageLinesTable pageLines = $PageLinesTable(this);
   late final $WordsTable words = $WordsTable(this);
+  late final $PageLinesV4Table pageLinesV4 = $PageLinesV4Table(this);
+  late final $WordsV4Table wordsV4 = $WordsV4Table(this);
   late final $TafsirsTable tafsirs = $TafsirsTable(this);
   late final $TranslationsTable translations = $TranslationsTable(this);
   late final $MutashabihatTable mutashabihat = $MutashabihatTable(this);
@@ -3093,6 +4009,8 @@ abstract class _$QuranDatabase extends GeneratedDatabase {
     ayahs,
     pageLines,
     words,
+    pageLinesV4,
+    wordsV4,
     tafsirs,
     translations,
     mutashabihat,
@@ -4163,6 +5081,482 @@ typedef $$WordsTableProcessedTableManager =
       Word,
       PrefetchHooks Function()
     >;
+typedef $$PageLinesV4TableCreateCompanionBuilder =
+    PageLinesV4Companion Function({
+      required int page,
+      required int lineNo,
+      required String lineType,
+      required int isCentered,
+      Value<int?> firstWordId,
+      Value<int?> lastWordId,
+      Value<int?> surahRef,
+      Value<int> rowid,
+    });
+typedef $$PageLinesV4TableUpdateCompanionBuilder =
+    PageLinesV4Companion Function({
+      Value<int> page,
+      Value<int> lineNo,
+      Value<String> lineType,
+      Value<int> isCentered,
+      Value<int?> firstWordId,
+      Value<int?> lastWordId,
+      Value<int?> surahRef,
+      Value<int> rowid,
+    });
+
+class $$PageLinesV4TableFilterComposer
+    extends Composer<_$QuranDatabase, $PageLinesV4Table> {
+  $$PageLinesV4TableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get page => $composableBuilder(
+    column: $table.page,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lineNo => $composableBuilder(
+    column: $table.lineNo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lineType => $composableBuilder(
+    column: $table.lineType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get isCentered => $composableBuilder(
+    column: $table.isCentered,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get firstWordId => $composableBuilder(
+    column: $table.firstWordId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lastWordId => $composableBuilder(
+    column: $table.lastWordId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get surahRef => $composableBuilder(
+    column: $table.surahRef,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PageLinesV4TableOrderingComposer
+    extends Composer<_$QuranDatabase, $PageLinesV4Table> {
+  $$PageLinesV4TableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get page => $composableBuilder(
+    column: $table.page,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get lineNo => $composableBuilder(
+    column: $table.lineNo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lineType => $composableBuilder(
+    column: $table.lineType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get isCentered => $composableBuilder(
+    column: $table.isCentered,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get firstWordId => $composableBuilder(
+    column: $table.firstWordId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get lastWordId => $composableBuilder(
+    column: $table.lastWordId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get surahRef => $composableBuilder(
+    column: $table.surahRef,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PageLinesV4TableAnnotationComposer
+    extends Composer<_$QuranDatabase, $PageLinesV4Table> {
+  $$PageLinesV4TableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get page =>
+      $composableBuilder(column: $table.page, builder: (column) => column);
+
+  GeneratedColumn<int> get lineNo =>
+      $composableBuilder(column: $table.lineNo, builder: (column) => column);
+
+  GeneratedColumn<String> get lineType =>
+      $composableBuilder(column: $table.lineType, builder: (column) => column);
+
+  GeneratedColumn<int> get isCentered => $composableBuilder(
+    column: $table.isCentered,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get firstWordId => $composableBuilder(
+    column: $table.firstWordId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get lastWordId => $composableBuilder(
+    column: $table.lastWordId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get surahRef =>
+      $composableBuilder(column: $table.surahRef, builder: (column) => column);
+}
+
+class $$PageLinesV4TableTableManager
+    extends
+        RootTableManager<
+          _$QuranDatabase,
+          $PageLinesV4Table,
+          PageLinesV4Data,
+          $$PageLinesV4TableFilterComposer,
+          $$PageLinesV4TableOrderingComposer,
+          $$PageLinesV4TableAnnotationComposer,
+          $$PageLinesV4TableCreateCompanionBuilder,
+          $$PageLinesV4TableUpdateCompanionBuilder,
+          (
+            PageLinesV4Data,
+            BaseReferences<_$QuranDatabase, $PageLinesV4Table, PageLinesV4Data>,
+          ),
+          PageLinesV4Data,
+          PrefetchHooks Function()
+        > {
+  $$PageLinesV4TableTableManager(_$QuranDatabase db, $PageLinesV4Table table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PageLinesV4TableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PageLinesV4TableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PageLinesV4TableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> page = const Value.absent(),
+                Value<int> lineNo = const Value.absent(),
+                Value<String> lineType = const Value.absent(),
+                Value<int> isCentered = const Value.absent(),
+                Value<int?> firstWordId = const Value.absent(),
+                Value<int?> lastWordId = const Value.absent(),
+                Value<int?> surahRef = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PageLinesV4Companion(
+                page: page,
+                lineNo: lineNo,
+                lineType: lineType,
+                isCentered: isCentered,
+                firstWordId: firstWordId,
+                lastWordId: lastWordId,
+                surahRef: surahRef,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required int page,
+                required int lineNo,
+                required String lineType,
+                required int isCentered,
+                Value<int?> firstWordId = const Value.absent(),
+                Value<int?> lastWordId = const Value.absent(),
+                Value<int?> surahRef = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PageLinesV4Companion.insert(
+                page: page,
+                lineNo: lineNo,
+                lineType: lineType,
+                isCentered: isCentered,
+                firstWordId: firstWordId,
+                lastWordId: lastWordId,
+                surahRef: surahRef,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PageLinesV4TableProcessedTableManager =
+    ProcessedTableManager<
+      _$QuranDatabase,
+      $PageLinesV4Table,
+      PageLinesV4Data,
+      $$PageLinesV4TableFilterComposer,
+      $$PageLinesV4TableOrderingComposer,
+      $$PageLinesV4TableAnnotationComposer,
+      $$PageLinesV4TableCreateCompanionBuilder,
+      $$PageLinesV4TableUpdateCompanionBuilder,
+      (
+        PageLinesV4Data,
+        BaseReferences<_$QuranDatabase, $PageLinesV4Table, PageLinesV4Data>,
+      ),
+      PageLinesV4Data,
+      PrefetchHooks Function()
+    >;
+typedef $$WordsV4TableCreateCompanionBuilder =
+    WordsV4Companion Function({
+      Value<int> id,
+      required int ayahId,
+      required int position,
+      required int page,
+      required int lineNo,
+      required String glyph,
+      required String charType,
+    });
+typedef $$WordsV4TableUpdateCompanionBuilder =
+    WordsV4Companion Function({
+      Value<int> id,
+      Value<int> ayahId,
+      Value<int> position,
+      Value<int> page,
+      Value<int> lineNo,
+      Value<String> glyph,
+      Value<String> charType,
+    });
+
+class $$WordsV4TableFilterComposer
+    extends Composer<_$QuranDatabase, $WordsV4Table> {
+  $$WordsV4TableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get ayahId => $composableBuilder(
+    column: $table.ayahId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get page => $composableBuilder(
+    column: $table.page,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lineNo => $composableBuilder(
+    column: $table.lineNo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get glyph => $composableBuilder(
+    column: $table.glyph,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get charType => $composableBuilder(
+    column: $table.charType,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$WordsV4TableOrderingComposer
+    extends Composer<_$QuranDatabase, $WordsV4Table> {
+  $$WordsV4TableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get ayahId => $composableBuilder(
+    column: $table.ayahId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get page => $composableBuilder(
+    column: $table.page,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get lineNo => $composableBuilder(
+    column: $table.lineNo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get glyph => $composableBuilder(
+    column: $table.glyph,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get charType => $composableBuilder(
+    column: $table.charType,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$WordsV4TableAnnotationComposer
+    extends Composer<_$QuranDatabase, $WordsV4Table> {
+  $$WordsV4TableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get ayahId =>
+      $composableBuilder(column: $table.ayahId, builder: (column) => column);
+
+  GeneratedColumn<int> get position =>
+      $composableBuilder(column: $table.position, builder: (column) => column);
+
+  GeneratedColumn<int> get page =>
+      $composableBuilder(column: $table.page, builder: (column) => column);
+
+  GeneratedColumn<int> get lineNo =>
+      $composableBuilder(column: $table.lineNo, builder: (column) => column);
+
+  GeneratedColumn<String> get glyph =>
+      $composableBuilder(column: $table.glyph, builder: (column) => column);
+
+  GeneratedColumn<String> get charType =>
+      $composableBuilder(column: $table.charType, builder: (column) => column);
+}
+
+class $$WordsV4TableTableManager
+    extends
+        RootTableManager<
+          _$QuranDatabase,
+          $WordsV4Table,
+          WordsV4Data,
+          $$WordsV4TableFilterComposer,
+          $$WordsV4TableOrderingComposer,
+          $$WordsV4TableAnnotationComposer,
+          $$WordsV4TableCreateCompanionBuilder,
+          $$WordsV4TableUpdateCompanionBuilder,
+          (
+            WordsV4Data,
+            BaseReferences<_$QuranDatabase, $WordsV4Table, WordsV4Data>,
+          ),
+          WordsV4Data,
+          PrefetchHooks Function()
+        > {
+  $$WordsV4TableTableManager(_$QuranDatabase db, $WordsV4Table table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$WordsV4TableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$WordsV4TableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$WordsV4TableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> ayahId = const Value.absent(),
+                Value<int> position = const Value.absent(),
+                Value<int> page = const Value.absent(),
+                Value<int> lineNo = const Value.absent(),
+                Value<String> glyph = const Value.absent(),
+                Value<String> charType = const Value.absent(),
+              }) => WordsV4Companion(
+                id: id,
+                ayahId: ayahId,
+                position: position,
+                page: page,
+                lineNo: lineNo,
+                glyph: glyph,
+                charType: charType,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int ayahId,
+                required int position,
+                required int page,
+                required int lineNo,
+                required String glyph,
+                required String charType,
+              }) => WordsV4Companion.insert(
+                id: id,
+                ayahId: ayahId,
+                position: position,
+                page: page,
+                lineNo: lineNo,
+                glyph: glyph,
+                charType: charType,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$WordsV4TableProcessedTableManager =
+    ProcessedTableManager<
+      _$QuranDatabase,
+      $WordsV4Table,
+      WordsV4Data,
+      $$WordsV4TableFilterComposer,
+      $$WordsV4TableOrderingComposer,
+      $$WordsV4TableAnnotationComposer,
+      $$WordsV4TableCreateCompanionBuilder,
+      $$WordsV4TableUpdateCompanionBuilder,
+      (
+        WordsV4Data,
+        BaseReferences<_$QuranDatabase, $WordsV4Table, WordsV4Data>,
+      ),
+      WordsV4Data,
+      PrefetchHooks Function()
+    >;
 typedef $$TafsirsTableCreateCompanionBuilder =
     TafsirsCompanion Function({
       Value<int> id,
@@ -4708,6 +6102,10 @@ class $QuranDatabaseManager {
       $$PageLinesTableTableManager(_db, _db.pageLines);
   $$WordsTableTableManager get words =>
       $$WordsTableTableManager(_db, _db.words);
+  $$PageLinesV4TableTableManager get pageLinesV4 =>
+      $$PageLinesV4TableTableManager(_db, _db.pageLinesV4);
+  $$WordsV4TableTableManager get wordsV4 =>
+      $$WordsV4TableTableManager(_db, _db.wordsV4);
   $$TafsirsTableTableManager get tafsirs =>
       $$TafsirsTableTableManager(_db, _db.tafsirs);
   $$TranslationsTableTableManager get translations =>
