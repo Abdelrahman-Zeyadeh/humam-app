@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- اختصارات نظام أندرويد (App Shortcuts) — ضغطة مطوّلة على أيقونة التطبيق
+     تفتح مباشرة "متابعة القراءة" أو "الأذكار" بلا المرور بالهوم. تعيد
+     استخدام نفس آلية `home_widget` القائمة أصلاً (`initiallyLaunchedFromHomeWidget`
+     تقرأ بيانات الـ Intent بغضّ النظر عن مصدره) — راجع `_handleWidgetUri`
+     بـ`home_widget_service.dart` لمعالجة `humam://quran` و`humam://azkar`،
+     نفس الروابط المستخدمة أصلاً بويدجتات الشاشة الرئيسية. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="quran_reading"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_quran_short"
+        android:shortcutLongLabel="@string/shortcut_quran_long">
+        <!-- عمداً نفس فعل (action) `home_widget` بالضبط، لا Intent.ACTION_VIEW
+             القياسي — الحزمة تتحقّق حرفياً من هالفعل بكودها الأصلي (`HomeWidgetPlugin.kt`)
+             قبل ما تعتبر الإطلاق "من ويدجت/رابط humam://"، فبلا هالتطابق
+             الدقيق `initiallyLaunchedFromHomeWidget`/`widgetClicked` ما رح
+             يلتقطا نقرة الاختصار إطلاقاً. -->
+        <intent
+            android:action="es.antonborri.home_widget.action.LAUNCH"
+            android:targetPackage="com.humam.humam_app"
+            android:targetClass="com.humam.humam_app.MainActivity"
+            android:data="humam://quran" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="azkar"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_azkar_short"
+        android:shortcutLongLabel="@string/shortcut_azkar_long">
+        <intent
+            android:action="es.antonborri.home_widget.action.LAUNCH"
+            android:targetPackage="com.humam.humam_app"
+            android:targetClass="com.humam.humam_app.MainActivity"
+            android:data="humam://azkar" />
+    </shortcut>
+</shortcuts>

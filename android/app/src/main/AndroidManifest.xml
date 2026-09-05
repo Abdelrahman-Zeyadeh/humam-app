@@ -51,6 +51,12 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <!-- اختصارات نظام أندرويد (App Shortcuts، ضغطة مطوّلة على الأيقونة)
+                 — راجع res/xml/shortcuts.xml. -->
+            <meta-data
+              android:name="android.app.shortcuts"
+              android:resource="@xml/shortcuts"
+              />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>

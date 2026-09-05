@@ -2,4 +2,9 @@
 <resources>
     <string name="app_name">هُمَام</string>
     <string name="widget_name">آية الفترة ومواقيت الصلاة</string>
+    <!-- نصوص اختصارات نظام أندرويد (App Shortcuts) — راجع res/xml/shortcuts.xml -->
+    <string name="shortcut_quran_short">القراءة</string>
+    <string name="shortcut_quran_long">متابعة القراءة</string>
+    <string name="shortcut_azkar_short">الأذكار</string>
+    <string name="shortcut_azkar_long">الأذكار</string>
 </resources>
