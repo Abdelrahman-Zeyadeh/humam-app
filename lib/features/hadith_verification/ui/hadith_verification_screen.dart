@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_card.dart';
 import '../../../core/theme/app_colors.dart';
 import '../models/dorar_hadith_result.dart';
+import '../services/dorar_search_cache.dart';
 import '../services/dorar_search_service.dart';
 import '../services/dorar_webview_fetcher.dart';
 
@@ -67,6 +70,20 @@ class _HadithVerificationScreenState
     });
 
     try {
+      final cache = ref.read(dorarSearchCacheProvider);
+      // كاش محلي أولاً — الجلب الفعلي يحتاج WebView كاملاً (بطيء نسبياً)،
+      // فتكرار نفس الاستعلام (بحث المستخدم لنفس الحديث مرة ثانية، أو نفس
+      // النص من "التحقق من صحة" بشاشات أخرى) يعيد النتيجة المحفوظة فوراً
+      // بدل تحميل صفحة جديدة كل مرة (راجع `DorarSearchCache` لمدة الصلاحية).
+      final cached = cache.get(q);
+      if (cached != null) {
+        setState(() {
+          _results = cached;
+          _status = _SearchStatus.loaded;
+        });
+        return;
+      }
+
       // جلب حقيقي عبر WebView (محرك متصفح حقيقي) لا Dio — راجع توثيق
       // `DorarWebViewFetcher` لسبب هذا القرار (Cloudflare يرفض طلبات Dio
       // بـ٤٠٣ مهما كانت الترويسات، حتى مع كوكيز جلسة صالحة).
@@ -74,6 +91,7 @@ class _HadithVerificationScreenState
       if (!mounted || _lastQuery != q) return;
       final service = ref.read(dorarSearchServiceProvider);
       final results = service.parseSearchResults(html);
+      unawaited(cache.set(q, results));
       setState(() {
         _results = results;
         _status = _SearchStatus.loaded;

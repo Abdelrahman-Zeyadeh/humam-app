@@ -50,4 +50,33 @@ class DorarHadithResult {
     buffer.writeln('موقع الدرر السنية: $permalink');
     return buffer.toString().trim();
   }
+
+  /// تسلسل/فكّ تسلسل JSON — لكاش البحث المحلي (`dorar_search_cache.dart`)
+  /// حصراً؛ لا استخدام آخر لهما حالياً.
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'matn': matn,
+    'grade': grade,
+    'narrator': narrator,
+    'muhaddith': muhaddith,
+    'source': source,
+    'pageOrNumber': pageOrNumber,
+    'takhrij': takhrij,
+    'categories': categories,
+  };
+
+  factory DorarHadithResult.fromJson(Map<String, dynamic> json) {
+    return DorarHadithResult(
+      id: json['id'] as String,
+      matn: json['matn'] as String,
+      grade: json['grade'] as String?,
+      narrator: json['narrator'] as String?,
+      muhaddith: json['muhaddith'] as String?,
+      source: json['source'] as String?,
+      pageOrNumber: json['pageOrNumber'] as String?,
+      takhrij: json['takhrij'] as String?,
+      categories:
+          (json['categories'] as List<dynamic>?)?.cast<String>() ?? const [],
+    );
+  }
 }
