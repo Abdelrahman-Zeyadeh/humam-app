@@ -14,7 +14,6 @@ import '../audio/ui/detailed_audio_sheet.dart';
 import '../shell/root_shell.dart' show rootTabIndexProvider;
 import 'ayah_share_sheet.dart';
 import 'ayah_text_view_screen.dart';
-import 'comparative_tafsir_sheet.dart';
 import 'gharib_words_sheet.dart';
 import 'mushaf_settings.dart' show mushafJumpRequestProvider;
 
@@ -362,15 +361,6 @@ class _AyahActionsSheetState extends ConsumerState<AyahActionsSheet> {
                                       kind: AyahTextViewKind.translation,
                                     ),
                                   ),
-                                ),
-                              ),
-                              _CategoryKnowledgeCard(
-                                title: 'التفسير المقارن',
-                                icon: Icons.compare_rounded,
-                                iconColor: AppColors.tealDeep,
-                                onTap: () => ComparativeTafsirSheet.show(
-                                  context,
-                                  ayah.id,
                                 ),
                               ),
                               _CategoryKnowledgeCard(
