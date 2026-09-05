@@ -6,6 +6,7 @@ import '../../core/data/quran/quran_providers.dart';
 import '../../core/data/quran/tafsir_edition_catalog.dart';
 import '../../core/text/arabic_normalizer.dart' show stripQuranicMarksForDisplay;
 import '../../core/theme/app_colors.dart';
+import 'mushaf_settings.dart' show readingTafsirEditionProvider;
 import 'tafsir_download_service.dart';
 
 enum AyahTextViewKind { tafsir, translation }
@@ -45,7 +46,12 @@ class _AyahTextViewScreenState extends ConsumerState<AyahTextViewScreen> {
   late int _ayahId = widget.ayahId;
   late MainTafsirTab _activeTab = widget.initialTab;
   String _tafsirLengthFilter = 'mukhtasarat'; // 'mukhtasarat' | 'mutawassitat' | 'tiwal'
-  final Set<String> _expandedEditions = {'mukhtasar'};
+  // يبدأ مفتوحاً على "تفسير المستخدم الرئيسي" المحفوظ (نفس تفضيل شاشة
+  // "قراءة مع التفسير" — `readingTafsirEditionProvider`) بدل قيمة ثابتة،
+  // فيكون هناك تفسير واحد افتراضي متّسق بكل الشاشة، والبقية مطويّة تحته.
+  late final Set<String> _expandedEditions = {
+    ref.read(readingTafsirEditionProvider),
+  };
 
   void _goTo(int ayahId) {
     if (ayahId < 1 || ayahId > kQuranAyahCount) return;
@@ -58,6 +64,11 @@ class _AyahTextViewScreenState extends ConsumerState<AyahTextViewScreen> {
         _expandedEditions.remove(key);
       } else {
         _expandedEditions.add(key);
+        // فتح تفسير من تبويب "التفاسير" يجعله التفسير الرئيسي المحفوظ
+        // للمرّة القادمة (بهذه الشاشة وبشاشة "قراءة مع التفسير" معاً).
+        if (_activeTab == MainTafsirTab.tafasir) {
+          ref.read(readingTafsirEditionProvider.notifier).set(key);
+        }
       }
     });
   }
