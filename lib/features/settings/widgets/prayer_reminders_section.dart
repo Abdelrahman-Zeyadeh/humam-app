@@ -11,14 +11,16 @@ import '../../notifications/adhan_notification_prefs.dart';
 import '../../notifications/adhan_notification_service.dart';
 import '../../prayer/adhan_voices.dart';
 import '../../more/reminders_screen.dart';
-import '../../tajweed/ui/tajweed_color_legend_sheet.dart';
-import '../../tajweed/ui/tajweed_screen.dart';
 import '../permissions_guide_screen.dart';
 import 'settings_section_helpers.dart';
 
-/// قسم "الصلاة والتذكيرات" — يجمع ٤ أقسام (تجويد، صوت الأذان، التذكيرات،
-/// دقة الأذان) ببطاقة واحدة بنفس مبدأ بقية أقسام شاشة الإعدادات. استُخرج
-/// من `settings_screen.dart` أثناء تفكيكه بلا أي تغيير سلوكي.
+/// قسم "الصلاة والتذكيرات" — يجمع ٣ أقسام (صوت الأذان، التذكيرات، دقة
+/// الأذان) ببطاقة واحدة بنفس مبدأ بقية أقسام شاشة الإعدادات. استُخرج من
+/// `settings_screen.dart` أثناء تفكيكه بلا أي تغيير سلوكي.
+///
+/// (كان يضم أيضاً "أحكام التجويد والضبط" و"دليل ألوان التجويد" — نُقلا
+/// لشاشة "أدواتي" بطلب صريح لاحق: علم قرآني عام مالوش علاقة بالصلاة/الأذان.
+/// راجع `_ToolItem` بمعرّف `tajweed` في `more_placeholder_screen.dart`.)
 class PrayerRemindersSection extends StatelessWidget {
   const PrayerRemindersSection({super.key});
 
@@ -32,48 +34,6 @@ class PrayerRemindersSection extends StatelessWidget {
           margin: EdgeInsets.zero,
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: [
-                        TextButton.icon(
-                          icon: const Icon(Icons.palette_outlined, size: 16),
-                          label: const Text(
-                            'دليل مفتاح ألوان التجويد',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                          onPressed: () => showModalBottomSheet(
-                            context: context,
-                            isScrollControlled: true,
-                            builder: (_) => const TajweedColorLegendSheet(),
-                          ),
-                        ),
-                        TextButton.icon(
-                          icon: const Icon(
-                            Icons.menu_book_outlined,
-                            size: 16,
-                          ),
-                          label: const Text(
-                            'أحكام التجويد والضبط',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const TajweedScreen(),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
               const _AdhanVoiceSection(),
               const Divider(height: 1),
               ListTile(
