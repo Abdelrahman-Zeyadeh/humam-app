@@ -126,3 +126,31 @@ final locationControllerProvider =
     NotifierProvider<LocationController, AsyncValue<void>>(
       LocationController.new,
     );
+
+/// يعيد جدولة **كل** إشعارات الأذان (بما فيها مؤذن/نمط كل صلاة على حدة
+/// ومتابعة "هل صليت؟") لتطابق أحدث تفضيلات محفوظة — تُستدعى من أي مكان
+/// يُعدَّل فيه إعداد يؤثر على الجدولة (إزاحة وقت، مدة إقامة، تنبيه مبكر،
+/// مؤذن صلاة بعينها، نمط التنبيه...). مستخرجة من `prayer_screen.dart`
+/// (كانت `_rescheduleAdhans` خاصة بالملف) لتُشارَك مع أوراق سفلية بملفات
+/// منفصلة (`widgets/prayer_detail_sheet.dart`,
+/// `widgets/prayer_voice_picker_sheet.dart`) بلا تكرار.
+Future<void> rescheduleAdhanNotifications(
+  WidgetRef ref,
+  LocationPrefs prefs,
+) async {
+  if (!prefs.hasLocation) return;
+  final notifPrefs = ref.read(adhanNotificationPrefsProvider);
+  final userPrefs = ref.read(userPrefsProvider);
+  await AdhanNotificationService.instance.rescheduleUpcoming(
+    lat: prefs.lat!,
+    lon: prefs.lon!,
+    methodKey: prefs.calculationMethod,
+    isEnabled: notifPrefs.effectivelyEnabled,
+    voiceId: userPrefs.adhanVoiceId,
+    getVoiceIdFor: (m) => userPrefs.adhanVoiceFor(m.name),
+    getModeFor: (m) => notifPrefs.notificationModeFor(m),
+    preAdhanMinutes: userPrefs.preAdhanMinutes,
+    checkinEnabled: userPrefs.prayerCheckinEnabled,
+    checkinFirstDelayMinutes: userPrefs.prayerCheckinFirstDelayMinutes,
+  );
+}
