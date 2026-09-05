@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/data/names_of_allah/names_of_allah_model.dart';
 import '../../core/theme/app_card.dart';
 import '../../core/theme/app_colors.dart';
+import '../story_maker/models/story_content.dart';
 import '../story_maker/ui/ayah_story_maker_screen.dart';
 
 /// شيت تفاصيل وتدبر اسم من أسماء الله الحسنى
@@ -270,7 +271,14 @@ class NameDetailSheet extends StatelessWidget {
                               Navigator.pop(context);
                               Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) => const AyahStoryMakerScreen(),
+                                  builder: (_) => AyahStoryMakerScreen(
+                                    initialContent: NameOfAllahContent(
+                                      name: name.name,
+                                      meaning: name.meaning,
+                                      tadabbur: name.tadabbur,
+                                      dua: name.dua,
+                                    ),
+                                  ),
                                 ),
                               );
                             },

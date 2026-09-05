@@ -7,6 +7,8 @@ import '../../core/data/hadith/hadith_book_catalog.dart';
 import '../../core/data/hadith/hadith_database.dart';
 import '../../core/data/hadith/hadith_providers.dart';
 import '../mushaf/mushaf_settings.dart';
+import '../story_maker/models/story_content.dart';
+import '../story_maker/ui/ayah_story_maker_screen.dart';
 
 final _hadithByIdProvider = FutureProvider.family<Hadith, (int bookId, int hadithId)>((ref, args) {
   return ref.watch(hadithRepositoryProvider).hadithById(args.$1, args.$2);
@@ -66,6 +68,22 @@ class HadithDetailScreen extends ConsumerWidget {
                     icon: const Icon(Icons.share_outlined),
                     label: const Text('مشاركة'),
                     onPressed: () => SharePlus.instance.share(ShareParams(text: hadith.content)),
+                  ),
+                  const SizedBox(width: 12),
+                  TextButton.icon(
+                    icon: const Icon(Icons.palette_outlined),
+                    label: const Text('تصميم بطاقة'),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => AyahStoryMakerScreen(
+                          initialContent: HadithContent(
+                            hadithText: hadith.content,
+                            narrator: 'حديث ${hadith.hadithNumber}',
+                            sourceBook: book.nameAr,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),

@@ -55,6 +55,9 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
   bool _showReference = true;
   bool _showBranding = true;
   bool _isExporting = false;
+  // خاص بوضع المحتوى غير القرآني (اسم من أسماء الله / حديث) — إظهار
+  // النص الفرعي (المعنى/الشرح) تحت النص الرئيسي. راجع `_buildNonAyahScaffold`.
+  bool _showSubText = true;
 
   String _tafsirName(String key) {
     switch (key) {
@@ -183,7 +186,9 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
       final bytes = await _captureImageBytes();
       if (bytes == null) return;
 
-      final filename = 'humam_story_${_selectedAyahId}_${DateTime.now().millisecondsSinceEpoch}.png';
+      // بلا اعتماد على `_selectedAyahId` — هاي الدالة تُستدعى من مسار
+      // الآية ومن مسار المحتوى غير القرآني (اسم/حديث) معاً.
+      final filename = 'humam_story_${DateTime.now().millisecondsSinceEpoch}.png';
       // الحفظ عبر MediaStore (أندرويد 10+) بدل كتابة مسار صريح كان يفشل
       // بالتخزين المقصّى Scoped Storage. النتيجة تعكس أين حُفظت فعلاً.
       final res = await savePngToGallery(bytes, displayName: filename);
@@ -420,6 +425,14 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // محتوى غير قرآني (اسم من أسماء الله / حديث) — مسار عرض مستقل بالكامل
+    // عن مسار الآية (لا يحتاج جلب آية/سورة من القاعدة، ولا خيارات خاصة
+    // بالمصحف/التفسير). راجع تعليق `StoryContent` بأعلى الملف لسبب الفصل.
+    final fixedContent = widget.initialContent;
+    if (fixedContent != null && fixedContent.type != StoryContentType.ayah) {
+      return _buildNonAyahScaffold(fixedContent);
+    }
+
     final ayahsFuture = _fetchSelectedAyahs();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -1172,6 +1185,456 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
                     color: accent,
                     loading: _isExporting,
                     onPressed: _isExporting ? null : () => _exportAndShare(ayahs, surah),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // مسار المحتوى غير القرآني (اسم من أسماء الله الحسنى / حديث شريف) — بديل
+  // كامل لمسار الآية أعلاه، بلا أي استعلام قاعدة بيانات ولا خيارات خاصة
+  // بالمصحف/التفسير (لا معنى لهما هون). أُضيف بطلب صريح بعد شكوى أن زر
+  // "تصميم بطاقة ستوري" باسم من أسماء الله كان يفتح الاستوديو على آية
+  // الكرسي الافتراضية بدل اسم الله نفسه (الشاشة أصلاً ما كانت تستخدم
+  // `initialContent` إطلاقاً).
+  // ===========================================================================
+
+  Future<void> _exportAndShareGeneric(StoryContent content) async {
+    setState(() => _isExporting = true);
+    try {
+      final buffer = await _captureImageBytes();
+      if (buffer == null) return;
+
+      final tempDir = await getTemporaryDirectory();
+      final filePath = '${tempDir.path}/humam_story_${DateTime.now().millisecondsSinceEpoch}.png';
+      final file = File(filePath);
+      await file.writeAsBytes(buffer);
+
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(filePath)],
+          text: '${content.mainText}\n\n${content.sourceReference}\n\nتطبيق هُمَام',
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تعذّر تصدير الصورة: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
+  String _titleForContent(StoryContent content) {
+    switch (content.type) {
+      case StoryContentType.nameOfAllah:
+        return 'استوديو تصميم أسماء الله الحسنى 🎨';
+      case StoryContentType.hadith:
+        return 'استوديو تصميم بطاقات الحديث 🎨';
+      case StoryContentType.dhikr:
+        return 'استوديو تصميم بطاقات الذكر 🎨';
+      case StoryContentType.custom:
+      case StoryContentType.ayah:
+        return 'استوديو تصميم البطاقات 🎨';
+    }
+  }
+
+  Widget _buildNonAyahScaffold(StoryContent content) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Scaffold(
+      appBar: AppBar(title: Text(_titleForContent(content)), centerTitle: true),
+      body: Column(
+        children: [
+          Expanded(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: _buildGenericCardPreview(content),
+              ),
+            ),
+          ),
+          _buildGenericControlsPanel(context, content, isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGenericCardPreview(StoryContent content) {
+    final double width;
+    final double height;
+    switch (_selectedRatio) {
+      case StoryRatio.story:
+        width = 280.0;
+        height = 490.0;
+        break;
+      case StoryRatio.square:
+        width = 310.0;
+        height = 310.0;
+        break;
+      case StoryRatio.banner:
+        width = 330.0;
+        height = 190.0;
+        break;
+    }
+
+    final textColor = _customImagePath != null ? Colors.white : _selectedTheme.textColor;
+
+    return RepaintBoundary(
+      key: _previewKey,
+      child: Container(
+        width: width,
+        height: height,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          gradient: _customImagePath == null
+              ? LinearGradient(
+                  colors: _selectedTheme.backgroundColors,
+                  begin: _selectedTheme.beginAlignment,
+                  end: _selectedTheme.endAlignment,
+                )
+              : null,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.35),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            if (_customImagePath != null) ...[
+              Positioned.fill(
+                child: Image.file(File(_customImagePath!), fit: BoxFit.cover),
+              ),
+              Positioned.fill(
+                child: Container(color: Colors.black.withValues(alpha: _overlayOpacity)),
+              ),
+            ],
+            Positioned.fill(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: _customImagePath != null ? Colors.white24 : _selectedTheme.frameColor,
+                      width: 1.2,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  if (_showReference)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _customImagePath != null ? Colors.black45 : _selectedTheme.badgeBackgroundColor,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: _customImagePath != null
+                              ? AppColors.gold.withValues(alpha: 0.4)
+                              : _selectedTheme.accentColor.withValues(alpha: 0.3),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Text(
+                        content.sourceReference,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: _customImagePath != null ? const Color(0xFFFFE082) : _selectedTheme.badgeTextColor,
+                        ),
+                      )
+                    )
+                  else
+                    const SizedBox.shrink(),
+
+                  Expanded(
+                    child: Center(
+                      child: SingleChildScrollView(
+                        child: Text(
+                          content.mainText,
+                          textAlign: TextAlign.center,
+                          textDirection: TextDirection.rtl,
+                          style: TextStyle(
+                            fontFamily: content.type == StoryContentType.nameOfAllah ? 'AmiriQuran' : null,
+                            fontSize: _fontSize,
+                            fontWeight: FontWeight.bold,
+                            height: 1.7,
+                            color: textColor,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  Column(
+                    children: [
+                      if (_showSubText && content.subText.isNotEmpty) ...[
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: _customImagePath != null ? Colors.black45 : _selectedTheme.badgeBackgroundColor,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            content.subText,
+                            maxLines: 4,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 11,
+                              height: 1.5,
+                              color: (_customImagePath != null ? Colors.white : _selectedTheme.textColor).withValues(alpha: 0.88),
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (_showBranding)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.auto_awesome,
+                              size: 10,
+                              color: _customImagePath != null ? AppColors.gold : _selectedTheme.accentColor,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'تطبيق هُمَام',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: (_customImagePath != null ? Colors.white : _selectedTheme.textColor).withValues(alpha: 0.6),
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGenericControlsPanel(BuildContext context, StoryContent content, bool isDark) {
+    final accent = themeAccent(context);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1B232E) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, -3)),
+        ],
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            PanelLabel('المقاس'),
+            SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<StoryRatio>(
+                segments: const [
+                  ButtonSegment(value: StoryRatio.story, label: Text('9:16')),
+                  ButtonSegment(value: StoryRatio.square, label: Text('1:1')),
+                  ButtonSegment(value: StoryRatio.banner, label: Text('16:9')),
+                ],
+                selected: {_selectedRatio},
+                onSelectionChanged: (set) => setState(() => _selectedRatio = set.first),
+                style: SegmentedButton.styleFrom(visualDensity: VisualDensity.compact),
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            PanelLabel('الخلفية'),
+            SizedBox(
+              height: 38,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  InkWell(
+                    onTap: _pickCustomImage,
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      margin: const EdgeInsets.only(left: 8),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: _customImagePath != null ? accent.withValues(alpha: 0.2) : (isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.05)),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: _customImagePath != null ? accent : Colors.grey.withValues(alpha: 0.3),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.photo_library_outlined, size: 16, color: _customImagePath != null ? accent : null),
+                          const SizedBox(width: 5),
+                          Text(
+                            _customImagePath != null ? 'تغيير صورتي' : 'صورة من المعرض',
+                            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: _customImagePath != null ? accent : null),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  for (final t in StoryTheme.presets) ...[
+                    InkWell(
+                      onTap: () => setState(() {
+                        _selectedTheme = t;
+                        _customImagePath = null;
+                      }),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        margin: const EdgeInsets.only(left: 6),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(colors: t.backgroundColors),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: (_selectedTheme.id == t.id && _customImagePath == null) ? accent : Colors.transparent,
+                            width: 2,
+                          ),
+                        ),
+                        child: Text(
+                          t.name,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: (_selectedTheme.id == t.id && _customImagePath == null) ? FontWeight.bold : FontWeight.w600,
+                            color: t.textColor,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            if (_customImagePath != null) ...[
+              Row(
+                children: [
+                  const Icon(Icons.brightness_6_rounded, size: 16),
+                  const SizedBox(width: 6),
+                  const Text('تعتيم الصورة:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  Expanded(
+                    child: Slider(
+                      value: _overlayOpacity,
+                      min: 0.15,
+                      max: 0.85,
+                      divisions: 7,
+                      label: '${(_overlayOpacity * 100).round()}%',
+                      activeColor: accent,
+                      onChanged: (val) => setState(() => _overlayOpacity = val),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+            ],
+
+            PanelLabel('حجم الخط'),
+            Row(
+              children: [
+                const Icon(Icons.format_size, size: 16),
+                Expanded(
+                  child: Slider(
+                    value: _fontSize,
+                    min: 16.0,
+                    max: 32.0,
+                    divisions: 8,
+                    label: '${_fontSize.round()}',
+                    activeColor: accent,
+                    onChanged: (val) => setState(() => _fontSize = val),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+
+            PanelLabel('عناصر إضافية'),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                if (content.subText.isNotEmpty)
+                  FilterChip(
+                    label: const Text('المعنى/الشرح', style: TextStyle(fontSize: 11)),
+                    selected: _showSubText,
+                    onSelected: (val) => setState(() => _showSubText = val),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                FilterChip(
+                  label: const Text('المصدر', style: TextStyle(fontSize: 11)),
+                  selected: _showReference,
+                  onSelected: (val) => setState(() => _showReference = val),
+                  visualDensity: VisualDensity.compact,
+                ),
+                FilterChip(
+                  label: const Text('الشعار', style: TextStyle(fontSize: 11)),
+                  selected: _showBranding,
+                  onSelected: (val) => setState(() => _showBranding = val),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Divider(height: 1, color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.08)),
+            const SizedBox(height: 10),
+
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: accent,
+                      side: BorderSide(color: accent, width: 1.5),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    icon: const Icon(Icons.download_rounded, size: 20),
+                    label: const Text('حفظ بالصور', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
+                    onPressed: _isExporting ? null : _saveToGallery,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: AppPrimaryButton(
+                    label: _isExporting ? 'جارٍ التصدير...' : 'مشاركة 🚀',
+                    icon: Icons.share_rounded,
+                    color: accent,
+                    loading: _isExporting,
+                    onPressed: _isExporting ? null : () => _exportAndShareGeneric(content),
                   ),
                 ),
               ],
