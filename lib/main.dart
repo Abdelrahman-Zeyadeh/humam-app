@@ -1,8 +1,10 @@
 import 'dart:async' show unawaited;
 import 'dart:io' show Platform;
+import 'dart:ui' show PlatformDispatcher;
 
 import 'package:audio_service/audio_service.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -395,6 +397,21 @@ Future<void> _initFirebaseInBackground() async {
     await Firebase.initializeApp();
   } catch (e) {
     debugPrint('Firebase.initializeApp فشل/تعذّر: $e');
+    return; // بلا Firebase مهيَّأ، Crashlytics لن يشتغل — لا داعي للمحاولة.
+  }
+
+  // Crashlytics: تسجيل الاستثناءات غير المُمسَكة عن بعد فقط — لا يستبدل أي
+  // `try/catch` موجود (كل التقاط هنا أعلى بالملف يبقى كما هو، يطبع تحذيراً
+  // محلياً ويكمل التطبيق عادي). فشل تفعيل Crashlytics نفسه لا يوقف التطبيق،
+  // بنفس فلسفة بقية التهيئات بالخلفية هون.
+  try {
+    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+    PlatformDispatcher.instance.onError = (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      return true;
+    };
+  } catch (e) {
+    debugPrint('تفعيل Crashlytics فشل/تعذّر: $e');
   }
 }
 

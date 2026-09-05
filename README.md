@@ -1,16 +1,72 @@
-# humam_app
+# هُمَام (Humam)
 
-A new Flutter project.
+تطبيق فلاتر (عربي فقط، RTL) يجمع القرآن الكريم (مصحف نصي + مصحف مصوَّر
+برسم عثماني وتجويد QCF)، الأذكار، الأحاديث مع تخريجها، الحفظ، مواقيت
+الصلاة والأذان، وميزات إسلامية يومية أخرى — بلا اعتماد على إنترنت لبيانات
+المحتوى الأساسية (القرآن/الحديث/الأذكار/مواقيت الصلاة كلها محلية).
 
-## Getting Started
+## خريطة `lib/`
 
-This project is a starting point for a Flutter application.
+- **`main.dart`** — نقطة الإقلاع: تهيئة قاعدة بيانات المستخدم (drift)
+  والتحميل المسبق لها *قبل* `runApp`، ثم تهيئة الخدمات التي لا يعتمد عليها
+  رسم أول شاشة (الصوت/الإشعارات/Firebase وCrashlytics) بالخلفية بلا حظر
+  الإقلاع — أي فشل بأي منها يُسجَّل ويُتجاوَز، لا يوقف التطبيق.
+- **`core/`** — طبقات مشتركة بين الميزات:
+  - `data/` — قواعد بيانات وريبوزيتوريز (`quran/`, `hadith/`, `user/` عبر
+    drift) وخدمات تنزيل عامة (`download_helper.dart`).
+  - `theme/`, `config/` — الهوية البصرية وإعدادات الموارد البعيدة.
+- **`features/`** — كل ميزة بمجلدها الخاص (واجهة + منطق محلي)، أبرزها:
+  - `mushaf/` — المصحف: النص الرقمي وخط QCF الرسمي، وصفحات مصورة
+    (raster) بطبعات متعددة قابلة للتنزيل عند الطلب.
+  - `tajweed/` — تلوين أحكام التجويد (خط QCF V4 Tajweed).
+  - `hadith/`, `hadith_verification/` — عرض الحديث وتخريجه (مطابقة محلية
+    + بحث دُرر السنية عبر WebView عند الحاجة فقط).
+  - `hifz/`, `khatma/`, `azkar/`, `qiyam/`, `fasting/` — تتبّع الحفظ
+    والختمة والأذكار وقيام الليل والصيام.
+  - `prayer/`, `notifications/` — مواقيت الصلاة (حساب محلي عبر
+    `adhan_dart`) وجدولة إشعارات الأذان/التذكيرات.
+  - باقي الميزات (`audio/`, `duroos/`, `library/`, `names_of_allah/`,
+    `story_maker/`, `wrapped/`, `widget/`, `groups/`, `profile/`, ...)
+    كل واحدة مستقلة بمجلدها.
 
-A few resources to get you started if this is your first Flutter project:
+## قواعد البيانات (`assets/quran/quran.db`, `assets/hadith/hadith.db`)
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+الملفان مبنيّان مسبقاً وليسا جزءاً من عملية بناء التطبيق وقت التشغيل —
+يُعاد توليدهما يدوياً فقط عند الحاجة عبر سكربتات `tools/`:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+# من جذر المشروع، ويحتاج بيانات خام بـ tools/raw/ — راجع tools/raw/README.md
+python tools/build_quran_db.py    # يبني assets/quran/quran.db
+python tools/build_hadith_db.py   # يبني assets/hadith/hadith.db
+```
+
+كلا السكربتين يفشل بخطأ واضح (exit code غير صفري) عند أي اختلال في عدد
+السور/الآيات/الأحاديث المتوقَّع — لا يُكتب ملف ناقص أو خاطئ أبداً. راجع
+تعليقات أعلى كل سكربت لتفاصيل مصدر البيانات وترخيصها، وبقية سكربتات
+`tools/` (تفاسير، أذكار، خطوط QCF V4، صور صفحات المصحف المصوَّر...)
+لتوليد بقية الأصول المشتقة بنفس الأسلوب.
+
+## تشغيل الاختبارات
+
+```bash
+flutter pub get
+flutter test
+```
+
+الاختبارات في `test/` تغطي طبقات البيانات الأساسية (قاعدة بيانات المستخدم
+والهجرة، ريبوزيتوري القرآن/الحديث، تنزيل الخطوط/الصفحات المصورة
+والاستئناف، حساب مواقيت الصلاة والتاريخ الهجري، مزامنة السحابة...) دون
+الحاجة لجهاز/محاكي فعلي.
+
+## بناء/تشغيل التطبيق
+
+مشروع فلاتر عادي:
+
+```bash
+flutter pub get
+flutter run
+```
+
+يدعم أندرويد وiOS بكامل الميزات؛ ويندوز/لينكس/ماك بيئة تطوير مكتبي فقط
+(بعض الخدمات مثل `audio_service` وإشعارات النظام مقصورة على
+أندرويد/iOS — راجع التعليقات في `main.dart`).
