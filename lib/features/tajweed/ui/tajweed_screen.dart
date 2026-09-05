@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/data/tajweed/tajweed_data.dart';
+import '../../../core/theme/app_card.dart';
 import '../../../core/theme/app_colors.dart';
 import 'tajweed_color_legend_sheet.dart';
 
@@ -117,14 +118,9 @@ class _TajweedScreenState extends State<TajweedScreen>
         // قائمة الأحكام
         Expanded(
           child: filteredRules.isEmpty
-              ? Center(
-                  child: Text(
-                    'لا توجد نتائج مطابقة لبحثك',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: isDark ? Colors.white60 : Colors.black54,
-                    ),
-                  ),
+              ? const EmptyState(
+                  icon: Icons.search_off_outlined,
+                  message: 'لا توجد نتائج مطابقة لبحثك',
                 )
               : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),

@@ -991,7 +991,7 @@ class _BottomChromeBar extends StatelessWidget {
 /// الإعدادات انتقلا لـ`_TopChromeBar` (الشريط العائم المتبدّل، راجع
 /// توثيقهما هناك)، فهالشريط صار مخصَّصاً بالكامل لهوية الصفحة بلا عناصر
 /// تحكّم إضافية تزاحمه.
-class _PageIdentityBar extends ConsumerWidget {
+class _PageIdentityBar extends ConsumerStatefulWidget {
   const _PageIdentityBar({
     required this.bg,
     required this.fg,
@@ -1006,29 +1006,49 @@ class _PageIdentityBar extends ConsumerWidget {
   final VoidCallback onJuzTap;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final juzAsync = ref.watch(_pageJuzProvider(page));
-    final hizbAsync = ref.watch(_pageHizbProvider(page));
-    final rubAsync = ref.watch(_pageRubProvider(page));
-    final surahAsync = ref.watch(_pageSurahNameProvider(page));
-    final surahIdAsync = ref.watch(_pageSurahIdProvider(page));
+  ConsumerState<_PageIdentityBar> createState() => _PageIdentityBarState();
+}
+
+class _PageIdentityBarState extends ConsumerState<_PageIdentityBar> {
+  // آخر قيم **محلولة فعلياً** (لا لحظة تحميل) — تبقى محفوظة هون بين
+  // إعادات البناء المتتالية أثناء التقليب السريع بين الصفحات. بدونها،
+  // كل تصفّح صفحة جديدة يطلب provider جديد بمفتاح [Widget.page] المختلف
+  // (`_pageSurahIdProvider(page)` مثلاً) يبدأ بحالة تحميل فارغة للحظة —
+  // ولمّا كان الكود القديم يلجأ لقيمة افتراضية `?? 1` بتلك اللحظة، كان
+  // يُظهر "الفاتحة" ومضاً خاطئاً قبل استقرار الاسم الصحيح (بلاغ صاحب
+  // المشروع). هلق: نعرض آخر اسم/جزء **حقيقي** معروف طوال فترة التحميل
+  // القصيرة، ولا نحدّثه إلا لمّا يصل فعلاً رقم/اسم الصفحة الجديدة —
+  // فيتغيّر مرّة واحدة نظيفة عند الاستقرار، لا وميض بالمنتصف.
+  int? _lastSurahId;
+  String? _lastSurahText;
+  String? _lastJuzText;
+  String? _lastHizbFraction;
+
+  @override
+  Widget build(BuildContext context) {
+    final juzAsync = ref.watch(_pageJuzProvider(widget.page));
+    final hizbAsync = ref.watch(_pageHizbProvider(widget.page));
+    final rubAsync = ref.watch(_pageRubProvider(widget.page));
+    final surahAsync = ref.watch(_pageSurahNameProvider(widget.page));
+    final surahIdAsync = ref.watch(_pageSurahIdProvider(widget.page));
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final accent = themeAccent(context);
+    final bg = widget.bg;
+    final fg = widget.fg;
+    final onSurahTap = widget.onSurahTap;
+    final onJuzTap = widget.onJuzTap;
 
-    final String juzText = juzAsync.maybeWhen(
-      data: (j) => 'الجُزْءُ $j',
-      orElse: () => '',
-    );
-    final String hizbFraction = (juzAsync.value == null ||
-            hizbAsync.value == null ||
-            rubAsync.value == null)
-        ? ''
-        : _hizbFractionText(rubAsync.value!, hizbAsync.value!);
+    if (juzAsync.hasValue) _lastJuzText = 'الجُزْءُ ${juzAsync.value}';
+    if (hizbAsync.hasValue && rubAsync.hasValue) {
+      _lastHizbFraction = _hizbFractionText(rubAsync.value!, hizbAsync.value!);
+    }
+    if (surahAsync.hasValue) _lastSurahText = 'سُورَةُ ${surahShortName(surahAsync.value!)}';
+    if (surahIdAsync.hasValue) _lastSurahId = surahIdAsync.value;
 
-    final String surahText = surahAsync.maybeWhen(
-      data: (n) => 'سُورَةُ ${surahShortName(n)}',
-      orElse: () => '',
-    );
+    final String juzText = _lastJuzText ?? '';
+    final String hizbFraction = _lastHizbFraction ?? '';
+    final String surahText = _lastSurahText ?? '';
+    final int? surahId = _lastSurahId;
 
     // شريط هوية الصفحة — إطار **متصل** واحد (بدل شريحتين منفصلتين + خط
     // سفلي فقط سابقاً): حدّ كامل حول الشريط بأكمله + خط فاصل عمودي واحد
@@ -1103,7 +1123,13 @@ class _PageIdentityBar extends ConsumerWidget {
                     onTap: onSurahTap,
                     borderRadius: const BorderRadius.horizontal(right: Radius.circular(10)),
                     child: Center(
-                      child: Semantics(
+                      // `surahId == null` فقط أول رسمة إطلاقاً قبل حلّ أي
+                      // provider مرّة — سريع جداً (استعلام SQLite محلي)،
+                      // فراغ لحظي بلا وميض اسم خاطئ أفضل من عرض الفاتحة
+                      // افتراضياً (كان السلوك القديم).
+                      child: surahId == null
+                          ? const SizedBox.shrink()
+                          : Semantics(
                         label: surahText,
                         child: ExcludeSemantics(
                           child: Row(
@@ -1126,7 +1152,7 @@ class _PageIdentityBar extends ConsumerWidget {
                               ),
                               const SizedBox(width: 3),
                               Text(
-                                'surah${(surahIdAsync.value ?? 1).toString().padLeft(3, '0')}',
+                                'surah${surahId.toString().padLeft(3, '0')}',
                                 style: TextStyle(
                                   color: isDark
                                       ? const Color(0xFFF3DA8E)
