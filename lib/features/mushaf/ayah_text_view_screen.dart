@@ -26,6 +26,19 @@ final _tafsirProvider =
           .tafsirForAyah(arg.ayahId, edition: arg.edition);
     });
 
+/// ترجمة صحيح إنترناشونال الإنجليزية لآية واحدة — **باج حقيقي مُصلَح هون**:
+/// `AyahTextViewKind.translation` كان مُعرَّفاً ومُمرَّراً فعلياً من "Golden
+/// Quran English" بـ`ayah_actions_sheet.dart`، لكن `build()` هون ما كان
+/// يستخدم `widget.kind` إطلاقاً بأي مكان — فالضغط على "Golden Quran
+/// English" كان يفتح شاشة التفاسير العربية العادية بلا أي ترجمة إنجليزية
+/// ظاهرة كلياً، رغم وجود جدول `translations`/`translationForAyah` جاهزَين.
+final _translationProvider = FutureProvider.family<Translation?, int>((
+  ref,
+  ayahId,
+) {
+  return ref.watch(quranRepositoryProvider).translationForAyah(ayahId);
+});
+
 class AyahTextViewScreen extends ConsumerStatefulWidget {
   const AyahTextViewScreen({
     super.key,
@@ -121,6 +134,10 @@ class _AyahTextViewScreenState extends ConsumerState<AyahTextViewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.kind == AyahTextViewKind.translation) {
+      return _TranslationView(ayahId: _ayahId, onGoTo: _goTo);
+    }
+
     final ayahAsync = ref.watch(_ayahRefProvider(_ayahId));
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -546,6 +563,156 @@ class _AccordionTafsirTile extends ConsumerWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// عرض "القرآن الكريم بالترجمة" (إنجليزي — صحيح إنترناشونال حالياً، الترجمة
+/// الوحيدة المتوفرة بقاعدة البيانات) — شاشة مستقلة عن تبويبات التفاسير
+/// العربية، بنفس شريط التنقل بين الآيات.
+class _TranslationView extends ConsumerWidget {
+  const _TranslationView({required this.ayahId, required this.onGoTo});
+
+  final int ayahId;
+  final void Function(int ayahId) onGoTo;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ayahAsync = ref.watch(_ayahRefProvider(ayahId));
+    final translationAsync = ref.watch(_translationProvider(ayahId));
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isFirst = ayahId <= 1;
+    final isLast = ayahId >= kQuranAyahCount;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('القرآن الكريم بالترجمة', style: TextStyle(fontWeight: FontWeight.w800)),
+        centerTitle: true,
+      ),
+      body: ayahAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('تعذّر تحميل الآية: $e')),
+        data: (ayah) {
+          return Column(
+            children: [
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.03),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: (isDark ? AppColors.lineDark : AppColors.line).withValues(alpha: 0.6),
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            'السورة ${ayah.surah} · الآية ${ayah.ayah}',
+                            style: TextStyle(fontSize: 12, color: onSurface.withValues(alpha: 0.6)),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            stripQuranicMarksForDisplay(ayah.textUthmani),
+                            textAlign: TextAlign.center,
+                            textDirection: TextDirection.rtl,
+                            style: TextStyle(
+                              fontFamily: 'AmiriQuran',
+                              fontSize: 22,
+                              height: 1.85,
+                              color: onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    translationAsync.when(
+                      loading: () => const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                      error: (e, _) => Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text('تعذّر تحميل الترجمة: $e'),
+                      ),
+                      data: (translation) {
+                        if (translation == null) {
+                          return const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Text('لا توجد ترجمة محفوظة لهذه الآية'),
+                          );
+                        }
+                        return Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.goldDeep.withValues(alpha: isDark ? 0.12 : 0.07),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Sahih International',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.goldDeep,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              SelectableText(
+                                translation.content,
+                                textDirection: TextDirection.ltr,
+                                style: TextStyle(fontSize: 15, height: 1.6, color: onSurface),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1B232E) : Colors.white,
+                  border: Border(top: BorderSide(color: isDark ? AppColors.lineDark : AppColors.line)),
+                ),
+                child: SafeArea(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      TextButton.icon(
+                        icon: const Icon(Icons.arrow_back_ios, size: 16),
+                        label: const Text('الآية السابقة'),
+                        onPressed: isFirst ? null : () => onGoTo(ayahId - 1),
+                      ),
+                      Text(
+                        'آية ${ayah.ayah} / سورة ${ayah.surah}',
+                        style: TextStyle(fontWeight: FontWeight.w700, color: onSurface.withValues(alpha: 0.7)),
+                      ),
+                      Directionality(
+                        textDirection: TextDirection.ltr,
+                        child: TextButton.icon(
+                          icon: const Icon(Icons.arrow_back_ios, size: 16),
+                          label: const Text('الآية التالية'),
+                          onPressed: isLast ? null : () => onGoTo(ayahId + 1),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
