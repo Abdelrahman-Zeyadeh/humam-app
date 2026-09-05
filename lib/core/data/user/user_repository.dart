@@ -1121,6 +1121,25 @@ class UserRepository {
 
   // --- تذكير يومي للحفظ ---
 
+  /// هل راجع المستخدم آية حفظ واحدة على الأقل اليوم (أي صف `lastReviewedAt`
+  /// بحدود اليوم التقويمي الحالي)؟ يُستخدَم لجعل تذكير الحفظ واعياً بالإنجاز
+  /// الفعلي بنفس فكرة `readToday`/`syncDailyWirdReminder` — لا حاجة لعمود
+  /// "سلسلة" مخصَّص، صف واحد اليوم يكفي دليلاً.
+  Future<bool> hifzReviewedToday() async {
+    try {
+      final now = DateTime.now();
+      final startOfDay = DateTime(now.year, now.month, now.day);
+      final row = await (_db.select(_db.hifzAyahReviews)
+            ..where((t) => t.lastReviewedAt.isBiggerOrEqualValue(startOfDay))
+            ..limit(1))
+          .getSingleOrNull();
+      return row != null;
+    } catch (e) {
+      debugPrint('تعذّر التحقق من مراجعة الحفظ اليوم: $e');
+      return false;
+    }
+  }
+
   bool get hifzEnabled => _hifzEnabled;
   int? get hifzHour => _hifzHour;
   int get hifzMinute => _hifzMinute;

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show debugPrint;
 
+import '../../core/data/user/hifz_prefs.dart';
 import '../../core/data/user/user_prefs.dart';
 import '../../core/data/user/user_repository.dart' show UserCategories;
 import 'adhan_notification_service.dart';
@@ -43,5 +44,29 @@ Future<void> syncDailyWirdReminder(UserPrefs prefs) async {
     }
   } catch (e) {
     debugPrint('مزامنة تذكير الورد اليومي الذكي فشلت: $e');
+  }
+}
+
+/// نفس فكرة [syncDailyWirdReminder] بالضبط لتذكير الحفظ — لو راجع المستخدم
+/// آية حفظ واحدة على الأقل اليوم (`HifzPrefs.reviewedToday`) نُلغي تذكير
+/// الحفظ المجدوَل (سواء كان دوّاراً بالتصميم القديم `scheduleHifzReminder`
+/// أو بفاصل مخصَّص `scheduleRepeatingReminder` — نُلغي كلا المسارين
+/// احتياطاً، `cancel*` بلا أثر لو غير مجدوَل أصلاً). يُعاد تفعيله تلقائياً
+/// بأول إقلاع بيوم جديد (`main.dart` يعيد تعبئة تذكير الحفظ بكل إقلاع لو
+/// مفعَّل، راجع توثيقه هناك) — نفس القيد المعروف بتذكير الورد اليومي: لا
+/// إلغاء فوري لو راجع المستخدم بعد آخر إقلاع/مراجعة بنفس اليوم بلا استدعاء
+/// لاحق لهذي الدالة.
+///
+/// يُستدعى من `hifz_review_screen.dart._grade` مباشرة بعد كل تقييم مراجعة.
+Future<void> syncHifzReminder(HifzPrefs hifzPrefs) async {
+  try {
+    if (!hifzPrefs.reminderEnabled || hifzPrefs.reminderHour == null) return;
+    if (!await hifzPrefs.reviewedToday()) return;
+
+    final svc = AdhanNotificationService.instance;
+    await svc.cancelHifzReminder();
+    await svc.cancelRepeatingReminder(UserCategories.hifz);
+  } catch (e) {
+    debugPrint('مزامنة تذكير الحفظ الذكي فشلت: $e');
   }
 }

@@ -35,6 +35,9 @@ class HifzPrefs {
 
   Future<void> setReminder({required bool enabled, int? hour, int? minute}) =>
       _repo.setHifzReminder(enabled: enabled, hour: hour, minute: minute);
+
+  /// راجع توثيق `UserRepository.hifzReviewedToday`.
+  Future<bool> reviewedToday() => _repo.hifzReviewedToday();
 }
 
 final hifzPrefsProvider = Provider<HifzPrefs>((ref) {

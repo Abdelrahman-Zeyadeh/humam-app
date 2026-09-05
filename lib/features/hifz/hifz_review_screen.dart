@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -8,6 +10,7 @@ import '../../core/text/arabic_normalizer.dart'
     show stripQuranicMarksForDisplay;
 import '../../core/theme/app_card.dart';
 import '../../core/theme/app_colors.dart';
+import '../notifications/smart_reminder_sync.dart';
 
 final _reviewAyahProvider = FutureProvider.family<Ayah, int>((ref, ayahId) {
   return ref.watch(quranRepositoryProvider).ayahById(ayahId);
@@ -84,9 +87,11 @@ class _HifzReviewScreenState extends ConsumerState<HifzReviewScreen> {
     final queue = _queue;
     if (queue == null || _index >= queue.length) return;
     final ayahId = queue[_index];
-    await ref
-        .read(hifzPrefsProvider)
-        .gradeReview(widget.planId, ayahId, quality);
+    final hifzPrefs = ref.read(hifzPrefsProvider);
+    await hifzPrefs.gradeReview(widget.planId, ayahId, quality);
+    // إلغاء فوري لتذكير الحفظ اليوم لو صار عندنا مراجعة واحدة على الأقل —
+    // بلا انتظار الإقلاع التالي (راجع توثيق `syncHifzReminder`).
+    unawaited(syncHifzReminder(hifzPrefs));
     if (!mounted) return;
     setState(() {
       _index++;

@@ -239,7 +239,12 @@ Future<void> _initAdhanNotificationsInBackground(
         );
       }
     }
-    if (hifzPrefs.reminderEnabled && hifzPrefs.reminderHour != null) {
+    // لو راجع المستخدم آية حفظ واحدة على الأقل اليوم، لا نعيد جدولة تذكير
+    // الحفظ من الأساس بهذا الإقلاع — نفس فكرة تفادي `readToday` بتذكير
+    // الورد اليومي (راجع توثيق `syncHifzReminder`).
+    if (hifzPrefs.reminderEnabled &&
+        hifzPrefs.reminderHour != null &&
+        !await hifzPrefs.reviewedToday()) {
       final messages = await hifzReminderMessages(hadithRepo);
       final interval = userPrefs.reminderIntervalMinutesFor(
         UserCategories.hifz,

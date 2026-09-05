@@ -499,6 +499,19 @@ void main() {
       expect(await repo.dueHifzAyahIdsForPlan(plan.id), isEmpty);
     });
 
+    test('hifzReviewedToday يرجع false بلا أي مراجعة بعد', () async {
+      final plan = await repo.startHifzPlan(fromAyahId: 10, toAyahId: 20);
+      await repo.updateHifzCurrentAyah(plan.id, 10);
+      expect(await repo.hifzReviewedToday(), isFalse);
+    });
+
+    test('hifzReviewedToday يرجع true بعد أي تقييم مراجعة اليوم', () async {
+      final plan = await repo.startHifzPlan(fromAyahId: 10, toAyahId: 20);
+      await repo.updateHifzCurrentAyah(plan.id, 10);
+      await repo.gradeHifzAyahReview(plan.id, 10, 2);
+      expect(await repo.hifzReviewedToday(), isTrue);
+    });
+
     test('خطتان مستقلتان تماماً — تقدّم واحدة لا يبذر مراجعات بالأخرى', () async {
       final a = await repo.startHifzPlan(fromAyahId: 1, toAyahId: 10);
       final b = await repo.startHifzPlan(fromAyahId: 100, toAyahId: 110);
