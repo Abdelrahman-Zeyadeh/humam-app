@@ -108,11 +108,13 @@ class HifzScreen extends ConsumerWidget {
     final plans = hifzPrefs.plans;
 
     return Scaffold(
-      // هيدر بتدرّج كحلي مطابق للوحة التصميم المعتمدة (`Plans.dc.html`) —
-      // بقي `AppBar` عادياً بلا لمس هيكل الجسم (`body`)، فقط زُيِّن بصرياً.
+      // هيدر بتدرّج كحلي موحَّد مع بقية الأقسام (`khatma`/`azkar`/"أدواتي":
+      // [AppColors.blue, AppColors.navy]) — كان هون وحده بنفسجي/كحلي (`purple`)
+      // بلا سبب، يكسر الهوية اللونية الموحّدة بين شاشات التطبيق. `purple`
+      // بقي كلون تمييز محلي (بطاقة الفضل/شريط التقدّم بأسفل هالملف) لا كخلفية هيدر.
       appBar: const GradientAppBar(
         title: 'قسم الحفظ',
-        colors: [AppColors.purple, AppColors.navy],
+        colors: [AppColors.blue, AppColors.navy],
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),
@@ -591,6 +593,10 @@ class _ReminderSection extends ConsumerWidget {
           contentPadding: EdgeInsets.zero,
           title: const Text('تفعيل التذكير'),
           value: hifzPrefs.reminderEnabled,
+          // لون تفعيل صريح بدل الاعتماد على لون Material الافتراضي (كان
+          // يظهر أسود بلا علاقة بلون التطبيق) — نفس لون تمييز التطبيق
+          // المستخدم بأزرار هالشاشة (`FilledButton`) لتوحيد الهوية اللونية.
+          activeThumbColor: themeAccent(context),
           onChanged: (v) => _toggleEnabled(context, ref, v),
         ),
         ListTile(

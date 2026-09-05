@@ -64,11 +64,12 @@ class _GroupsHubScreenState extends ConsumerState<GroupsHubScreen> {
     final groupIdsAsync = ref.watch(myGroupIdsProvider);
 
     return Scaffold(
-      // هيدر بتدرّج مطابق لأسلوب لوحة التصميم المعتمدة — `AppBar` عادي
-      // بلا لمس هيكل الجسم، فقط زُيِّن بصرياً (`flexibleSpace`).
+      // هيدر بتدرّج كحلي موحَّد مع بقية الأقسام (`khatma`/`azkar`/"أدواتي"/`hifz`:
+      // [AppColors.blue, AppColors.navy]) — كان تيل/كحلي هون وحده بلا سبب
+      // موحِّد. `teal` بقي كلون تمييز محلي (شارات/أيقونات القسم) لا كخلفية هيدر.
       appBar: const GradientAppBar(
         title: 'مجموعات الصحبة والتنافس الإيماني',
-        colors: [AppColors.teal, AppColors.navy],
+        colors: [AppColors.blue, AppColors.navy],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),

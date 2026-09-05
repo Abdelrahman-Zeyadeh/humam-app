@@ -81,6 +81,7 @@ class LeaderboardTab extends ConsumerWidget {
                     MemberCard(
                       member: members[i],
                       rank: i + 1,
+                      totalMembers: members.length,
                       isMe: members[i].userId == currentUid,
                       isDark: isDark,
                       onNudge: () =>

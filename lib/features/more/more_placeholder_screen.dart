@@ -22,6 +22,7 @@ import '../profile/achievements_screen.dart';
 import '../profile/profile_stats_screen.dart';
 import '../qiyam/qiyam_screen.dart';
 import '../radio/radio_and_duroos_screen.dart';
+import '../tajweed/ui/tajweed_screen.dart';
 import 'reminders_screen.dart';
 import '../onboarding/onboarding_target_keys.dart';
 import '../settings/settings_screen.dart';
@@ -64,6 +65,18 @@ class _CategoryDef {
   final IconData icon;
   final Color color;
   final Color darkColor;
+}
+
+/// يشتق درجة (أفتح/أغمق) من لون فئة الأداة الأساسي حسب موقع الأداة
+/// ضمن فئتها — بدل تلوين كل أداة بلون عشوائي منفصل بلا نظام (كانت أيقونات
+/// "أدواتي" خليطاً من بنفسجي/أخضر/برتقالي/وردي بلا رابط)، فتنتمي كل أدوات
+/// نفس الفئة لعائلة لونية واحدة بتدرجات فقط. `index`/`count` يحدّدان موقع
+/// الأداة ضمن ترتيب فئتها لتوزيع التدرّج بالتساوي.
+Color _toolShade(Color base, int index, int count) {
+  final hsl = HSLColor.fromColor(base);
+  final spread = count <= 1 ? 0.0 : (index / (count - 1) - 0.5) * 0.36;
+  final lightness = (hsl.lightness + spread).clamp(0.16, 0.82);
+  return hsl.withLightness(lightness).toColor();
 }
 
 const List<_CategoryDef> _kToolCategories = [
@@ -141,7 +154,7 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
       title: 'خطة الختمة',
       icon: Icons.bookmark_outline,
       category: 'عبادات وطاعات',
-      color: const Color(0xFF386892),
+      color: _toolShade(_kToolCategories[0].color, 0, 8),
       featured: true,
       onTap: (ctx, _) => Navigator.of(
         ctx,
@@ -152,7 +165,7 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
       title: 'خطة الحفظ والمراجعة',
       icon: Icons.sticky_note_2_outlined,
       category: 'عبادات وطاعات',
-      color: const Color(0xFF685197),
+      color: _toolShade(_kToolCategories[0].color, 1, 8),
       featured: true,
       onTap: (ctx, _) => Navigator.of(
         ctx,
@@ -163,7 +176,7 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
       title: 'اتجاه القبلة',
       icon: Icons.explore_outlined,
       category: 'عبادات وطاعات',
-      color: const Color(0xFF285E6E),
+      color: _toolShade(_kToolCategories[0].color, 2, 8),
       onTap: (ctx, _) => Navigator.of(
         ctx,
       ).push(MaterialPageRoute(builder: (_) => const QiblaScreen())),
@@ -176,7 +189,7 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
       title: 'المسبحة الإلكترونية',
       icon: Icons.grain_rounded,
       category: 'عبادات وطاعات',
-      color: const Color(0xFF2E8071),
+      color: _toolShade(_kToolCategories[0].color, 3, 8),
       onTap: (ctx, _) => Navigator.of(
         ctx,
       ).push(MaterialPageRoute(builder: (_) => const TasbihScreen())),
@@ -186,7 +199,7 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
       title: 'التقويم الهجري',
       icon: Icons.calendar_today_outlined,
       category: 'عبادات وطاعات',
-      color: const Color(0xFFB88E3E),
+      color: _toolShade(_kToolCategories[0].color, 4, 8),
       onTap: (ctx, _) => Navigator.of(
         ctx,
       ).push(MaterialPageRoute(builder: (_) => const HijriCalendarScreen())),
@@ -196,7 +209,7 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
       title: 'قيام الليل والوتر',
       icon: Icons.nights_stay_outlined,
       category: 'عبادات وطاعات',
-      color: const Color(0xFF8E5B45),
+      color: _toolShade(_kToolCategories[0].color, 5, 8),
       onTap: (ctx, _) => Navigator.of(
         ctx,
       ).push(MaterialPageRoute(builder: (_) => const QiyamScreen())),
@@ -206,7 +219,7 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
       title: 'مساعد صيام التطوع',
       icon: Icons.dark_mode_outlined,
       category: 'عبادات وطاعات',
-      color: const Color(0xFF00796B),
+      color: _toolShade(_kToolCategories[0].color, 6, 8),
       onTap: (ctx, _) => Navigator.of(
         ctx,
       ).push(MaterialPageRoute(builder: (_) => const FastingAssistantScreen())),
@@ -219,7 +232,7 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
       title: 'التذكيرات',
       icon: Icons.notifications_active_outlined,
       category: 'عبادات وطاعات',
-      color: const Color(0xFFC0392B),
+      color: _toolShade(_kToolCategories[0].color, 7, 8),
       onTap: (ctx, _) => Navigator.of(
         ctx,
       ).push(MaterialPageRoute(builder: (_) => const RemindersScreen())),
@@ -231,7 +244,7 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
       title: 'مجموعات التنافس',
       icon: Icons.people_outline,
       category: 'الصحبة والمنافسة',
-      color: const Color(0xFFB88E3E),
+      color: _toolShade(_kToolCategories[1].color, 0, 4),
       onTap: (ctx, _) => Navigator.of(
         ctx,
       ).push(MaterialPageRoute(builder: (_) => const GroupsHubScreen())),
@@ -241,7 +254,7 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
       title: 'التقرير الأسبوعي',
       icon: Icons.bar_chart_rounded,
       category: 'الصحبة والمنافسة',
-      color: const Color(0xFF2E8071),
+      color: _toolShade(_kToolCategories[1].color, 1, 4),
       onTap: (ctx, _) => Navigator.of(
         ctx,
       ).push(MaterialPageRoute(builder: (_) => const WeeklyReportScreen())),
@@ -251,7 +264,7 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
       title: 'التقرير الإيماني المرئي (Wrapped)',
       icon: Icons.auto_awesome_rounded,
       category: 'الصحبة والمنافسة',
-      color: const Color(0xFF685197),
+      color: _toolShade(_kToolCategories[1].color, 2, 4),
       onTap: (ctx, _) => Navigator.of(
         ctx,
       ).push(MaterialPageRoute(builder: (_) => const FaithWrappedScreen())),
@@ -263,7 +276,7 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
       title: 'الإنجازات والأوسمة',
       icon: Icons.emoji_events_outlined,
       category: 'الصحبة والمنافسة',
-      color: const Color(0xFFC0392B),
+      color: _toolShade(_kToolCategories[1].color, 3, 4),
       onTap: (ctx, _) => Navigator.of(
         ctx,
       ).push(MaterialPageRoute(builder: (_) => const AchievementsScreen())),
@@ -275,7 +288,7 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
       title: 'العلامات المرجعية',
       icon: Icons.bookmark_outline,
       category: 'المكتبة والعلوم',
-      color: const Color(0xFF386892),
+      color: _toolShade(_kToolCategories[2].color, 0, 6),
       onTap: (ctx, _) => Navigator.of(
         ctx,
       ).push(MaterialPageRoute(builder: (_) => const BookmarksScreen())),
@@ -285,7 +298,7 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
       title: 'ملاحظاتي',
       icon: Icons.edit_note_rounded,
       category: 'المكتبة والعلوم',
-      color: const Color(0xFF8A6D3B),
+      color: _toolShade(_kToolCategories[2].color, 1, 6),
       onTap: (ctx, _) => Navigator.of(
         ctx,
       ).push(MaterialPageRoute(builder: (_) => const NotesScreen())),
@@ -300,7 +313,7 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
       title: 'الحديث الشريف',
       icon: Icons.menu_book_outlined,
       category: 'المكتبة والعلوم',
-      color: const Color(0xFF685197),
+      color: _toolShade(_kToolCategories[2].color, 2, 6),
       onTap: (ctx, _) => Navigator.of(
         ctx,
       ).push(MaterialPageRoute(builder: (_) => const HadithHubScreen())),
@@ -310,10 +323,23 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
       title: 'أسماء الله الحسنى والتدبر',
       icon: Icons.auto_awesome_rounded,
       category: 'المكتبة والعلوم',
-      color: AppColors.goldDeep,
+      color: _toolShade(_kToolCategories[2].color, 3, 6),
       onTap: (ctx, _) => Navigator.of(
         ctx,
       ).push(MaterialPageRoute(builder: (_) => const NamesOfAllahScreen())),
+    ),
+    // نُقل من قسم "الصلاة والتذكيرات" بالإعدادات (بطلب صريح) — أحكام
+    // التجويد وألوانه علم قرآني عام، مالوش علاقة بالصلاة/الأذان، فمكانه
+    // الطبيعي هون مع بقية أدوات "المكتبة والعلوم". راجع `TajweedScreen`.
+    _ToolItem(
+      id: 'tajweed',
+      title: 'أحكام التجويد والضبط',
+      icon: Icons.menu_book_outlined,
+      category: 'المكتبة والعلوم',
+      color: _toolShade(_kToolCategories[2].color, 4, 6),
+      onTap: (ctx, _) => Navigator.of(
+        ctx,
+      ).push(MaterialPageRoute(builder: (_) => const TajweedScreen())),
     ),
     _ToolItem(
       // id جديد مقصود (لا 'radio' ولا 'duroos') — الاثنان دُمجا بشاشة واحدة
@@ -325,7 +351,7 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
       title: 'الإذاعة والدروس الصوتية',
       icon: Icons.radio_outlined,
       category: 'المكتبة والعلوم',
-      color: const Color(0xFFB88E3E),
+      color: _toolShade(_kToolCategories[2].color, 5, 6),
       onTap: (ctx, _) => Navigator.of(
         ctx,
       ).push(MaterialPageRoute(builder: (_) => const RadioAndDuroosScreen())),

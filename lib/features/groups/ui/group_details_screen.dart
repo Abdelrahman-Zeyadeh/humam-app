@@ -88,13 +88,12 @@ class _GroupDetailsScreenState extends ConsumerState<GroupDetailsScreen>
     );
 
     return Scaffold(
-      // هيدر بتدرّج مطابق لأسلوب لوحة التصميم المعتمدة — كانت هذه الشاشة
-      // ("من داخل" مجموعة) الوحيدة بقسم المجموعات اللي فاتها التعديل، رغم
-      // تطبيقه على `groups_hub_screen.dart` — بطلب صاحب المشروع "المجموعات
-      // من الداخل ما تغيّر شي".
+      // هيدر بتدرّج كحلي موحَّد مع بقية الأقسام ([AppColors.blue, AppColors.navy])
+      // — طابَقناه هون مع `groups_hub_screen.dart` بعد توحيد لون هيدرها هي
+      // الأخرى (كان تيل بالاثنين، يكسر الهوية اللونية الموحّدة بين الأقسام).
       appBar: GradientAppBar(
         title: widget.groupName,
-        colors: const [AppColors.teal, AppColors.navy],
+        colors: const [AppColors.blue, AppColors.navy],
         actions: [
           groupAsync.when(
             data: (group) => group != null

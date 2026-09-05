@@ -11,6 +11,7 @@ class MemberCard extends StatelessWidget {
     super.key,
     required this.member,
     required this.rank,
+    required this.totalMembers,
     required this.isMe,
     required this.isDark,
     required this.onNudge,
@@ -18,6 +19,10 @@ class MemberCard extends StatelessWidget {
 
   final GroupMember member;
   final int rank;
+  /// عدد أعضاء المجموعة كلها — يُستخدم فقط لإخفاء شارة الترتيب ("الأول 🥇")
+  /// لو كان المستخدم العضو الوحيد بالمجموعة (ملاحظة فعلية: شارة "الأول"
+  /// لعضو منفرد لا معنى تنافسياً لها). تظهر الشارة بمجرد انضمام عضو ثانٍ.
+  final int totalMembers;
   final bool isMe;
   final bool isDark;
   final VoidCallback onNudge;
@@ -26,6 +31,7 @@ class MemberCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final score = member.progress.scorePercentage;
     final accent = themeAccent(context);
+    final showRankBadge = totalMembers > 1;
 
     Color rankColor;
     String rankLabel = '$rank';
@@ -52,7 +58,7 @@ class MemberCard extends StatelessWidget {
         border: Border.all(
           color: isMe
               ? accent.withValues(alpha: 0.8)
-              : (rank <= 3
+              : (showRankBadge && rank <= 3
                     ? rankColor.withValues(alpha: 0.4)
                     : (isDark ? AppColors.lineDark : AppColors.line)),
           width: isMe ? 1.6 : 1.2,
@@ -71,24 +77,27 @@ class MemberCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                // رتبة العضو
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: rankColor.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: rankColor.withValues(alpha: 0.4)),
-                  ),
-                  child: Text(
-                    rankLabel,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: rankColor,
+                // رتبة العضو — تُخفى كلياً لو كان المستخدم العضو الوحيد
+                // بالمجموعة (راجع توثيق [totalMembers] أعلاه).
+                if (showRankBadge) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: rankColor.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: rankColor.withValues(alpha: 0.4)),
+                    ),
+                    child: Text(
+                      rankLabel,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: rankColor,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 10),
+                  const SizedBox(width: 10),
+                ],
 
                 // أفاتار العضو المختار (راجع `group_avatars.dart`) — لا حرف
                 // اسم كالسابق، كل عضو يختار أفاتاره فعلياً وقت إنشاء/الانضمام
