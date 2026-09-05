@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../auth/cloud_sync_service.dart';
 import '../../hijri/hijri_calendar_screen.dart';
 import '../../profile/profile_stats_screen.dart';
+import '../../search/unified_search_screen.dart';
 
 /// شريط الترحيب أعلى الشاشة الرئيسية — تحية بحسب الوقت، اسم المستخدم،
 /// حالة المزامنة السحابية، والتاريخ الهجري. استُخرج من `home_screen.dart`
@@ -79,6 +80,24 @@ class HomeHeader extends ConsumerWidget {
                             ),
                           ),
                         ],
+                      ),
+                    ),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const UnifiedSearchScreen(),
+                        ),
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        margin: const EdgeInsets.only(left: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.14),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                        ),
+                        child: const Icon(Icons.search, color: Colors.white, size: 18),
                       ),
                     ),
                     InkWell(
