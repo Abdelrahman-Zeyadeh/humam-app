@@ -14,9 +14,10 @@ import '../../../core/data/quran/quran_providers.dart';
 import '../../../core/platform/gallery_saver.dart';
 import '../../../core/theme/app_card.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../mushaf/mushaf_font_service.dart';
 import '../models/story_content.dart';
 import '../models/story_theme.dart';
+import 'widgets/ayah_end_circle.dart';
+import 'widgets/story_panel_controls.dart';
 
 enum StoryRatio { story, square, banner }
 
@@ -342,7 +343,7 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
                   child: Row(
                     children: [
                       Expanded(
-                        child: _AyahNumberDropdown(
+                        child: AyahNumberDropdown(
                           label: 'من الآية',
                           ayahs: ayahs,
                           value: fromIndex,
@@ -354,7 +355,7 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: _AyahNumberDropdown(
+                        child: AyahNumberDropdown(
                           label: 'إلى الآية',
                           ayahs: ayahs,
                           value: toIndex,
@@ -501,7 +502,7 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
       spans.add(TextSpan(text: '${a.textUthmani} '));
       spans.add(WidgetSpan(
         alignment: PlaceholderAlignment.middle,
-        child: _AyahEndCircle(
+        child: AyahEndCircle(
           ayahId: a.id,
           ayahNumber: a.ayah,
           pageNumber: a.page,
@@ -910,7 +911,7 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
             // الآية المختارة — عرض مباشر + اختصار لتغييرها (نفس شاشة
             // "من — إلى" بزر شريط العنوان)، بدل الاكتفاء بأيقونة AppBar
             // بعيدة عن بقية عناصر التحكم.
-            _PanelLabel('الآية المختارة'),
+            PanelLabel('الآية المختارة'),
             InkWell(
               onTap: () => _showAyahPicker(context),
               borderRadius: BorderRadius.circular(10),
@@ -944,7 +945,7 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
             // زر مقاس بعرضه الذاتي، فيضغط زر النمط الطويل النص لعرض ضيّق
             // جداً ويتكسّر شكله لدائرة متراكبة بشاشات عادية — شكوى صريحة
             // "شكله عجقة").
-            _PanelLabel('النمط'),
+            PanelLabel('النمط'),
             SizedBox(
               width: double.infinity,
               child: SegmentedButton<bool>(
@@ -963,7 +964,7 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
               ),
             ),
             const SizedBox(height: 10),
-            _PanelLabel('المقاس'),
+            PanelLabel('المقاس'),
             SizedBox(
               width: double.infinity,
               child: SegmentedButton<StoryRatio>(
@@ -983,7 +984,7 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
 
             // شريط اختيار الثيمات والصورة المخصصة (إذا لم يكن في وضع المصحف)
             if (!_isMushafMode) ...[
-              _PanelLabel('الخلفية'),
+              PanelLabel('الخلفية'),
               SizedBox(
                 height: 38,
                 child: ListView(
@@ -1084,7 +1085,7 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
 
             // حجم الخط — صف مستقل بعرض كامل (كان يتشارك الصف مع ٤ شرائح
             // فلتر معاً، بلا التفاف، فيضغط على بعضه بشاشات ضيّقة)
-            _PanelLabel('حجم الخط'),
+            PanelLabel('حجم الخط'),
             Row(
               children: [
                 const Icon(Icons.format_size, size: 16),
@@ -1105,7 +1106,7 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
 
             // عناصر إضافية — شرائح قابلة للالتفاف (`Wrap` بدل `Row`) عشان
             // ما تنضغط ببعضها بشاشات ضيّقة
-            _PanelLabel('عناصر إضافية'),
+            PanelLabel('عناصر إضافية'),
             Wrap(
               spacing: 6,
               runSpacing: 6,
@@ -1182,203 +1183,7 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
   }
 }
 
-/// عنوان صغير لكل مجموعة تحكّم بلوح الخيارات — يفصل بصرياً بين "النمط
-/// والمقاس"/"الخلفية"/"حجم الخط"/"عناصر إضافية" بدل ما تكون كتلة واحدة
-/// متلاصقة (كانت شكوى صريحة: "شكله كثير معجوق").
-class _PanelLabel extends StatelessWidget {
-  const _PanelLabel(this.text);
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 11.5,
-          fontWeight: FontWeight.w700,
-          color: onSurface.withValues(alpha: 0.55),
-        ),
-      ),
-    );
-  }
-}
-
-/// قائمة منسدلة مضغوطة لاختيار رقم آية ضمن سورة — تُستخدَم مرّتين
-/// (طرف "من" و"إلى") بلوح اختيار نطاق الآيات. `minIndex` يقصّ الخيارات
-/// الأقل من طرف "من" عند استخدامها لطرف "إلى".
-class _AyahNumberDropdown extends StatelessWidget {
-  const _AyahNumberDropdown({
-    required this.label,
-    required this.ayahs,
-    required this.value,
-    required this.onChanged,
-    this.minIndex = 0,
-  });
-
-  final String label;
-  final List<Ayah> ayahs;
-  final int value;
-  final int minIndex;
-  final ValueChanged<int> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return DropdownButtonFormField<int>(
-      initialValue: value,
-      isExpanded: true,
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(fontSize: 11.5),
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-      items: [
-        for (var i = minIndex; i < ayahs.length; i++)
-          DropdownMenuItem(value: i, child: Text('آية ${ayahs[i].ayah}', style: const TextStyle(fontSize: 13))),
-      ],
-      onChanged: (v) {
-        if (v != null) onChanged(v);
-      },
-    );
-  }
-}
-
-final _storyAyahGlyphProvider = FutureProvider.family<String?, int>((ref, ayahId) {
-  return ref.watch(quranRepositoryProvider).ayahMarkerGlyph(ayahId);
-});
-
-class _AyahEndCircle extends ConsumerWidget {
-  final int ayahId;
-  final int ayahNumber;
-  final int pageNumber;
-  final double size;
-
-  const _AyahEndCircle({
-    required this.ayahId,
-    required this.ayahNumber,
-    required this.pageNumber,
-    this.size = 26,
-  });
-
-  String _toArabic(int num) {
-    const arabicDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-    return num.toString().split('').map((d) => arabicDigits[int.parse(d)]).join();
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final fontAsync = ref.watch(pageFontFamilyProvider(pageNumber));
-    final glyphAsync = ref.watch(_storyAyahGlyphProvider(ayahId));
-
-    if (fontAsync.hasValue && glyphAsync.hasValue && glyphAsync.value != null && glyphAsync.value!.isNotEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2.0),
-        child: Text(
-          glyphAsync.value!,
-          textDirection: TextDirection.rtl,
-          style: TextStyle(
-            fontFamily: fontAsync.value,
-            fontSize: size * 1.05,
-            color: const Color(0xFF1E1912),
-            height: 1.0,
-          ),
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2.5),
-      child: CustomPaint(
-        size: Size(size, size * 1.15),
-        painter: _AyahEndCirclePainter(color: const Color(0xFF1E1912)),
-        child: SizedBox(
-          width: size,
-          height: size * 1.15,
-          child: Center(
-            child: Text(
-              _toArabic(ayahNumber),
-              style: TextStyle(
-                fontFamily: 'AmiriQuran',
-                fontSize: size * 0.40,
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF1E1912),
-                height: 1.0,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AyahEndCirclePainter extends CustomPainter {
-  final Color color;
-
-  _AyahEndCirclePainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final cx = w / 2;
-    final cy = h / 2;
-
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final fillPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    // 1. الإطار البيضاوي المركزي
-    final ovalRect = Rect.fromCenter(center: Offset(cx, cy), width: w * 0.76, height: h * 0.76);
-    canvas.drawOval(ovalRect, paint);
-
-    // 2. التاج الزخرفي العلوي (3 فصوص مصحفية)
-    final topY = cy - h * 0.38;
-    final topPath = Path();
-    topPath.moveTo(cx - w * 0.22, topY + h * 0.08);
-    topPath.quadraticBezierTo(cx - w * 0.18, topY - h * 0.06, cx - w * 0.08, topY - h * 0.08);
-    topPath.quadraticBezierTo(cx - w * 0.03, topY - h * 0.16, cx, topY - h * 0.18);
-    topPath.quadraticBezierTo(cx + w * 0.03, topY - h * 0.16, cx + w * 0.08, topY - h * 0.08);
-    topPath.quadraticBezierTo(cx + w * 0.18, topY - h * 0.06, cx + w * 0.22, topY + h * 0.08);
-    canvas.drawPath(topPath, paint);
-
-    canvas.drawCircle(Offset(cx, topY - h * 0.08), 0.9, fillPaint);
-
-    // 3. الزخرفتان السفليتان المنحنيتان (أجنحة زهرة المصحف)
-    final bottomY = cy + h * 0.38;
-    final bottomPath = Path();
-    bottomPath.moveTo(cx - w * 0.25, bottomY - h * 0.10);
-    bottomPath.cubicTo(
-      cx - w * 0.28, bottomY + h * 0.08,
-      cx - w * 0.12, bottomY + h * 0.16,
-      cx, bottomY + h * 0.18,
-    );
-    bottomPath.cubicTo(
-      cx + w * 0.12, bottomY + h * 0.16,
-      cx + w * 0.28, bottomY + h * 0.08,
-      cx + w * 0.25, bottomY - h * 0.10,
-    );
-    canvas.drawPath(bottomPath, paint);
-
-    // حلقتان زخرفيتان سفليتان
-    final scrollPath = Path();
-    scrollPath.moveTo(cx - w * 0.18, bottomY - h * 0.02);
-    scrollPath.quadraticBezierTo(cx - w * 0.08, bottomY + h * 0.07, cx, bottomY + h * 0.07);
-    scrollPath.quadraticBezierTo(cx + w * 0.08, bottomY + h * 0.07, cx + w * 0.18, bottomY - h * 0.02);
-    canvas.drawPath(scrollPath, paint..strokeWidth = 0.8);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
+// راجع lib/features/story_maker/ui/widgets/story_panel_controls.dart
+// (PanelLabel، AyahNumberDropdown) وwidgets/ayah_end_circle.dart
+// (AyahEndCircle والرسّام الزخرفي) — استُخرجت من هون أثناء تفكيك الملف
+// بلا أي تغيير سلوكي.
