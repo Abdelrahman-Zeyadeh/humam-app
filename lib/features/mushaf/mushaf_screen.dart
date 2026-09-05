@@ -19,7 +19,6 @@ import '../settings/settings_screen.dart';
 import 'font_download_screen.dart';
 import 'font_download_service.dart';
 import 'mushaf_page_widget.dart';
-import 'mushaf_raster_page_widget.dart';
 import 'mushaf_search_screen.dart';
 import 'mushaf_settings.dart';
 import 'mushaf_surah_index_sheet.dart';
@@ -551,8 +550,6 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
     final bg = palette.bg(isDark);
     final fg = palette.fg(isDark);
     final textSize = ref.watch(mushafTextSizeProvider);
-    final displayMode = ref.watch(mushafDisplayModeProvider);
-    final rasterEdition = ref.watch(rasterMushafEditionProvider);
     final downloadState = ref.watch(fontDownloadControllerProvider);
     final chromeVisible = ref.watch(mushafChromeVisibleProvider);
 
@@ -745,12 +742,6 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
                     onPageChanged: _onPageChanged,
                     itemBuilder: (context, index) {
                       final page = index + 1;
-                      if (displayMode == MushafDisplayMode.rasterImage) {
-                        return RepaintBoundary(
-                          key: ValueKey('mushaf_raster_page_${page}_${rasterEdition.id}'),
-                          child: MushafRasterPageWidget(page: page, edition: rasterEdition),
-                        );
-                      }
                       return RepaintBoundary(
                         key: ValueKey('mushaf_page_${page}_${textSize.name}'),
                         child: MushafPageWidget(page: page),

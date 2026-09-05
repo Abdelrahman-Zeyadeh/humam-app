@@ -113,14 +113,10 @@ flutter:
     # duroos_screen.dart لخريطة كل مصدر لصورته. الباقي (بلا صورة بعد) يعرض
     # أيقونة احتياطية تلقائياً.
     - assets/images/scholars/
-    # معاينات شكل صفحة كل طبعة مصورة بقائمة اختيار الإعدادات — راجع
-    # `RasterMushafEdition.previewAsset` بـ`mushaf_settings.dart`.
-    - assets/images/mushaf_editions/
     # أول ٥٠ صفحة فقط مضمّنة كـ asset (~١٨ ميجا) — الباقي (٥١-٦٠٤) يُنزَّل
     # عند الطلب عبر FontDownloadService. راجع lib/features/mushaf/
     # font_download_service.dart وlib/core/config/remote_assets_config.dart
-    # (رابط الاستضافة لسا placeholder — راجع tools/raw/README.md، قسم
-    # "مدير تنزيل الخطوط").
+    # (رابط الاستضافة فعلي على GitHub Releases، راجع `kFontsBaseUrl`).
     - assets/quran/fonts/pages/
     # أصوات أذان مختارة للمعاينة داخل الإعدادات (نفس الملفين مضمَّنين أيضاً
     # كموارد Android خام بـandroid/app/src/main/res/raw لتشغيلهما كصوت
