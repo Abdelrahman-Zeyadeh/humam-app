@@ -6,6 +6,7 @@ import '../../../core/data/user/user_prefs.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/auth_dialog.dart';
 import '../../auth/cloud_sync_service.dart';
+import '../../auth/sync_status_indicator.dart';
 import '../../onboarding/onboarding_screen.dart';
 import '../about_screen.dart';
 import 'settings_section_helpers.dart';
@@ -136,6 +137,13 @@ class _BackupSectionState extends ConsumerState<_BackupSection> {
                             color: onSurface.withValues(alpha: 0.6),
                           ),
                         ),
+                        if (syncState.isSignedIn) ...[
+                          const SizedBox(height: 4),
+                          SyncStatusIndicator(
+                            syncState: syncState,
+                            onRetry: () => ref.read(cloudSyncControllerProvider.notifier).syncNow(),
+                          ),
+                        ],
                       ],
                     ),
                   ),

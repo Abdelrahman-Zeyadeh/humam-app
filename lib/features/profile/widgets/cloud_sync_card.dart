@@ -5,6 +5,7 @@ import '../../../core/theme/app_card.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/auth_dialog.dart';
 import '../../auth/cloud_sync_service.dart';
+import '../../auth/sync_status_indicator.dart';
 
 /// بطاقة تسجيل الدخول السحابي بأعلى شاشة الملف الشخصي — تعرض حالة
 /// المزامنة الحالية وتتيح تسجيل الدخول/الخروج.
@@ -53,6 +54,13 @@ class CloudSyncCard extends ConsumerWidget {
                     color: onSurface.withValues(alpha: 0.6),
                   ),
                 ),
+                if (syncState.isSignedIn) ...[
+                  const SizedBox(height: 4),
+                  SyncStatusIndicator(
+                    syncState: syncState,
+                    onRetry: () => ref.read(cloudSyncControllerProvider.notifier).syncNow(),
+                  ),
+                ],
               ],
             ),
           ),
