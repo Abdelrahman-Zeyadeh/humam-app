@@ -184,7 +184,7 @@ class AboutScreen extends StatelessWidget {
                 const Divider(height: 16),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.share_outlined, color: Color(0xFF386892)),
+                  leading: const Icon(Icons.share_outlined, color: AppColors.infoBlue),
                   title: const Text('مشاركة التطبيق واحتساب الأجر', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
                   subtitle: const Text('الدال على الخير كفاعله، شارك تطبيق هُمَام مع من تحب', style: TextStyle(fontSize: 11.5)),
                   trailing: const Icon(Icons.chevron_left_rounded),

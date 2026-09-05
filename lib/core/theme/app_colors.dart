@@ -35,6 +35,13 @@ abstract final class AppColors {
   /// الفيروزي بـ`app_accent_colors.dart` — تباين ~7.5:1، بلا لون جديد كلياً.
   static const tealDeep = Color(0xFF005B52);
 
+  /// أزرق معلوماتي محايد — لعناصر "معلومة/مشاركة/إحصائية" لا علاقة إلها
+  /// بلون التمييز (accent) ولا بعائلة الذهبي. كان مكرَّراً كـ`Color(0xFF386892)`
+  /// حرفياً بـ٥ ملفات منفصلة (`about_screen`, `account_data_section`,
+  /// `more_placeholder_screen` مرتين، `achievements_screen`) بلا أي ثابت
+  /// مشترك بينها — خطر واضح لانحراف اللون لو تغيّر بمكان ونُسي غيره.
+  static const infoBlue = Color(0xFF386892);
+
   static const line = Color(0x1A0B2545); // navy بشفافية 10%
 
   // الوضع الليلي — دافئة لا سوداء صريحة، بنفس الهوية

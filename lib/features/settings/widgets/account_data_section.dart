@@ -50,7 +50,7 @@ class AccountDataSection extends ConsumerWidget {
           child: ListTile(
             leading: const Icon(
               Icons.info_outline_rounded,
-              color: Color(0xFF386892),
+              color: AppColors.infoBlue,
             ),
             title: const Text('عن هُمَام والمصادر المعتمدة'),
             subtitle: const Text(

@@ -120,7 +120,7 @@ class AchievementsScreen extends ConsumerWidget {
                 Expanded(
                   child: _StatTile(
                     icon: Icons.bookmark_rounded,
-                    color: const Color(0xFF386892),
+                    color: AppColors.infoBlue,
                     value: '$completedKhatmas',
                     label: 'ختمات مكتملة',
                   ),
