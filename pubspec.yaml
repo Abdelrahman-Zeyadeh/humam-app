@@ -59,9 +59,10 @@ dependencies:
   flutter_timezone: ^5.1.0
   home_widget: ^0.9.3 # ويدجت الشاشة الرئيسية (آية الفترة + الصلاة القادمة)
   file_picker: ^12.0.0 # اختيار ملف نسخة احتياطية (استعادة) — راجع backup_service.dart
-  firebase_core: ^4.13.0
+  firebase_core: ^4.14.0
   cloud_firestore: ^6.8.0
   firebase_auth: ^6.5.7
+  firebase_crashlytics: ^5.3.0 # تتبّع تعطّلات/استثناءات غير مُمسَكة عن بعد — راجع main.dart
   google_sign_in: ^7.2.0
   image: ^4.5.4 # تصغير/ضغط صورة الملف الشخصي محلياً قبل رفعها لـ Firestore (بلا Storage) — Dart خالص، يعمل على كل المنصّات
 dev_dependencies:
