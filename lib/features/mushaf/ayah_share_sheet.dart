@@ -14,7 +14,10 @@ import '../../../core/theme/app_card.dart';
 import '../../../core/theme/app_colors.dart';
 import '../audio/reciters.dart';
 import '../story_maker/ui/ayah_story_maker_screen.dart';
-import 'mushaf_font_service.dart';
+import 'widgets/ayah_share_format.dart';
+import 'widgets/ayah_share_pickers.dart';
+import 'widgets/ayah_share_previews.dart';
+import 'widgets/ayah_share_theme.dart';
 
 enum ShareTab { text, image, audio }
 
@@ -66,12 +69,6 @@ class _AyahShareSheetState extends ConsumerState<AyahShareSheet> {
   Surah? _surah;
   List<Ayah> _allSurahAyahs = [];
 
-  static const _kPrimaryGreen = Color(0xFF437A4D);
-  static const _kParchmentBg = Color(0xFFF9F6EE);
-  static const _kParchmentCard = Color(0xFFFAF7F0);
-  static const _kBorderTan = Color(0xFFE2D8C3);
-  static const _kGoldMushaf = Color(0xFFC5A059);
-
   @override
   void initState() {
     super.initState();
@@ -117,33 +114,9 @@ class _AyahShareSheetState extends ConsumerState<AyahShareSheet> {
     return _allSurahAyahs.where((a) => a.ayah >= _fromAyah && a.ayah <= _toAyah).toList();
   }
 
-  static String toArabicDigits(int num) {
-    const arabicDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-    return num.toString().split('').map((d) => arabicDigits[int.parse(d)]).join();
-  }
-
   String get _cleanSurahName {
     if (_surah == null) return '';
     return _surah!.nameAr.replaceFirst('سورة ', '').replaceFirst('سُورَةُ ', '').trim();
-  }
-
-  String _tafsirDisplayName(String key) {
-    switch (key) {
-      case 'mukhtasar':
-        return 'تفسير المختصر';
-      case 'saadi':
-        return 'تفسير السعدي';
-      case 'muyassar':
-        return 'التفسير الميسر';
-      case 'jalalayn':
-        return 'تفسير الجلالين';
-      case 'asbab':
-        return 'أسباب النزول';
-      case 'en_sahih':
-        return 'English (Sahih)';
-      default:
-        return 'بدون تفسير';
-    }
   }
 
   Future<Uint8List?> _captureCardBytes() async {
@@ -264,216 +237,35 @@ class _AyahShareSheetState extends ConsumerState<AyahShareSheet> {
   }
 
   void _showTafsirDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        contentPadding: EdgeInsets.zero,
-        titlePadding: EdgeInsets.zero,
-        title: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: const BoxDecoration(
-            color: _kPrimaryGreen,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('اختر كتاب التفسير', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-              IconButton(
-                icon: const Icon(Icons.close, color: Colors.white, size: 20),
-                onPressed: () => Navigator.pop(ctx),
-                visualDensity: VisualDensity.compact,
-              ),
-            ],
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final entry in [
-              ('none', 'بدون تفسير', ''),
-              ('mukhtasar', 'تفسير المختصر', 'المختصر في تفسير القرآن الكريم'),
-              ('saadi', 'تفسير السعدي', 'تيسير الكريم الرحمن في تفسير كلام المنان'),
-              ('muyassar', 'التفسير الميسر', 'مجمع الملك فهد لطباعة المصحف الشريف'),
-              ('jalalayn', 'تفسير الجلالين', 'للإمامين المحلي والسيوطي'),
-              ('en_sahih', 'English', 'Sahih International Translation'),
-            ])
-              ListTile(
-                leading: Icon(
-                  _selectedTafsirKey == entry.$1 ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
-                  color: _selectedTafsirKey == entry.$1 ? _kPrimaryGreen : Colors.grey,
-                ),
-                title: Text(entry.$2, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                subtitle: entry.$3.isNotEmpty ? Text(entry.$3, style: const TextStyle(fontSize: 11, color: Colors.grey)) : null,
-                onTap: () {
-                  setState(() => _selectedTafsirKey = entry.$1);
-                  Navigator.pop(ctx);
-                },
-              ),
-          ],
-        ),
-      ),
+    showAyahShareTafsirDialog(
+      context,
+      selectedKey: _selectedTafsirKey,
+      onSelected: (key) => setState(() => _selectedTafsirKey = key),
     );
   }
 
   void _showSurahPicker() {
-    final surahsAsync = ref.read(allSurahsProvider);
-    surahsAsync.whenData((surahs) {
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        builder: (ctx) => DraggableScrollableSheet(
-          initialChildSize: 0.75,
-          expand: false,
-          builder: (ctx, scrollCtrl) => Column(
-            children: [
-              const SizedBox(height: 12),
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)),
-              ),
-              const SizedBox(height: 14),
-              const Text('اختر السورة', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Expanded(
-                child: ListView.builder(
-                  controller: scrollCtrl,
-                  itemCount: surahs.length,
-                  itemBuilder: (ctx, i) {
-                    final s = surahs[i];
-                    final isSel = s.id == _surahId;
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: isSel ? _kPrimaryGreen : Colors.grey.withValues(alpha: 0.15),
-                        child: Text('${s.id}', style: TextStyle(color: isSel ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 13)),
-                      ),
-                      title: Text(s.nameAr, style: TextStyle(fontWeight: isSel ? FontWeight.bold : FontWeight.w600, fontSize: 15)),
-                      subtitle: Text('${s.ayahCount} آية • ${s.revelationPlace == 'makkah' ? 'مكية' : 'مدنية'}'),
-                      selected: isSel,
-                      onTap: () {
-                        Navigator.pop(ctx);
-                        _onSurahChanged(s.id);
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    });
+    showAyahShareSurahPicker(
+      context,
+      ref,
+      currentSurahId: _surahId,
+      onSurahSelected: _onSurahChanged,
+    );
   }
 
   void _showAyahSearchPicker({required bool isFrom}) {
-    String searchQuery = '';
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          final filtered = _allSurahAyahs.where((a) {
-            if (searchQuery.isEmpty) return true;
-            return a.ayah.toString().contains(searchQuery) ||
-                toArabicDigits(a.ayah).contains(searchQuery) ||
-                a.textUthmani.contains(searchQuery);
-          }).toList();
-
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            contentPadding: EdgeInsets.zero,
-            titlePadding: EdgeInsets.zero,
-            title: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: const BoxDecoration(
-                color: _kPrimaryGreen,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(isFrom ? 'اختر آية البداية' : 'اختر آية النهاية', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white, size: 20),
-                    onPressed: () => Navigator.pop(ctx),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ],
-              ),
-            ),
-            content: SizedBox(
-              width: double.maxFinite,
-              height: 380,
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-                    child: TextField(
-                      onChanged: (val) => setDialogState(() => searchQuery = val.trim()),
-                      decoration: InputDecoration(
-                        hintText: 'ابحث برقم الآية أو كلماتها...',
-                        prefixIcon: const Icon(Icons.search, color: _kPrimaryGreen, size: 20),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: filtered.length,
-                      itemBuilder: (ctx, i) {
-                        final a = filtered[i];
-                        final isSel = isFrom ? a.ayah == _fromAyah : a.ayah == _toAyah;
-                        return ListTile(
-                          leading: Container(
-                            width: 34,
-                            height: 34,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: isSel ? _kPrimaryGreen : const Color(0xFFE8F3EB),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Text(
-                              toArabicDigits(a.ayah),
-                              style: TextStyle(
-                                color: isSel ? Colors.white : _kPrimaryGreen,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                          title: Text(
-                            a.textUthmani,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontFamily: 'AmiriQuran', fontSize: 15),
-                          ),
-                          onTap: () {
-                            setState(() {
-                              if (isFrom) {
-                                _fromAyah = a.ayah;
-                                if (_toAyah < _fromAyah) _toAyah = _fromAyah;
-                              } else {
-                                _toAyah = a.ayah;
-                                if (_fromAyah > _toAyah) _fromAyah = _toAyah;
-                              }
-                            });
-                            Navigator.pop(ctx);
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+    showAyahShareSearchPicker(
+      context,
+      isFrom: isFrom,
+      ayahs: _allSurahAyahs,
+      fromAyah: _fromAyah,
+      toAyah: _toAyah,
+      onRangeChanged: (newFrom, newTo) {
+        setState(() {
+          _fromAyah = newFrom;
+          _toAyah = newTo;
+        });
+      },
     );
   }
 
@@ -485,10 +277,10 @@ class _AyahShareSheetState extends ConsumerState<AyahShareSheet> {
       return Container(
         height: 250,
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF161E28) : _kParchmentBg,
+          color: isDark ? const Color(0xFF161E28) : AyahShareColors.parchmentBg,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         ),
-        child: const Center(child: CircularProgressIndicator(color: _kPrimaryGreen)),
+        child: const Center(child: CircularProgressIndicator(color: AyahShareColors.primaryGreen)),
       );
     }
 
@@ -497,7 +289,7 @@ class _AyahShareSheetState extends ConsumerState<AyahShareSheet> {
         maxHeight: MediaQuery.of(context).size.height * 0.92,
       ),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF161E28) : _kParchmentBg,
+        color: isDark ? const Color(0xFF161E28) : AyahShareColors.parchmentBg,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: SafeArea(
@@ -507,7 +299,7 @@ class _AyahShareSheetState extends ConsumerState<AyahShareSheet> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: const BoxDecoration(
-                color: _kPrimaryGreen,
+                color: AyahShareColors.primaryGreen,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
               ),
               child: Row(
@@ -537,7 +329,7 @@ class _AyahShareSheetState extends ConsumerState<AyahShareSheet> {
                     decoration: BoxDecoration(
                       color: isDark ? AppColors.surfaceDark : Colors.white,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: _kBorderTan),
+                      border: Border.all(color: AyahShareColors.borderTan),
                     ),
                     child: Row(
                       children: [
@@ -624,15 +416,15 @@ class _AyahShareSheetState extends ConsumerState<AyahShareSheet> {
                             decoration: BoxDecoration(
                               color: isDark ? AppColors.surfaceDark : Colors.white,
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: _kBorderTan),
+                              border: Border.all(color: AyahShareColors.borderTan),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.menu_book_rounded, color: _kPrimaryGreen, size: 20),
+                                const Icon(Icons.menu_book_rounded, color: AyahShareColors.primaryGreen, size: 20),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    _selectedTafsirKey == 'none' ? 'إضافة تفسير' : _tafsirDisplayName(_selectedTafsirKey),
+                                    _selectedTafsirKey == 'none' ? 'إضافة تفسير' : tafsirDisplayName(_selectedTafsirKey),
                                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -669,7 +461,7 @@ class _AyahShareSheetState extends ConsumerState<AyahShareSheet> {
                       decoration: BoxDecoration(
                         color: isDark ? AppColors.surfaceDark : Colors.white,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: _kBorderTan),
+                        border: Border.all(color: AyahShareColors.borderTan),
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
@@ -680,7 +472,7 @@ class _AyahShareSheetState extends ConsumerState<AyahShareSheet> {
                               value: r.id,
                               child: Row(
                                 children: [
-                                  const Icon(Icons.mic_none_rounded, color: _kPrimaryGreen, size: 18),
+                                  const Icon(Icons.mic_none_rounded, color: AyahShareColors.primaryGreen, size: 18),
                                   const SizedBox(width: 8),
                                   Text(r.nameAr, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
                                 ],
@@ -699,8 +491,25 @@ class _AyahShareSheetState extends ConsumerState<AyahShareSheet> {
                     child: RepaintBoundary(
                       key: _cardPreviewKey,
                       child: _selectedTab == ShareTab.text
-                          ? _buildTextCardPreview(isDark)
-                          : _buildMushafImagePreview(isDark),
+                          ? AyahTextCardPreview(
+                              isDark: isDark,
+                              ayahs: _selectedAyahs,
+                              cleanSurahName: _cleanSurahName,
+                              fromAyah: _fromAyah,
+                              toAyah: _toAyah,
+                              selectedTafsirKey: _selectedTafsirKey,
+                              ref: ref,
+                            )
+                          : AyahMushafImagePreview(
+                              isDark: isDark,
+                              ayahs: _selectedAyahs,
+                              cleanSurahName: _cleanSurahName,
+                              surahId: _surahId,
+                              fromAyah: _fromAyah,
+                              selectedTafsirKey: _selectedTafsirKey,
+                              fontSize: _fontSize,
+                              ref: ref,
+                            ),
                     ),
                   ),
                 ],
@@ -722,8 +531,8 @@ class _AyahShareSheetState extends ConsumerState<AyahShareSheet> {
                   Expanded(
                     child: OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: _kPrimaryGreen,
-                        side: const BorderSide(color: _kPrimaryGreen, width: 1.5),
+                        foregroundColor: AyahShareColors.primaryGreen,
+                        side: const BorderSide(color: AyahShareColors.primaryGreen, width: 1.5),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
@@ -740,7 +549,7 @@ class _AyahShareSheetState extends ConsumerState<AyahShareSheet> {
                     child: AppPrimaryButton(
                       label: _isProcessing ? 'جارٍ المعالجة...' : 'مشاركة',
                       icon: Icons.share_rounded,
-                      color: _kPrimaryGreen,
+                      color: AyahShareColors.primaryGreen,
                       loading: _isProcessing,
                       onPressed: _isProcessing ? null : _executeShare,
                     ),
@@ -767,7 +576,7 @@ class _AyahShareSheetState extends ConsumerState<AyahShareSheet> {
         padding: const EdgeInsets.symmetric(vertical: 8),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected ? _kPrimaryGreen : Colors.transparent,
+          color: selected ? AyahShareColors.primaryGreen : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -801,9 +610,9 @@ class _AyahShareSheetState extends ConsumerState<AyahShareSheet> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
         decoration: BoxDecoration(
-          color: isDark ? AppColors.surfaceDark : _kParchmentCard,
+          color: isDark ? AppColors.surfaceDark : AyahShareColors.parchmentCard,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _kBorderTan),
+          border: Border.all(color: AyahShareColors.borderTan),
         ),
         child: Column(
           children: [
@@ -829,352 +638,4 @@ class _AyahShareSheetState extends ConsumerState<AyahShareSheet> {
       ),
     );
   }
-
-  /// معاينة بطاقة النص (مطابقة تماماً للصورة 1)
-  Widget _buildTextCardPreview(bool isDark) {
-    final ayahs = _selectedAyahs;
-    final rangeStr = _fromAyah == _toAyah ? '$_fromAyah' : '$_fromAyah - $_toAyah';
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E2836) : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _kBorderTan),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 3)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // أيقونة النسخ السريعة في زاوية البطاقة
-          Align(
-            alignment: Alignment.topLeft,
-            child: InkWell(
-              onTap: () async {
-                final buffer = StringBuffer();
-                for (final a in ayahs) {
-                  buffer.write('${a.textUthmani} ﴿${toArabicDigits(a.ayah)}﴾ ');
-                }
-                await Clipboard.setData(ClipboardData(text: '{ ${buffer.toString().trim()} }\n[ سورة $_cleanSurahName : $rangeStr ]'));
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نسخ نص الآية بنجاح 📋')));
-                }
-              },
-              child: const Icon(Icons.copy_rounded, color: _kPrimaryGreen, size: 20),
-            ),
-          ),
-          const SizedBox(height: 6),
-
-          // نص الآيات
-          Text.rich(
-            TextSpan(
-              children: [
-                const TextSpan(text: '{ '),
-                for (final a in ayahs) ...[
-                  TextSpan(text: '${a.textUthmani} '),
-                  WidgetSpan(
-                    alignment: PlaceholderAlignment.middle,
-                    child: _AyahEndCircle(
-                      ayahId: a.id,
-                      ayahNumber: a.ayah,
-                      pageNumber: a.page,
-                      size: 24,
-                    ),
-                  ),
-                  const TextSpan(text: ' '),
-                ],
-                const TextSpan(text: '}'),
-              ],
-            ),
-            textAlign: TextAlign.center,
-            textDirection: TextDirection.rtl,
-            style: const TextStyle(
-              fontFamily: 'AmiriQuran',
-              fontSize: 18,
-              height: 2.2,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // توثيق السورة والآية
-          Text(
-            '[ سورة $_cleanSurahName : $rangeStr ]',
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey),
-          ),
-
-          // التفسير المختار إن وُجد
-          if (_selectedTafsirKey != 'none' && ayahs.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            const Divider(height: 1),
-            const SizedBox(height: 8),
-            FutureBuilder<Tafsir?>(
-              future: ref.read(quranRepositoryProvider).tafsirForAyah(ayahs.first.id, edition: _selectedTafsirKey),
-              builder: (ctx, snap) {
-                final content = snap.data?.content ?? '';
-                if (content.isEmpty) return const SizedBox.shrink();
-                return Text(
-                  content,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 11.5, height: 1.4, color: Color(0xFF5D4037)),
-                );
-              },
-            ),
-          ],
-
-          const SizedBox(height: 10),
-          const Text(
-            'بواسطة تطبيق هُمَام',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 10, color: Colors.grey),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// معاينة بطاقة المصحف الشريف الأصيلة (مطابقة تماماً للصورة 3 بدائرة نهاية الآيات المصحفية)
-  Widget _buildMushafImagePreview(bool isDark) {
-    final ayahs = _selectedAyahs;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFBF8F1),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _kGoldMushaf, width: 2.5),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 4)),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // لافتة اسم السورة المزخرفة بالألوان العثمانية (مطابقة لصور وحي)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFECE3D0),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF8D7344), width: 1.2),
-            ),
-            child: Text(
-              'سُورَةُ $_cleanSurahName',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontFamily: 'AmiriQuran',
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF2C2416),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          // البسملة إن كانت البداية
-          if (_fromAyah == 1 && _surahId != 9 && _surahId != 1) ...[
-            const Text(
-              'بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontFamily: 'AmiriQuran', fontSize: 16.5, color: Color(0xFF2C2416)),
-            ),
-            const SizedBox(height: 8),
-          ],
-
-          // نص الآيات القرآنية مع رقم الآية الدائري المصحفي الأصيل
-          Text.rich(
-            TextSpan(
-              children: [
-                for (final a in ayahs) ...[
-                  TextSpan(text: '${a.textUthmani} '),
-                  WidgetSpan(
-                    alignment: PlaceholderAlignment.middle,
-                    child: _AyahEndCircle(
-                      ayahId: a.id,
-                      ayahNumber: a.ayah,
-                      pageNumber: a.page,
-                      size: 26,
-                    ),
-                  ),
-                  const TextSpan(text: ' '),
-                ],
-              ],
-            ),
-            textAlign: TextAlign.center,
-            textDirection: TextDirection.rtl,
-            style: TextStyle(
-              fontFamily: 'AmiriQuran',
-              fontSize: _fontSize,
-              height: 2.3,
-              leadingDistribution: TextLeadingDistribution.even,
-              color: const Color(0xFF1E1912),
-            ),
-          ),
-
-          // التفسير المختار إن وُجد
-          if (_selectedTafsirKey != 'none' && ayahs.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            const Divider(color: _kGoldMushaf, height: 1),
-            const SizedBox(height: 6),
-            FutureBuilder<Tafsir?>(
-              future: ref.read(quranRepositoryProvider).tafsirForAyah(ayahs.first.id, edition: _selectedTafsirKey),
-              builder: (ctx, snap) {
-                final content = snap.data?.content ?? '';
-                if (content.isEmpty) return const SizedBox.shrink();
-                return Text(
-                  content,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 11, height: 1.4, color: Color(0xFF5D4037)),
-                );
-              },
-            ),
-          ],
-
-          const SizedBox(height: 8),
-          const Text(
-            'بواسطة تطبيق هُمَام',
-            style: TextStyle(fontSize: 9.5, color: Color(0xFF8D7344), fontWeight: FontWeight.bold),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-final _ayahGlyphProvider = FutureProvider.family<String?, int>((ref, ayahId) {
-  return ref.watch(quranRepositoryProvider).ayahMarkerGlyph(ayahId);
-});
-
-/// علامة نهاية الآية الدائرية المطابقة تماماً للمصحف الشريف (زهرة المصحف الأصلية بـ QCF V2 أو الرسم المتجهي الدقيق)
-class _AyahEndCircle extends ConsumerWidget {
-  final int ayahId;
-  final int ayahNumber;
-  final int pageNumber;
-  final double size;
-
-  const _AyahEndCircle({
-    required this.ayahId,
-    required this.ayahNumber,
-    required this.pageNumber,
-    this.size = 26,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final fontAsync = ref.watch(pageFontFamilyProvider(pageNumber));
-    final glyphAsync = ref.watch(_ayahGlyphProvider(ayahId));
-
-    if (fontAsync.hasValue && glyphAsync.hasValue && glyphAsync.value != null && glyphAsync.value!.isNotEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2.0),
-        child: Text(
-          glyphAsync.value!,
-          textDirection: TextDirection.rtl,
-          style: TextStyle(
-            fontFamily: fontAsync.value,
-            fontSize: size * 1.05,
-            color: const Color(0xFF1E1912),
-            height: 1.0,
-          ),
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2.5),
-      child: CustomPaint(
-        size: Size(size, size * 1.15),
-        painter: _AyahEndCirclePainter(color: const Color(0xFF1E1912)),
-        child: SizedBox(
-          width: size,
-          height: size * 1.15,
-          child: Center(
-            child: Text(
-              _AyahShareSheetState.toArabicDigits(ayahNumber),
-              style: TextStyle(
-                fontFamily: 'AmiriQuran',
-                fontSize: size * 0.40,
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF1E1912),
-                height: 1.0,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AyahEndCirclePainter extends CustomPainter {
-  final Color color;
-
-  _AyahEndCirclePainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final cx = w / 2;
-    final cy = h / 2;
-
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final fillPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    // 1. الإطار البيضاوي المركزي
-    final ovalRect = Rect.fromCenter(center: Offset(cx, cy), width: w * 0.76, height: h * 0.76);
-    canvas.drawOval(ovalRect, paint);
-
-    // 2. التاج الزخرفي العلوي (3 فصوص مصحفية متناسقة)
-    final topY = cy - h * 0.38;
-    final topPath = Path();
-    topPath.moveTo(cx - w * 0.22, topY + h * 0.08);
-    topPath.quadraticBezierTo(cx - w * 0.18, topY - h * 0.06, cx - w * 0.08, topY - h * 0.08);
-    topPath.quadraticBezierTo(cx - w * 0.03, topY - h * 0.16, cx, topY - h * 0.18);
-    topPath.quadraticBezierTo(cx + w * 0.03, topY - h * 0.16, cx + w * 0.08, topY - h * 0.08);
-    topPath.quadraticBezierTo(cx + w * 0.18, topY - h * 0.06, cx + w * 0.22, topY + h * 0.08);
-    canvas.drawPath(topPath, paint);
-
-    canvas.drawCircle(Offset(cx, topY - h * 0.08), 0.9, fillPaint);
-
-    // 3. الزخرفتان السفليتان المنحنيتان (أجنحة زهرة المصحف)
-    final bottomY = cy + h * 0.38;
-    final bottomPath = Path();
-    bottomPath.moveTo(cx - w * 0.25, bottomY - h * 0.10);
-    bottomPath.cubicTo(
-      cx - w * 0.28, bottomY + h * 0.08,
-      cx - w * 0.12, bottomY + h * 0.16,
-      cx, bottomY + h * 0.18,
-    );
-    bottomPath.cubicTo(
-      cx + w * 0.12, bottomY + h * 0.16,
-      cx + w * 0.28, bottomY + h * 0.08,
-      cx + w * 0.25, bottomY - h * 0.10,
-    );
-    canvas.drawPath(bottomPath, paint);
-
-    // حلقتان زخرفيتان سفليتان
-    final scrollPath = Path();
-    scrollPath.moveTo(cx - w * 0.18, bottomY - h * 0.02);
-    scrollPath.quadraticBezierTo(cx - w * 0.08, bottomY + h * 0.07, cx, bottomY + h * 0.07);
-    scrollPath.quadraticBezierTo(cx + w * 0.08, bottomY + h * 0.07, cx + w * 0.18, bottomY - h * 0.02);
-    canvas.drawPath(scrollPath, paint..strokeWidth = 0.8);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
