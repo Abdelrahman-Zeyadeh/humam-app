@@ -4,7 +4,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../core/data/user/user_prefs.dart' show sharedPreferencesProvider;
+import '../../core/theme/app_colors.dart';
 import 'data/daily_hadith_data.dart';
+import 'hadith_books_screen.dart';
+import 'hadith_download_service.dart';
 import 'widgets/daily_hadith_card.dart';
 import 'widgets/daily_hadith_category_chips.dart';
 import 'widgets/daily_hadith_fawaid_card.dart';
@@ -24,10 +28,13 @@ class DailyHadithScreen extends ConsumerStatefulWidget {
   ConsumerState<DailyHadithScreen> createState() => _DailyHadithScreenState();
 }
 
+const _kHadithVarietyBannerDismissedKey = 'daily_hadith_variety_banner_dismissed';
+
 class _DailyHadithScreenState extends ConsumerState<DailyHadithScreen> {
   int _selectedIndex = 0;
   String _selectedCategory = 'الكل';
   String _searchQuery = '';
+  bool _varietyBannerDismissed = false;
 
   @override
   void initState() {
@@ -36,6 +43,13 @@ class _DailyHadithScreenState extends ConsumerState<DailyHadithScreen> {
     // تدوير يومي موثوق حسب أيام السنة
     final dayKey = (now.year * 366) + (now.month * 31) + now.day;
     _selectedIndex = dayKey % kCuratedDailyHadiths.length;
+    _varietyBannerDismissed =
+        ref.read(sharedPreferencesProvider).getBool(_kHadithVarietyBannerDismissedKey) ?? false;
+  }
+
+  void _dismissVarietyBanner() {
+    setState(() => _varietyBannerDismissed = true);
+    ref.read(sharedPreferencesProvider).setBool(_kHadithVarietyBannerDismissedKey, true);
   }
 
   List<DailyHadithItem> get _filteredHadiths {
@@ -97,6 +111,14 @@ class _DailyHadithScreenState extends ConsumerState<DailyHadithScreen> {
   @override
   Widget build(BuildContext context) {
     final hadith = kCuratedDailyHadiths[_selectedIndex];
+    // لا تنويع فعلي بلا تنزيل كتاب حديث حقيقي (البخاري/مسلم/إلخ) —
+    // الكتابان المضمَّنان بالتطبيق (الأربعون النووية/القدسية) بلا تنزيل لا
+    // يُحسبان هون؛ "حديث اليوم" بيدور فقط على ٣٦ حديثاً مختاراً يدوياً
+    // (`kCuratedDailyHadiths`) بغضّ النظر عن هالبانر، لكن التنزيل يفتح
+    // للمستخدم تصفّح/بحث آلاف الأحاديث الحقيقية بميزة "موسوعة الحديث".
+    final hasDownloadedAnyBook = ref.watch(
+      hadithDownloadControllerProvider.select((s) => s.downloadedKeys.isNotEmpty),
+    );
 
     final categories = [
       'الكل',
@@ -134,6 +156,11 @@ class _DailyHadithScreenState extends ConsumerState<DailyHadithScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
+          if (!hasDownloadedAnyBook && !_varietyBannerDismissed) ...[
+            _HadithVarietyBanner(onDismiss: _dismissVarietyBanner),
+            const SizedBox(height: 14),
+          ],
+
           // شريط الفئات السريعة
           DailyHadithCategoryChips(
             categories: categories,
@@ -177,6 +204,72 @@ class _DailyHadithScreenState extends ConsumerState<DailyHadithScreen> {
 
           // كرت ضبط إشعار حديث اليوم
           const DailyHadithNotificationCard(),
+        ],
+      ),
+    );
+  }
+}
+
+/// بانر اقتراح تنزيل كتاب حديث (بطلب صريح) — يظهر فقط لمن لم يُنزّل أي
+/// كتاب بعد، ويختفي دائماً بعد إغلاقه يدوياً (`_kHadithVarietyBannerDismissedKey`)
+/// حتى لو نزّل كتاباً لاحقاً ثم حذفه. الهدف تعريف المستخدم أن "حديث اليوم"
+/// الحالي مبني على قائمة مختارة يدوياً محدودة، وأن تنزيل كتاب حقيقي (من
+/// شاشة "موسوعة الحديث") يفتح له تصفّح وبحث آلاف الأحاديث الحقيقية.
+class _HadithVarietyBanner extends StatelessWidget {
+  const _HadithVarietyBanner({required this.onDismiss});
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+      decoration: BoxDecoration(
+        color: AppColors.goldDeep.withValues(alpha: isDark ? 0.16 : 0.09),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.goldDeep.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.auto_stories_outlined, color: AppColors.goldDeep, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'حديث اليوم حالياً من قائمة مختارة محدودة',
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'نزّل كتاب حديث كامل (كصحيح البخاري أو مسلم) من "موسوعة الحديث" لتنويع أكبر وتصفّح آلاف الأحاديث.',
+                  style: TextStyle(fontSize: 11, height: 1.5),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const HadithBooksScreen()),
+                  ),
+                  child: const Text(
+                    'تصفّح كتب الحديث ونزّل واحداً ←',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.goldDeep),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close_rounded, size: 18),
+            tooltip: 'إخفاء',
+            onPressed: onDismiss,
+          ),
         ],
       ),
     );
