@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- نفس لون خلفية SplashScreen بـ`lib/features/splash/splash_screen.dart`
+         (AppColors.navy) — يمنع "ومضة" شاشة بيضاء قبل رسم أول فريم لفلاتر
+         (كانت الخلفية الافتراضية @android:color/white، فيظهر أبيض للحظة ثم
+         يتبدّل فجأة لكحلي، وهو ما يعطي انطباع "بطء تحميل"). -->
+    <color name="launch_background_navy">#0B2545</color>
+</resources>
