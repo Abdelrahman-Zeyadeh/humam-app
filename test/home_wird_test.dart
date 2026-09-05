@@ -1,10 +1,11 @@
-// اختبار حساب "ورد اليوم" (home_screen.dart.wirdPagesForToday) — دالة نقيّة
-// بلا قاعدة بيانات: (٦٠٤ - الصفحة الحالية) ÷ الأيام المتبقّية من مدّة
-// الخطة الأصلية، مع "حساب جديد تلقائياً" لو انتهت المدّة الأصلية.
+// اختبار حساب "ورد اليوم" (widgets/home_goals_group.dart.wirdPagesForToday)
+// — دالة نقيّة بلا قاعدة بيانات: (٦٠٤ - الصفحة الحالية) ÷ الأيام المتبقّية
+// من مدّة الخطة الأصلية، مع "حساب جديد تلقائياً" لو انتهت المدّة الأصلية.
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:humam_app/core/data/user/user_repository.dart' show KhatmaPlan;
-import 'package:humam_app/features/home/home_screen.dart' show wirdPagesForToday;
+import 'package:humam_app/features/home/widgets/home_goals_group.dart'
+    show wirdPagesForToday;
 
 void main() {
   test('خطة بدأت اليوم بهدف ٣٠ يوماً من الصفحة ١: ورد اليوم = ٦٠٤/٣٠ مقرَّب لأعلى', () {
