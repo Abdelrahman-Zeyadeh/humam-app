@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/data/user/khatma_prefs.dart';
 import '../../core/data/user/user_prefs.dart';
 import '../../core/data/user/user_repository.dart' show UserCategories, UserRepository;
 import '../../core/theme/app_card.dart';
@@ -37,6 +38,8 @@ class WeeklyReportData {
     required this.todayIndex,
     required this.audioMinutesThisWeek,
     required this.audioMinutesThisMonth,
+    required this.khatmaProgressPercent,
+    required this.khatmaPagesRemaining,
   });
 
   final Map<String, List<bool>> categoryWeeks; // فئة → ٧ أيام ثابتة (السبت..الجمعة)
@@ -47,6 +50,13 @@ class WeeklyReportData {
   /// راجع `UserRepository.getAudioMinutes`.
   final int audioMinutesThisWeek;
   final int audioMinutesThisMonth;
+
+  /// نسبة تقدّم خطة الختمة الأكثر تقدّماً بين خطط المستخدم النشطة (0-100)،
+  /// أو `null` لو ماله أي خطة ختمة نشطة حالياً — بطلب صريح بالتودو: التقرير
+  /// الأسبوعي كان يغطّي الصلوات/الحفظ/الأذكار/القيام بس بلا الختمة، رغم
+  /// كونها أحد أكبر ميزتين بالتطبيق (راجع `more_placeholder_screen.dart`).
+  final int? khatmaProgressPercent;
+  final int khatmaPagesRemaining;
 
   int get fardCompletedCount =>
       _kFardCategories.fold(0, (sum, c) => sum + (categoryWeeks[c]?.where((d) => d).length ?? 0));
@@ -76,6 +86,25 @@ final weeklyReportProvider = FutureProvider.autoDispose<WeeklyReportData>((ref) 
   final audioMinutesThisWeek = await prefs.getAudioMinutes(7);
   final audioMinutesThisMonth = await prefs.getAudioMinutes(30);
 
+  // خطة الختمة الأكثر تقدّماً بين خطط المستخدم النشطة (لو أكثر من خطة) —
+  // لا معنى لجمع تقدّم خطط متعددة، فنعرض الأبرز فقط.
+  final khatmaPlans = ref.watch(khatmaPrefsProvider).activePlans;
+  int? khatmaProgressPercent;
+  var khatmaPagesRemaining = 0;
+  if (khatmaPlans.isNotEmpty) {
+    final best = khatmaPlans.reduce(
+      (a, b) =>
+          (a.currentPage - a.startPage) >= (b.currentPage - b.startPage)
+          ? a
+          : b,
+    );
+    final read = best.currentPage - best.startPage;
+    khatmaProgressPercent = ((read / best.totalPagesToRead) * 100)
+        .clamp(0, 100)
+        .round();
+    khatmaPagesRemaining = (best.totalPagesToRead - read).clamp(0, 604);
+  }
+
   return WeeklyReportData(
     categoryWeeks: weeks,
     qiyamAyahsThisWeek: qiyamAyahs,
@@ -83,6 +112,8 @@ final weeklyReportProvider = FutureProvider.autoDispose<WeeklyReportData>((ref) 
     todayIndex: daysSinceSaturday,
     audioMinutesThisWeek: audioMinutesThisWeek,
     audioMinutesThisMonth: audioMinutesThisMonth,
+    khatmaProgressPercent: khatmaProgressPercent,
+    khatmaPagesRemaining: khatmaPagesRemaining,
   );
 });
 
@@ -173,6 +204,21 @@ class WeeklyReportScreen extends ConsumerWidget {
               label: 'سلسلة الورد اليومي الحالية',
               value: '${data.dailyWirdStreak} يوم',
               color: AppColors.tealDeep,
+              wide: true,
+            ),
+            const SizedBox(height: 10),
+            // تقدّم خطة الختمة — كان التقرير الأسبوعي يغطّي الصلوات/الحفظ/
+            // الأذكار/القيام بس بلا الختمة رغم كونها أحد أكبر ميزتين
+            // بالتطبيق (بطلب صريح لاحق بالتودو).
+            _SummaryCard(
+              icon: Icons.bookmark_outline,
+              label: data.khatmaProgressPercent != null
+                  ? 'تقدّم خطة الختمة — باقي ${data.khatmaPagesRemaining} صفحة'
+                  : 'لا يوجد خطة ختمة نشطة حالياً',
+              value: data.khatmaProgressPercent != null
+                  ? '${data.khatmaProgressPercent}%'
+                  : '—',
+              color: AppColors.infoBlue,
               wide: true,
             ),
             const SizedBox(height: 10),
