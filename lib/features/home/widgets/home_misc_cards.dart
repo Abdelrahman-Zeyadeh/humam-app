@@ -125,33 +125,41 @@ class CardSkeleton extends StatelessWidget {
   }
 }
 
-/// شارة صغيرة "دقائق التلاوة هذا الأسبوع" — راجع
+/// شارة صغيرة مدمجة "دقائق التلاوة هذا الأسبوع" — راجع
 /// `UserRepository.getAudioMinutes`/`audio_log` (`quran_audio_controller.dart`
 /// يسجّل ثواني الاستماع الفعلية). تظهر فقط لو استمع المستخدم فعلياً هذا
-/// الأسبوع (>٠ دقيقة) — بلا بطاقة فارغة لمستخدم جديد. استُخرجت من
-/// `home_screen.dart` أثناء تفكيك الملف بلا أي تغيير سلوكي.
+/// الأسبوع (>٠ دقيقة) — بلا بطاقة فارغة لمستخدم جديد.
+///
+/// بشكل شارة (pill) صغيرة بدل بطاقة كاملة العرض — تُعرض كـ`trailing` بجانب
+/// عنوان قسم "سلاسل الاستمرار" (`StreaksRow`) بدل ما تاخد سطر/كرت مستقل
+/// أسفل الرئيسية (كانت تضيف كرت + مسافة كاملين لمعلومة سطر واحد قصير).
 class ListeningMinutesChip extends StatelessWidget {
   const ListeningMinutesChip({super.key, required this.minutes});
   final int minutes;
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.tealDeep.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           const Icon(
             Icons.headphones_outlined,
             color: AppColors.tealDeep,
-            size: 20,
+            size: 13,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 5),
           Text(
-            'دقائق التلاوة هذا الأسبوع: $minutes دقيقة',
-            style: TextStyle(
-              fontSize: 12.5,
+            '$minutes د الأسبوع',
+            style: const TextStyle(
+              fontSize: 10.5,
               fontWeight: FontWeight.w700,
-              color: homeTextStrong(context),
+              color: AppColors.tealDeep,
             ),
           ),
         ],

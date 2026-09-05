@@ -6,8 +6,10 @@ import '../../../core/theme/app_accent_colors.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/cloud_sync_service.dart';
 import '../../hijri/hijri_calendar_screen.dart';
+import '../../onboarding/onboarding_target_keys.dart';
 import '../../profile/profile_stats_screen.dart';
 import '../../search/unified_search_screen.dart';
+import '../dashboard_customize_sheet.dart';
 
 /// شريط الترحيب أعلى الشاشة الرئيسية — تحية بحسب الوقت، اسم المستخدم،
 /// حالة المزامنة السحابية، والتاريخ الهجري. استُخرج من `home_screen.dart`
@@ -80,6 +82,32 @@ class HomeHeader extends ConsumerWidget {
                             ),
                           ),
                         ],
+                      ),
+                    ),
+                    // زر "تخصيص الواجهة" — كان زرّاً بأسفل الرئيسية بعد سكرول
+                    // طويل رغم إنه إجراء يُستخدم بشكل دوري؛ نقلناه هون
+                    // ضمن أزرار الهيدر الثابتة (أقرب وأدوم ظهورًا).
+                    InkWell(
+                      key: dashboardCustomizeButtonKey,
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        builder: (_) => const DashboardCustomizeSheet(),
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        margin: const EdgeInsets.only(left: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.14),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                        ),
+                        child: const Icon(
+                          Icons.dashboard_customize_outlined,
+                          color: Colors.white,
+                          size: 18,
+                        ),
                       ),
                     ),
                     InkWell(

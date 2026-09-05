@@ -41,16 +41,24 @@ List<BoxShadow> homeCardShadow(BuildContext c) => [
 /// (الأهداف، سلاسل الاستمرار) بنفس أسلوب لوحة التصميم المعتمدة، بدل
 /// قفز مباشر من بطاقة لبطاقة بلا عنوان يفصلها.
 class SectionLabel extends StatelessWidget {
-  const SectionLabel({super.key, required this.icon, required this.label});
+  const SectionLabel({
+    super.key,
+    required this.icon,
+    required this.label,
+    this.trailing,
+  });
   final IconData icon;
   final String label;
+  // ودجت اختياري يظهر بنهاية صف العنوان (مثلاً شارة صغيرة ملخّصة تخص
+  // القسم) — بيسمح بدمج معلومة ثانوية مرتبطة بدل ما تاخد كرت كامل لحالها
+  // تحت القسم (يقلّل طول السكرول بالرئيسية).
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(right: 2, bottom: 8),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             width: 22,
@@ -71,6 +79,7 @@ class SectionLabel extends StatelessWidget {
               color: homeTextStrong(context),
             ),
           ),
+          if (trailing != null) ...[const Spacer(), trailing!],
         ],
       ),
     );

@@ -17,7 +17,11 @@ import '../home_style_helpers.dart';
 /// الداشبورد) — استُخرجت من `home_screen.dart` أثناء تفكيك الملف بلا أي
 /// تغيير سلوكي.
 class StreaksRow extends ConsumerWidget {
-  const StreaksRow({super.key});
+  const StreaksRow({super.key, this.trailing});
+
+  // ودجت اختياري يُعرض بجانب عنوان "سلاسل الاستمرار" (مثلاً شارة دقائق
+  // الاستماع) بدل ما ياخد كرت كامل لحاله أسفل هالقسم.
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -132,9 +136,10 @@ class StreaksRow extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionLabel(
+        SectionLabel(
           icon: Icons.local_fire_department_outlined,
           label: 'سلاسل الاستمرار',
+          trailing: trailing,
         ),
         GridView.count(
           crossAxisCount: 3,

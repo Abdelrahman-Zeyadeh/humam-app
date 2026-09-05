@@ -13,7 +13,6 @@ import '../prayer/prayer_countdown_card.dart';
 import '../prayer/prayer_location_controller.dart';
 import '../prayer/prayer_times_service.dart';
 import '../shell/root_shell.dart';
-import 'dashboard_customize_sheet.dart';
 import 'home_dashboard_data.dart';
 import 'home_widget_sync.dart';
 import 'weekly_report_screen.dart';
@@ -152,6 +151,7 @@ class HomeScreen extends ConsumerWidget {
                           ? dashboardAsync.value?.continueReadingSurah
                           : null,
                     ),
+                    const SizedBox(height: 12),
                     if (dashboardCards.contains('start_plan_cta') &&
                         (khatmaPrefs.activePlans.isEmpty ||
                             hifzPrefs.plans.isEmpty)) ...[
@@ -159,47 +159,46 @@ class HomeScreen extends ConsumerWidget {
                         showKhatma: khatmaPrefs.activePlans.isEmpty,
                         showHifz: hifzPrefs.plans.isEmpty,
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
                     ],
                     if (dashboardCards.contains('streaks_section')) ...[
-                      const StreaksRow(),
-                      const SizedBox(height: 10),
-                    ],
-                    if ((dashboardAsync.value?.audioMinutesThisWeek ?? 0) >
-                        0) ...[
-                      ListeningMinutesChip(
-                        minutes: dashboardAsync.value!.audioMinutesThisWeek,
+                      StreaksRow(
+                        trailing:
+                            (dashboardAsync.value?.audioMinutesThisWeek ??
+                                    0) >
+                                0
+                            ? ListeningMinutesChip(
+                                minutes:
+                                    dashboardAsync.value!.audioMinutesThisWeek,
+                              )
+                            : null,
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
+                    ] else if ((dashboardAsync.value?.audioMinutesThisWeek ??
+                            0) >
+                        0) ...[
+                      // ما فيه قسم "سلاسل الاستمرار" ليتعلّق فيه (المستخدم
+                      // عطّله بتخصيص الداشبورد) — نعرض الشارة لحالها بدل ما
+                      // نخفيها بالكامل.
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: ListeningMinutesChip(
+                          minutes: dashboardAsync.value!.audioMinutesThisWeek,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                     ],
-                    Row(
-                      children: [
-                        Expanded(
-                          child: PillActionButton(
-                            icon: Icons.bar_chart_outlined,
-                            label: 'تقرير أسبوعي',
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const WeeklyReportScreen(),
-                              ),
-                            ),
-                          ),
+                    // زر "تخصيص الواجهة" انتقل لأيقونة ثابتة بالهيدر
+                    // (`HomeHeader`) — بقي هون فقط زر التقرير الأسبوعي،
+                    // فصار بعرض كامل بدل نص الصف.
+                    PillActionButton(
+                      icon: Icons.bar_chart_outlined,
+                      label: 'تقرير أسبوعي',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const WeeklyReportScreen(),
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: PillActionButton(
-                            key: dashboardCustomizeButtonKey,
-                            icon: Icons.dashboard_customize_outlined,
-                            label: 'تخصيص الواجهة',
-                            accent: true,
-                            onTap: () => showModalBottomSheet(
-                              context: context,
-                              isScrollControlled: true,
-                              builder: (_) => const DashboardCustomizeSheet(),
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
