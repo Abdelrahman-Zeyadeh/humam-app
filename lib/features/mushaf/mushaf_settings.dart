@@ -322,7 +322,11 @@ final qiyamSessionProvider =
 
 const _kTafsirFontSizeKey = 'tafsir_font_size_sp';
 
-/// حجم خط التفسير والأحاديث والترجمة (14 - 28 pt)
+/// حجم خط التفسير/الأحاديث/الترجمة، وكذلك **نص القرآن نفسه** بشاشة "قراءة
+/// مع التفسير" (`tafsir_reading_screen.dart` — نص متدفّق عادي لا صفحة
+/// مصحف بتخطيط ثابت، فتكبير خطه لا يكسر أي محاذاة). الحدّ الأقصى مرفوع
+/// لـ٣٤ (كان ٢٨) بطلب "وضع قراءة بخط أكبر لكبار السن/ضعاف البصر" — هامش
+/// حقيقي إضافي فوق حجم خط النظام العام.
 class TafsirFontSizeNotifier extends Notifier<double> {
   @override
   double build() {
@@ -331,7 +335,7 @@ class TafsirFontSizeNotifier extends Notifier<double> {
   }
 
   void setSize(double size) {
-    final clamped = size.clamp(13.0, 28.0);
+    final clamped = size.clamp(13.0, 34.0);
     state = clamped;
     ref.read(sharedPreferencesProvider).setDouble(_kTafsirFontSizeKey, clamped);
   }

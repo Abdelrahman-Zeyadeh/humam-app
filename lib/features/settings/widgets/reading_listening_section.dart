@@ -84,7 +84,7 @@ class ReadingListeningSection extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SubHeader('حجم خط التفسير والأحاديث والترجمة'),
+                    const SubHeader('حجم خط التفسير والأحاديث والترجمة وقراءة المصحف مع التفسير'),
                     const _TafsirFontSizeSection(),
                   ],
                 ),
@@ -202,7 +202,8 @@ void _showReciterPickerModal(
   );
 }
 
-/// شريحة انزلاق دقيقة لحجم خط التفسير والأحاديث والترجمة مع معاينة حية
+/// شريحة انزلاق دقيقة لحجم خط التفسير والأحاديث والترجمة (وقرآن "قراءة مع
+/// التفسير") مع معاينة حية — راجع توثيق `TafsirFontSizeNotifier`.
 class _TafsirFontSizeSection extends ConsumerWidget {
   const _TafsirFontSizeSection();
 
@@ -228,8 +229,8 @@ class _TafsirFontSizeSection extends ConsumerWidget {
               child: Slider(
                 value: fontSize,
                 min: 13.0,
-                max: 26.0,
-                divisions: 13,
+                max: 34.0,
+                divisions: 21,
                 label: '${fontSize.toInt()} pt',
                 activeColor: themeAccent(context),
                 onChanged: (v) =>
