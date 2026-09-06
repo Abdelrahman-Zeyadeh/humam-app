@@ -26,12 +26,14 @@ import 'widgets/mushaf_chrome_bars.dart';
 
 const int kMushafPageCount = 604;
 
-/// مفتاح "تجاهل" شريط تنبيه تنزيل الخطوط الباقية — **محفوظ بين الجلسات**
+/// مفتاح "طيّ" شريط تنبيه تنزيل الخطوط الباقية — **محفوظ بين الجلسات**
 /// (كان قبلاً `bool` محلي بالودجت فقط، يرجع يظهر كل فتح تطبيق جديد رغم
 /// ضغط "لاحقاً" — بلاغ صاحب المشروع "مزعج وماخذ مساحة"). **مستقل لكل طبعة**
 /// (`.name` مضافاً لاحقة) — الشريط هلق يتبع طبعة المصحف المختارة فعلياً
-/// (`fontDownloadedCountProvider`، لا V2 حصراً كالسابق)، فتجاهله لطبعة لا
-/// يخفيه تلقائياً عن طبعة أخرى بعد تبديل الخط.
+/// (`fontDownloadedCountProvider`، لا V2 حصراً كالسابق)، فطيّه لطبعة لا
+/// يطويه تلقائياً عن طبعة أخرى بعد تبديل الخط. **لم يعد إخفاءً نهائياً**
+/// (تعديل لاحق: طلب صاحب المشروع تحويله لأيقونة صغيرة قابلة لإعادة الفتح
+/// بدل الاختفاء الكامل) — راجع `_collapseDownloadBanner`/`_expandDownloadBanner`.
 String _fontDownloadBannerDismissedKey(MushafFontEdition edition) =>
     'mushaf_font_download_banner_dismissed_${edition.name}';
 
@@ -114,9 +116,12 @@ class MushafScreen extends ConsumerStatefulWidget {
 class _MushafScreenState extends ConsumerState<MushafScreen> {
   late final PageController _controller;
   late int _currentPage;
-  /// أسماء طبعات (`MushafFontEdition.name`) تجاهَل المستخدم شريط تنزيلها
-  /// — راجع توثيق [_fontDownloadBannerDismissedKey].
-  final Set<String> _dismissedFontDownloadBanners = {};
+  /// أسماء طبعات (`MushafFontEdition.name`) طوى المستخدم شريط تنزيلها
+  /// لأيقونة صغيرة — راجع توثيق [_fontDownloadBannerDismissedKey]. **لم
+  /// يعد "إخفاء نهائي"** كما كان سابقاً (بلاغ: الشريط الكامل يزعج بعد أول
+  /// ظهور) — بل طيّ قابل للتراجع: أيقونة صغيرة تبقى ظاهرة طالما فيه صفحات
+  /// ناقصة فعلياً، والضغط عليها يعيد فتح الشريط الكامل من جديد.
+  final Set<String> _collapsedFontDownloadBanners = {};
   Timer? _highlightClearTimer;
   // --- تعقّب "جلسة قراءة" لـ`reading_log` (راجع UserRepository.logReadingSession)
   // — لا نكتب صفاً بكل تصفّح صفحة (بحث/قفز فهرس يقلّب عدة صفحات بسرعة)، بل
@@ -144,7 +149,7 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
     final prefs = ref.read(sharedPreferencesProvider);
     for (final edition in MushafFontEdition.values) {
       if (prefs.getBool(_fontDownloadBannerDismissedKey(edition)) ?? false) {
-        _dismissedFontDownloadBanners.add(edition.name);
+        _collapsedFontDownloadBanners.add(edition.name);
       }
     }
     // **لا** تعديل حالة أي Notifier هون (`hifzPickerProvider.notifier.activate()`
@@ -404,12 +409,19 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
     ref.read(qiyamSessionProvider.notifier).recordAyahs(ayahs.map((a) => a.id));
   }
 
-  /// يخفي شريط "تنزيل الخطوط الباقية" **نهائياً لهذه الطبعة تحديداً** (لا
-  /// لهالجلسة فقط، ولا لبقية الطبعات) — راجع توثيق
-  /// [_fontDownloadBannerDismissedKey] أعلى الملف.
-  void _dismissDownloadBannerPermanently(MushafFontEdition edition) {
-    setState(() => _dismissedFontDownloadBanners.add(edition.name));
+  /// يطوي شريط "تنزيل الخطوط الباقية" لأيقونة صغيرة **لهذه الطبعة تحديداً**
+  /// (لا لهالجلسة فقط، ولا لبقية الطبعات) — محفوظ فيبقى مطوياً بعد إعادة
+  /// فتح التطبيق أيضاً. راجع توثيق [_fontDownloadBannerDismissedKey] أعلى
+  /// الملف و[_expandDownloadBanner] للعملية العكسية.
+  void _collapseDownloadBanner(MushafFontEdition edition) {
+    setState(() => _collapsedFontDownloadBanners.add(edition.name));
     ref.read(sharedPreferencesProvider).setBool(_fontDownloadBannerDismissedKey(edition), true);
+  }
+
+  /// يعيد فتح الشريط الكامل بعد طيّه لأيقونة — الضغط على الأيقونة الصغيرة.
+  void _expandDownloadBanner(MushafFontEdition edition) {
+    setState(() => _collapsedFontDownloadBanners.remove(edition.name));
+    ref.read(sharedPreferencesProvider).setBool(_fontDownloadBannerDismissedKey(edition), false);
   }
 
   /// ينهي جلسة القيام: يحفظ عدد آياتها بـ`QiyamAyahLog` (تراكمي لليوم)،
@@ -545,11 +557,12 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
     final missingPages = totalDownloadable - (downloadedCountAsync.value ?? 0);
     final bulkRunningForCurrentEdition =
         downloadState.isBulkRunning && downloadState.activeEdition == currentFontEdition;
+    final downloadBannerRelevant =
+        !bulkRunningForCurrentEdition && downloadedCountAsync.hasValue && missingPages > 0;
     final showDownloadBanner =
-        !_dismissedFontDownloadBanners.contains(currentFontEdition.name) &&
-        !bulkRunningForCurrentEdition &&
-        downloadedCountAsync.hasValue &&
-        missingPages > 0;
+        downloadBannerRelevant && !_collapsedFontDownloadBanners.contains(currentFontEdition.name);
+    final showCollapsedDownloadIcon =
+        downloadBannerRelevant && _collapsedFontDownloadBanners.contains(currentFontEdition.name);
 
     return Scaffold(
       backgroundColor: bg,
@@ -625,10 +638,12 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
             ),
           // شريط رفيع سطر واحد (بدل `MaterialBanner` القديم الكبير بحشوة
           // ٨+صف أزرار كاملة) — بلاغ صاحب المشروع "مزعج وماخذ مساحة".
-          // "تجاهل" **دائم لكل طبعة على حدة** (`_fontDownloadBannerDismissedKey`)
-          // لا جلسة واحدة فقط — يظهر مرّة لكل طبعة، يختفي نهائياً بعد
-          // "لاحقاً" أو × **لتلك الطبعة تحديداً**، والعدّاد نفسه يتبع طبعة
-          // المصحف الحالية دايماً (`fontDownloadedCountProvider`).
+          // الطيّ **دائم لكل طبعة على حدة** (`_fontDownloadBannerDismissedKey`)
+          // لا جلسة واحدة فقط، لكنه **قابل للتراجع** (بخلاف "تجاهل نهائي"
+          // السابق) — × يطويه لأيقونة صغيرة (`showCollapsedDownloadIcon`
+          // بالأسفل) تبقى ظاهرة بدل الاختفاء الكامل، والضغط عليها يعيد فتح
+          // الشريط الكامل. العدّاد نفسه يتبع طبعة المصحف الحالية دايماً
+          // (`fontDownloadedCountProvider`).
           if (showDownloadBanner)
             SafeArea(
               bottom: false,
@@ -650,7 +665,7 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
                     ),
                     GestureDetector(
                       onTap: () async {
-                        _dismissDownloadBannerPermanently(currentFontEdition);
+                        _collapseDownloadBanner(currentFontEdition);
                         await Navigator.of(context).push(
                           MaterialPageRoute(builder: (_) => FontDownloadScreen(edition: currentFontEdition)),
                         );
@@ -665,14 +680,44 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
                       ),
                     ),
                     IconButton(
+                      tooltip: 'طيّ الشريط',
                       icon: const Icon(Icons.close, size: 15),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                       visualDensity: VisualDensity.compact,
                       color: fg.withValues(alpha: 0.6),
-                      onPressed: () => _dismissDownloadBannerPermanently(currentFontEdition),
+                      onPressed: () => _collapseDownloadBanner(currentFontEdition),
                     ),
                   ],
+                ),
+              ),
+            ),
+          // أيقونة صغيرة بديلة عن الشريط الكامل بعد طيّه — راجع توثيق
+          // `_collapseDownloadBanner`/`_expandDownloadBanner`. تبقى ظاهرة
+          // طالما فيه صفحات ناقصة فعلياً، بمساحة أقل بكثير من الشريط.
+          if (showCollapsedDownloadIcon)
+            SafeArea(
+              bottom: false,
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 10, top: 4),
+                  child: Material(
+                    color: themeAccent(context).withValues(alpha: 0.14),
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: () => _expandDownloadBanner(currentFontEdition),
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: Icon(
+                          Icons.cloud_download_outlined,
+                          size: 16,
+                          color: themeAccent(context),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
