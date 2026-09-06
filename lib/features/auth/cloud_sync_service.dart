@@ -484,6 +484,32 @@ class CloudSyncController extends Notifier<CloudSyncState> {
     }
   }
 
+  /// **نسخ احتياطي سحابي دوري تلقائي** — يُستدعى من `RootShell` عند إقلاع
+  /// التطبيق وعند كل عودة من الخلفية (`AppLifecycleState.resumed`)، بلا أي
+  /// واجهة أو مؤشر تحميل (فشل صامت تماماً لو لا اتصال إنترنت الآن — ستُعاد
+  /// المحاولة بالمرة التالية). لا نضيف جدولة نظام حقيقية (WorkManager/
+  /// AlarmManager) تعمل والتطبيق مغلق تماماً — تعقيد اعتماد أصلي جديد غير
+  /// متناسب مع كون هذه أصلاً مزامنة "أفضل جهد" لبيانات خفيفة (راجع
+  /// `syncToCloud`)، لا نسخة ملفات ضخمة تحتاج ضمان تنفيذ صارم. يتحقق من:
+  /// تسجيل دخول فعلي + تفعيل الإعداد + مرور [interval] منذ آخر تزامن ناجح
+  /// لهذا الجهاز (يُعاد استخدام نفس نقطة تفتيش `syncNow` — أي تزامن يدوي
+  /// حديث يؤجّل هذا التلقائي أيضاً، لا ازدواجية).
+  Future<void> maybeAutoSync({
+    Duration interval = const Duration(hours: 24),
+  }) async {
+    if (!state.isSignedIn) return;
+    try {
+      if (!ref.read(userPrefsProvider).autoCloudBackupEnabled) return;
+      final checkpoint = await _readLocalSyncCheckpoint();
+      if (checkpoint != null && DateTime.now().difference(checkpoint) < interval) {
+        return;
+      }
+      await syncNow();
+    } catch (e) {
+      debugPrint('CloudSync maybeAutoSync error: $e');
+    }
+  }
+
   Future<DateTime?> _readLocalSyncCheckpoint() async {
     try {
       final sp = await SharedPreferences.getInstance();

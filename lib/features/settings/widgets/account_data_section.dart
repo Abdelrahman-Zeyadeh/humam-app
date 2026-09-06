@@ -172,6 +172,24 @@ class _BackupSectionState extends ConsumerState<_BackupSection> {
                 ],
               ),
             ),
+            if (syncState.isSignedIn) ...[
+              const SizedBox(height: 12),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text(
+                  'نسخ احتياطي سحابي تلقائي دوري',
+                  style: TextStyle(fontSize: 13),
+                ),
+                subtitle: const Text(
+                  'مزامنة صامتة كل ٢٤ ساعة تقريباً عند فتح التطبيق، بلا تدخّل يدوي',
+                  style: TextStyle(fontSize: 11),
+                ),
+                value: ref.watch(userPrefsProvider).autoCloudBackupEnabled,
+                onChanged: (v) =>
+                    ref.read(userPrefsProvider).setAutoCloudBackupEnabled(v),
+              ),
+            ],
             const SizedBox(height: 16),
             const Divider(height: 1),
             const SizedBox(height: 12),

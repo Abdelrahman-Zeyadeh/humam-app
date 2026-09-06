@@ -210,6 +210,7 @@ class UserRepository {
   // معطَّل افتراضياً عمداً (خلافاً لبقية إعدادات هالملف) — كتم كل إشعارات
   // الجهاز تأثير نظام واسع يستحق موافقة صريحة أولى لا تفعيلاً ضمنياً.
   bool _dndWhileReadingEnabled = false;
+  bool _autoCloudBackupEnabled = true;
   double? _lat;
   double? _lon;
   String? _cityName;
@@ -510,6 +511,7 @@ class UserRepository {
           sp.getInt('post_prayer_azkar_delay_minutes') ?? 5;
       _listenOnlyModeEnabled = sp.getBool('listen_only_mode_enabled') ?? false;
       _dndWhileReadingEnabled = sp.getBool('dnd_while_reading_enabled') ?? false;
+      _autoCloudBackupEnabled = sp.getBool('auto_cloud_backup_enabled') ?? true;
       for (final m in ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']) {
         final iq = sp.getInt('iqamah_minutes_$m');
         if (iq != null) _iqamahMinutes[m] = iq;
@@ -1282,6 +1284,21 @@ class UserRepository {
     try {
       final sp = await SharedPreferences.getInstance();
       await sp.setBool('dnd_while_reading_enabled', value);
+    } catch (_) {}
+  }
+
+  /// نسخ احتياطي سحابي دوري تلقائي — راجع
+  /// `CloudSyncController.maybeAutoSync` (يعمل فقط لمستخدم مسجَّل دخول
+  /// فعلياً، بلا أي أثر إن لم يكن كذلك). مفعَّل افتراضياً خلافاً لـ
+  /// `dndWhileReadingEnabled` لأنه بلا أي تأثير جانبي محسوس على المستخدم
+  /// (مجرد رفع/سحب صامت لبيانات هو أصلاً وافق على مزامنتها بتسجيل الدخول).
+  bool get autoCloudBackupEnabled => _autoCloudBackupEnabled;
+
+  Future<void> setAutoCloudBackupEnabled(bool value) async {
+    _autoCloudBackupEnabled = value;
+    try {
+      final sp = await SharedPreferences.getInstance();
+      await sp.setBool('auto_cloud_backup_enabled', value);
     } catch (_) {}
   }
 

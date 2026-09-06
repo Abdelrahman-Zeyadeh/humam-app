@@ -171,6 +171,13 @@ class UserPrefs {
   Future<void> setDndWhileReadingEnabled(bool value) =>
       _repo.setDndWhileReadingEnabled(value);
 
+  // --- نسخ احتياطي سحابي دوري تلقائي (راجع CloudSyncController.maybeAutoSync) ---
+
+  bool get autoCloudBackupEnabled => _repo.autoCloudBackupEnabled;
+
+  Future<void> setAutoCloudBackupEnabled(bool value) =>
+      _repo.setAutoCloudBackupEnabled(value);
+
   // --- لوحة ألوان صفحة المصحف ---
 
   String get mushafPaletteId => _repo.mushafPaletteId;

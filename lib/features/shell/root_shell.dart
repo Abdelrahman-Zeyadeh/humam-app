@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../auth/cloud_sync_service.dart';
 import '../azkar/azkar_library_screen.dart';
 import '../azkar/post_prayer_azkar_screen.dart';
 import '../groups/providers/groups_providers.dart';
@@ -84,13 +87,17 @@ class RootShell extends ConsumerStatefulWidget {
   ConsumerState<RootShell> createState() => _RootShellState();
 }
 
-class _RootShellState extends ConsumerState<RootShell> {
+class _RootShellState extends ConsumerState<RootShell> with WidgetsBindingObserver {
   final _built = List<Widget?>.filled(_tabs.length, null);
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     initHomeWidgetLaunchHandler(ref);
+    // نسخ احتياطي سحابي دوري تلقائي — راجع `CloudSyncController.
+    // maybeAutoSync` (فشل صامت تماماً لو غير مسجَّل دخول/بلا إنترنت الآن).
+    unawaited(ref.read(cloudSyncControllerProvider.notifier).maybeAutoSync());
     // "اقرأ الآن" بتنبيه أذكار بعد الصلاة — فتح فوري لو التطبيق حيّ بنفس
     // الجلسة (راجع توثيق `postPrayerAzkarOpenCallback`)، بلا حاجة إعادة
     // بناء الشاشة أو انتظار استئناف. تُلغى بالتخلّص (`dispose`) لتفادي
@@ -126,7 +133,15 @@ class _RootShellState extends ConsumerState<RootShell> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(ref.read(cloudSyncControllerProvider.notifier).maybeAutoSync());
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     postPrayerAzkarOpenCallback = null;
     super.dispose();
   }
