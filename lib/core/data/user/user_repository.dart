@@ -201,6 +201,11 @@ class UserRepository {
   String _reciterId = 'husary';
   double _speed = 1.0;
   bool _liveListenEnabled = false;
+  // وضع "استماع فقط" — تشغيل صوتي متسلسل للسور بلا تفاعل لمسي، ينتقل
+  // تلقائياً للسورة التالية عند انتهاء كل سورة (راجع `QuranAudioController`).
+  // SharedPreferences مباشرة (لا جدول `AudioSettings` الـDrift كـ
+  // `liveListenEnabled` — تفادياً لهجرة مخطط جديدة لإعداد بسيط).
+  bool _listenOnlyModeEnabled = false;
   double? _lat;
   double? _lon;
   String? _cityName;
@@ -499,6 +504,7 @@ class UserRepository {
       _postPrayerAzkarEnabled = sp.getBool('post_prayer_azkar_enabled') ?? true;
       _postPrayerAzkarDelayMinutes =
           sp.getInt('post_prayer_azkar_delay_minutes') ?? 5;
+      _listenOnlyModeEnabled = sp.getBool('listen_only_mode_enabled') ?? false;
       for (final m in ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']) {
         final iq = sp.getInt('iqamah_minutes_$m');
         if (iq != null) _iqamahMinutes[m] = iq;
@@ -1249,6 +1255,18 @@ class UserRepository {
             liveListenEnabled: Value(value),
           ),
         );
+  }
+
+  /// وضع "استماع فقط" — تشغيل صوتي متسلسل للسور بلا تفاعل لمسي (راجع
+  /// `QuranAudioController._advanceToNextSurahIfListenOnly`).
+  bool get listenOnlyModeEnabled => _listenOnlyModeEnabled;
+
+  Future<void> setListenOnlyModeEnabled(bool value) async {
+    _listenOnlyModeEnabled = value;
+    try {
+      final sp = await SharedPreferences.getInstance();
+      await sp.setBool('listen_only_mode_enabled', value);
+    } catch (_) {}
   }
 
   // --- اسم المستخدم والملف الشخصي ---

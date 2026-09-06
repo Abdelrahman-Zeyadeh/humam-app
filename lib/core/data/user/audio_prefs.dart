@@ -22,6 +22,12 @@ class AudioPrefs {
   bool get liveListenEnabled => _repo.liveListenEnabled;
 
   Future<void> setLiveListenEnabled(bool value) => _repo.setLiveListenEnabled(value);
+
+  /// وضع "استماع فقط" — راجع توثيق `UserRepository.listenOnlyModeEnabled`.
+  bool get listenOnlyModeEnabled => _repo.listenOnlyModeEnabled;
+
+  Future<void> setListenOnlyModeEnabled(bool value) =>
+      _repo.setListenOnlyModeEnabled(value);
 }
 
 final audioPrefsProvider = Provider<AudioPrefs>((ref) {

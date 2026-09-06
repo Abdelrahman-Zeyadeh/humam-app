@@ -462,6 +462,23 @@ class _MoreOptionsSheet extends ConsumerWidget {
                 fg: onSurface,
               ),
             ),
+            // وضع "استماع فقط": انتقال تلقائي للسورة التالية عند الانتهاء —
+            // بلا حاجة فتح المصحف أو التفاعل بالشاشة إطلاقاً، بطلب صريح
+            // "تشغيل صوتي متسلسل للسور بلا تفاعل لمسي".
+            _MoreOptionRow(
+              icon: Icons.playlist_play_rounded,
+              label: 'استماع فقط (تشغيل متسلسل للسور)',
+              // نفس نمط بقية خيارات هالشيت (تكرار/سرعة) — قيمة لحظة الفتح
+              // فقط (`audio` معطى ثابت لا مُراقَب)، وتُغلَق الشيت فور
+              // التبديل بدل تحديثها حيّة بمكانها.
+              trailing: Switch(
+                value: audio.listenOnlyModeEnabled,
+                onChanged: (v) {
+                  controller.setListenOnlyModeEnabled(v);
+                  Navigator.of(context).pop();
+                },
+              ),
+            ),
             if (surahId != null)
               _MoreOptionRow(
                 icon: Icons.download_outlined,

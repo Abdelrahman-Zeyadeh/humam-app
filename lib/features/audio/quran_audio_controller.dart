@@ -61,6 +61,7 @@ class QuranAudioState {
     this.supportsHighlight = true,
     this.errorMessage,
     this.liveListenEnabled = false,
+    this.listenOnlyModeEnabled = false,
     this.sleepTimerEndsAt,
   });
 
@@ -84,6 +85,9 @@ class QuranAudioState {
   /// وضع "سماع مباشر" — راجع توثيق `AudioSettings.liveListenEnabled`.
   final bool liveListenEnabled;
 
+  /// وضع "استماع فقط" — راجع توثيق `UserRepository.listenOnlyModeEnabled`.
+  final bool listenOnlyModeEnabled;
+
   /// وقت انتهاء مؤقّت النوم الحالي (`null` = لا مؤقّت نشط) — راجع
   /// [QuranAudioController.setSleepTimer].
   final DateTime? sleepTimerEndsAt;
@@ -102,6 +106,7 @@ class QuranAudioState {
     bool? supportsHighlight,
     Object? errorMessage = _sentinel,
     bool? liveListenEnabled,
+    bool? listenOnlyModeEnabled,
     Object? sleepTimerEndsAt = _sentinel,
   }) {
     return QuranAudioState(
@@ -126,6 +131,8 @@ class QuranAudioState {
           ? this.errorMessage
           : errorMessage as String?,
       liveListenEnabled: liveListenEnabled ?? this.liveListenEnabled,
+      listenOnlyModeEnabled:
+          listenOnlyModeEnabled ?? this.listenOnlyModeEnabled,
       sleepTimerEndsAt: identical(sleepTimerEndsAt, _sentinel)
           ? this.sleepTimerEndsAt
           : sleepTimerEndsAt as DateTime?,
@@ -180,13 +187,21 @@ class QuranAudioController extends Notifier<QuranAudioState> {
     final stateSub = player.playerStateStream.listen((s) {
       final completed = s.processingState == ProcessingState.completed;
       final wasPlaying = state.isPlaying;
+      // وضع "استماع فقط": سورة انتهت + ما فيه سورة تالية بعد — لا نعتبر
+      // التشغيل "خامل" فوراً (يمنع وميض واجهة سريع) لحد ما ننتقل فعلياً
+      // بـ`_advanceToNextSurahIfListenOnly` بالأسفل.
+      final listenOnlyAdvancing =
+          completed &&
+          state.currentSurah != null &&
+          state.listenOnlyModeEnabled &&
+          state.currentSurah! < 114;
       final nowPlaying = s.playing && !completed;
       state = state.copyWith(
         isPlaying: nowPlaying,
         isLoading:
             s.processingState == ProcessingState.loading ||
             s.processingState == ProcessingState.buffering,
-        isActive: completed ? false : null,
+        isActive: completed && !listenOnlyAdvancing ? false : null,
         currentAyahId: completed ? null : _sentinelKeep(),
       );
       if (nowPlaying && !wasPlaying) {
@@ -200,6 +215,7 @@ class QuranAudioController extends Notifier<QuranAudioState> {
         _audioLogTimer?.cancel();
         _audioLogTimer = null;
       }
+      if (listenOnlyAdvancing) _advanceToNextSurahIfListenOnly();
     });
 
     ref.onDispose(() {
@@ -214,6 +230,7 @@ class QuranAudioController extends Notifier<QuranAudioState> {
       reciterId: prefs.reciterId,
       speed: prefs.speed,
       liveListenEnabled: prefs.liveListenEnabled,
+      listenOnlyModeEnabled: prefs.listenOnlyModeEnabled,
     );
   }
 
@@ -233,6 +250,12 @@ class QuranAudioController extends Notifier<QuranAudioState> {
   Future<void> setLiveListenEnabled(bool value) async {
     state = state.copyWith(liveListenEnabled: value);
     await ref.read(audioPrefsProvider).setLiveListenEnabled(value);
+  }
+
+  /// وضع "استماع فقط" — راجع توثيق `UserRepository.listenOnlyModeEnabled`.
+  Future<void> setListenOnlyModeEnabled(bool value) async {
+    state = state.copyWith(listenOnlyModeEnabled: value);
+    await ref.read(audioPrefsProvider).setListenOnlyModeEnabled(value);
   }
 
   /// يبدأ مؤقّت نوم يوقف التلاوة تلقائياً بعد [duration] — يستبدل أي مؤقّت
@@ -289,6 +312,17 @@ class QuranAudioController extends Notifier<QuranAudioState> {
 
   Future<void> playSurahFull(int surahId) async {
     await _playSelection(surahId: surahId);
+  }
+
+  /// وضع "استماع فقط" — تشغيل صوتي متسلسل للسور بلا أي تفاعل لمسي (بطلب
+  /// صاحب المشروع بالاعتماد على `audio_service` الموجود أصلاً). يُستدعى
+  /// فقط من مستمع `playerStateStream` أعلاه عند اكتمال السورة الحالية
+  /// و`UserRepository.listenOnlyModeEnabled` مفعّل. يتوقّف تلقائياً بعد
+  /// السورة ١١٤ (لا التفاف على السورة الأولى — نهاية طبيعية للمصحف).
+  Future<void> _advanceToNextSurahIfListenOnly() async {
+    final next = (state.currentSurah ?? 0) + 1;
+    if (next > 114) return;
+    await _playSelection(surahId: next);
   }
 
   Future<void> playAyah(int surahId, int ayahNumber) async {
