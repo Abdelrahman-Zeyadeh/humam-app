@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/data/user/hifz_prefs.dart';
 import '../../core/data/user/user_prefs.dart';
@@ -68,5 +69,74 @@ Future<void> syncHifzReminder(HifzPrefs hifzPrefs) async {
     await svc.cancelRepeatingReminder(UserCategories.hifz);
   } catch (e) {
     debugPrint('مزامنة تذكير الحفظ الذكي فشلت: $e');
+  }
+}
+
+/// الأنشطة المرشَّحة لـ"تذكير ذكي بالورد الفائت" — الورد اليومي ومراجعة
+/// الحفظ (طلب أصلي بالمواصفات) + أذكار الصباح/المساء/النوم (طلب لاحق:
+/// "ضيف عليها أذكار الصباح والمسا والنوم"). كلها تشترك بنفس بنية سلسلة
+/// الاستمرار المستقلة (`UserRepository._categoryStreakLastDay`)، فنفس
+/// المنطق يعمل للجميع بلا تخصيص لكل فئة.
+const _kMissedActivityCategories = [
+  UserCategories.dailyWird,
+  UserCategories.hifz,
+  UserCategories.morningAzkar,
+  UserCategories.eveningAzkar,
+  UserCategories.nightAzkar,
+];
+
+const _kMissedActivityLabels = {
+  UserCategories.dailyWird: 'الورد اليومي',
+  UserCategories.hifz: 'مراجعة الحفظ',
+  UserCategories.morningAzkar: 'أذكار الصباح',
+  UserCategories.eveningAzkar: 'أذكار المساء',
+  UserCategories.nightAzkar: 'أذكار النوم',
+};
+
+/// معرّفات إشعار اقتراح تخفيف الخطة — ثابتة (٥ فئات فقط، لا حاجة لخريطة
+/// hash كالتحديات الجماعية) وبعيدة عن كل مدايات إشعارات المشروع الأخرى.
+const _kMissedActivityNotifIdBase = 13300;
+
+String _lastMissedSuggestionDateKey(String category) =>
+    'missed_activity_suggestion_last_date_$category';
+
+/// **تذكير ذكي بالورد/النشاط الفائت** — بديل عن تكرار نفس رسالة التذكير
+/// العادية يومياً بلا وعي، لو المستخدم فوّت نشاطاً معيّناً **يومين متتاليين
+/// على الأقل** (لا يوم واحد فقط — طبيعي وغير مقلق). عوض تكرار "حان وقت..."
+/// نرسل اقتراحاً مختلف الصياغة: مراجعة/تخفيف هدف الخطة. مبني بالكامل فوق
+/// `UserRepository.daysSinceLastCompletionFor` الموجود أصلاً — بلا جدول
+/// جديد، فقط علم "آخر تاريخ اقتُرح فيه" بـ`SharedPreferences` لتفادي إرسال
+/// نفس الاقتراح كل مرة يُفتح فيها التطبيق بنفس اليوم (مرّة واحدة كحدّ أقصى
+/// باليوم لكل فئة، لا مرّة واحدة للأبد — لو استمر التفويت لأيام إضافية
+/// يستحق تذكيراً جديداً).
+///
+/// يُستدعى من `main.dart` بجانب [syncDailyWirdReminder] بكل إقلاع.
+Future<void> syncMissedActivityReminders(UserPrefs prefs) async {
+  try {
+    final sp = await SharedPreferences.getInstance();
+    final todayKey = '${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}';
+
+    for (final category in _kMissedActivityCategories) {
+      if (!prefs.reminderEnabledFor(category)) continue;
+
+      final missedDays = prefs.daysSinceLastCompletionFor(category);
+      // `null` = لم يُنجَز إطلاقاً بعد (مستخدم جديد) — ليس "تفويتاً" يستحق
+      // اقتراحاً. يوم واحد فقط طبيعي جداً (قد يكون نفس اليوم لم ينتهِ بعد
+      // بالنسبة لوقت التذكير المعتاد) — نبدأ الاقتراح من يومين فأكثر.
+      if (missedDays == null || missedDays < 2) continue;
+
+      final lastSuggestedKey = _lastMissedSuggestionDateKey(category);
+      if (sp.getString(lastSuggestedKey) == todayKey) continue;
+
+      final label = _kMissedActivityLabels[category] ?? category;
+      await AdhanNotificationService.instance.showInstantAlert(
+        id: _kMissedActivityNotifIdBase + _kMissedActivityCategories.indexOf(category),
+        title: 'فاتك "$label" منذ $missedDays أيام',
+        body: 'ما رح نكرر عليك نفس التذكير — جرّب تخفّف هدفك اليومي بهالنشاط من الإعدادات، أسهل من التوقف كلياً',
+      );
+      await sp.setString(lastSuggestedKey, todayKey);
+    }
+  } catch (e) {
+    debugPrint('مزامنة تذكير الورد الفائت الذكي فشلت: $e');
   }
 }

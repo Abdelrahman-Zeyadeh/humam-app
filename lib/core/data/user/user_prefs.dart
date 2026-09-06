@@ -36,6 +36,9 @@ class UserPrefs {
 
   bool completedTodayFor(String category) => _repo.completedTodayFor(category);
 
+  int? daysSinceLastCompletionFor(String category) =>
+      _repo.daysSinceLastCompletionFor(category);
+
   Future<void> bumpCategoryStreakIfNewDay(String category) =>
       _repo.bumpCategoryStreakIfNewDay(category);
 

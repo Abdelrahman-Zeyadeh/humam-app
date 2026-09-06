@@ -405,6 +405,11 @@ Future<void> _initAdhanNotificationsInBackground(
   // فعلاً (بدل تذكير أعمى يتكرر بلا وعي بالإنجاز)، راجع توثيق
   // `syncDailyWirdReminder` الكامل.
   await syncDailyWirdReminder(container.read(userPrefsProvider));
+
+  // تذكير ذكي بالورد/النشاط الفائت (ورد يومي، حفظ، أذكار الصباح/المساء/
+  // النوم) — اقتراح تخفيف الخطة بدل تكرار نفس التذكير عند تفويت يومين
+  // متتاليين فأكثر، راجع توثيق `syncMissedActivityReminders` الكامل.
+  await syncMissedActivityReminders(container.read(userPrefsProvider));
 }
 
 /// يهيّئ اتصال Firebase بالخلفية — راجع الملاحظة أعلى استدعائها بـ`main()`.

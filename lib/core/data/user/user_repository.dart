@@ -722,6 +722,22 @@ class UserRepository {
   bool completedTodayFor(String category) =>
       _categoryStreakLastDay[category] == _dateKey(DateTime.now());
 
+  /// عدد الأيام الكاملة منذ آخر مرّة أُنجز فيها هذا النشاط — `null` لو لم
+  /// يُنجَز إطلاقاً بعد (لا نعتبره "فائتاً" حينها، مجرد لم يبدأ). يعتمد على
+  /// نفس `_categoryStreakLastDay` المستخدَم أصلاً بـ[completedTodayFor]/
+  /// [bumpCategoryStreakIfNewDay] — بلا أي تخزين إضافي. راجع
+  /// `smart_reminder_sync.dart.syncMissedActivityReminders` لاستخدامه
+  /// باقتراح تخفيف خطة بدل تكرار نفس التذكير عند تفويت يومين متتاليين.
+  int? daysSinceLastCompletionFor(String category) {
+    final lastDay = _categoryStreakLastDay[category];
+    if (lastDay == null) return null;
+    final parts = lastDay.split('-').map(int.parse).toList();
+    final last = DateTime(parts[0], parts[1], parts[2]);
+    final today = DateTime.now();
+    final todayMidnight = DateTime(today.year, today.month, today.day);
+    return todayMidnight.difference(last).inDays;
+  }
+
   /// نفس منطق [bumpStreakIfNewDay] بالضبط لكن معمَّم لأي فئة — يُستدعى
   /// عند اكتمال نشاط اليوم (كل أذكار الصباح مثلاً) أو تسجيل يدوي (قيام
   /// الليل). لا شيء لو استُدعي مرتين بنفس اليوم.
