@@ -331,6 +331,136 @@ class GroupsService {
             snap.docs.map((doc) => GroupMember.fromFirestore(doc)).toList());
   }
 
+  /// إنشاء تحدٍ جماعي جديد بموعد نهائي — أي عضو يقدر ينشئ (لا حصر بمنشئ
+  /// المجموعة). لا نمنع إنشاء تحدٍ ثانٍ أثناء وجود تحدٍ نشط أصلاً هون
+  /// عمداً (تعقيد تحقّق إضافي بمعاملة/استعلام مسبق لقيمة محدودة) —
+  /// `streamActiveChallenges` تعرض الأحدث فقط بالواجهة، والقديم يبقى
+  /// بالسجل التاريخي.
+  Future<GroupChallenge> createChallenge({
+    required String groupId,
+    required String title,
+    required String unit,
+    required int targetValue,
+    required DateTime startDate,
+    required DateTime endDate,
+    required String creatorName,
+  }) async {
+    final user = await ensureAuthenticated();
+    if (user == null) {
+      throw Exception('تعذّر الاتصال بالخدمة. تأكد من اتصال الإنترنت.');
+    }
+
+    final ref = _firestore
+        .collection('groups')
+        .doc(groupId)
+        .collection('challenges')
+        .doc();
+    final challenge = GroupChallenge(
+      id: ref.id,
+      title: title.trim(),
+      unit: unit.trim().isEmpty ? 'نقطة' : unit.trim(),
+      targetValue: targetValue,
+      createdBy: user.uid,
+      createdByName: creatorName.trim().isEmpty ? 'صاحب همّة' : creatorName.trim(),
+      startDate: startDate,
+      endDate: endDate,
+      createdAt: DateTime.now(),
+    );
+    await ref.set(challenge.toMap());
+    return challenge;
+  }
+
+  /// إضافة تقدّم لعضو بتحدٍ معيّن — تجميعي (`FieldValue.increment`) لا
+  /// استبدال، فأكثر من رفعة بنفس الجلسة تتراكم بلا فقدان قيمة سابقة.
+  Future<void> contributeToChallenge({
+    required String groupId,
+    required String challengeId,
+    required int addValue,
+    required String displayName,
+    required int avatarIndex,
+  }) async {
+    final user = _auth?.currentUser;
+    if (user == null || addValue <= 0) return;
+
+    try {
+      final progressRef = _firestore
+          .collection('groups')
+          .doc(groupId)
+          .collection('challenges')
+          .doc(challengeId)
+          .collection('progress')
+          .doc(user.uid);
+
+      await progressRef.set({
+        'userId': user.uid,
+        'displayName': displayName,
+        'avatarIndex': avatarIndex,
+        'value': FieldValue.increment(addValue),
+        'updatedAt': Timestamp.fromDate(DateTime.now()),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('contributeToChallenge error: $e');
+    }
+  }
+
+  /// أرشفة تحدٍ منتهٍ — منشئ التحدي فقط (راجع قاعدة الأمان بـ`firestore.rules`).
+  Future<void> archiveChallenge({
+    required String groupId,
+    required String challengeId,
+  }) async {
+    await _firestore
+        .collection('groups')
+        .doc(groupId)
+        .collection('challenges')
+        .doc(challengeId)
+        .update({'archived': true});
+  }
+
+  /// الاستماع المباشر لأحدث تحدٍ غير مؤرشَف (النشط حالياً إن وُجد).
+  Stream<GroupChallenge?> streamActiveChallenge(String groupId) {
+    return _firestore
+        .collection('groups')
+        .doc(groupId)
+        .collection('challenges')
+        .where('archived', isEqualTo: false)
+        .orderBy('createdAt', descending: true)
+        .limit(1)
+        .snapshots()
+        .map((snap) => snap.docs.isEmpty
+            ? null
+            : GroupChallenge.fromFirestore(snap.docs.first));
+  }
+
+  /// سجل التحديات المؤرشَفة (السابقة) بالمجموعة، الأحدث أولاً.
+  Stream<List<GroupChallenge>> streamChallengeHistory(String groupId) {
+    return _firestore
+        .collection('groups')
+        .doc(groupId)
+        .collection('challenges')
+        .where('archived', isEqualTo: true)
+        .orderBy('endDate', descending: true)
+        .snapshots()
+        .map((snap) =>
+            snap.docs.map((doc) => GroupChallenge.fromFirestore(doc)).toList());
+  }
+
+  /// الاستماع المباشر لتقدّم أعضاء تحدٍ معيّن، مرتَّب تنازلياً حسب القيمة.
+  Stream<List<ChallengeProgress>> streamChallengeProgress({
+    required String groupId,
+    required String challengeId,
+  }) {
+    return _firestore
+        .collection('groups')
+        .doc(groupId)
+        .collection('challenges')
+        .doc(challengeId)
+        .collection('progress')
+        .orderBy('value', descending: true)
+        .snapshots()
+        .map((snap) =>
+            snap.docs.map((doc) => ChallengeProgress.fromFirestore(doc)).toList());
+  }
+
   /// الاستماع المباشر لآخر رسائل التشجيع في المجموعة
   Stream<List<GroupNudge>> streamNudges(String groupId) {
     return _firestore

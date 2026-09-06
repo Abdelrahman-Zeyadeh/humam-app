@@ -8,6 +8,7 @@ import '../../notifications/adhan_notification_service.dart';
 import '../models/faith_group.dart';
 import '../providers/groups_providers.dart';
 import '../services/groups_service.dart';
+import 'widgets/challenge_tab.dart';
 import 'widgets/leaderboard_tab.dart';
 import 'widgets/nudges_tab.dart';
 
@@ -38,7 +39,7 @@ class _GroupDetailsScreenState extends ConsumerState<GroupDetailsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -160,6 +161,7 @@ class _GroupDetailsScreenState extends ConsumerState<GroupDetailsScreen>
           unselectedLabelColor: Colors.white70,
           tabs: const [
             Tab(icon: Icon(Icons.leaderboard_rounded), text: 'لوحة التنافس'),
+            Tab(icon: Icon(Icons.flag_circle_rounded), text: 'تحدٍ جماعي'),
             Tab(icon: Icon(Icons.favorite_rounded), text: 'حائط التواصي'),
           ],
         ),
@@ -180,7 +182,10 @@ class _GroupDetailsScreenState extends ConsumerState<GroupDetailsScreen>
                 isDark: isDark,
               ),
 
-              // 2. حائط التواصي والدعاء
+              // 2. التحدي الجماعي بموعد نهائي
+              ChallengeTab(groupId: widget.groupId, isDark: isDark),
+
+              // 3. حائط التواصي والدعاء
               NudgesTab(nudgesAsync: nudgesAsync, isDark: isDark),
             ],
           );

@@ -144,6 +144,15 @@ const _kRepeatingReminderIdBases = {
 };
 const _kMaxRepeatingSlots = 100;
 
+/// تذكير "باقي يوم على انتهاء التحدي الجماعي" — راجع `GroupsService`/
+/// `group_details_screen.dart`. معرّف مُشتَق من hash معرّف التحدي نفسه
+/// (كل جهاز يجدول محلياً لنفسه عند الانضمام لتحدٍ نشط، بلا خادم دفع) —
+/// بلوك ١٠٠ معرّف بعيد تماماً عن كل المدايات أعلاه (أقصاها ١٣١٠٠).
+const _kGroupChallengeReminderChannelId = 'group_challenge_reminder_ch';
+const _kGroupChallengeReminderChannelName = 'تذكير التحدي الجماعي';
+const _kGroupChallengeReminderIdBase = 13200;
+const _kGroupChallengeReminderSlots = 100;
+
 class _RepeatingReminderMeta {
   const _RepeatingReminderMeta({
     required this.channelId,
@@ -1844,6 +1853,63 @@ class AdhanNotificationService {
 
   Future<void> cancelCustomHabitReminder(int habitId) async {
     await _plugin.cancel(id: _kCustomHabitNotifIdBase + habitId);
+  }
+
+  /// معرّف إشعار مستقر (خانة ثابتة ١-١٠٠) لتحدٍ جماعي معيّن — نفس `challengeId`
+  /// يُنتج دائماً نفس المعرّف على نفس الجهاز، فتُلغي إعادة الجدولة (لو تغيّر
+  /// الموعد النهائي) الإشعار القديم تلقائياً بدل تكديس نسخ متعددة.
+  int _groupChallengeReminderId(String challengeId) =>
+      _kGroupChallengeReminderIdBase +
+      (challengeId.hashCode.abs() % _kGroupChallengeReminderSlots);
+
+  /// تذكير محلي واحد قبل يوم كامل من الموعد النهائي لتحدٍ جماعي نشط —
+  /// يُجدوَل على جهاز كل عضو عند الانضمام لتحدٍ (أو عرض تفاصيله) بلا أي
+  /// خادم دفع (Push) بهذا المشروع. لو الموعد المتبقي أقل من يوم أصلاً وقت
+  /// الاستدعاء، لا نجدول شيئاً (فات الأوان لتذكير "باقي يوم"). **تبسيط
+  /// متعمَّد**: النص عام يشجّع على الإنجاز بلا فحص تحقّق فعلي وقت الإطلاق
+  /// (لا قدرة على استعلام Firestore من دالة استدعاء الإشعار بخلفية معزولة)
+  /// — لا ضرر حقيقي بتذكير عضو أنجز هدفه أصلاً بأن "تحدياً ينتهي غداً".
+  Future<void> scheduleGroupChallengeDeadlineReminder({
+    required String challengeId,
+    required String challengeTitle,
+    required DateTime endDate,
+  }) async {
+    if (!_initialized) await initialize();
+
+    final reminderAt = tz.TZDateTime.from(
+      endDate.subtract(const Duration(days: 1)),
+      tz.local,
+    );
+    final now = tz.TZDateTime.now(tz.local);
+    if (!reminderAt.isAfter(now)) return;
+
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        _kGroupChallengeReminderChannelId,
+        _kGroupChallengeReminderChannelName,
+        channelDescription: 'تذكير قبل يوم من انتهاء تحدٍ جماعي بمجموعة الصحبة',
+        importance: Importance.high,
+        priority: Priority.high,
+      ),
+      iOS: DarwinNotificationDetails(),
+    );
+
+    try {
+      await _plugin.zonedSchedule(
+        id: _groupChallengeReminderId(challengeId),
+        title: 'باقي يوم على انتهاء تحدي "$challengeTitle"',
+        body: 'أكمل هدفك الآن قبل انتهاء المهلة — بادر بمزيد من التقدّم مع مجموعتك',
+        scheduledDate: reminderAt,
+        notificationDetails: details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      );
+    } catch (e) {
+      debugPrint('جدولة تذكير التحدي الجماعي "$challengeTitle" فشلت: $e');
+    }
+  }
+
+  Future<void> cancelGroupChallengeDeadlineReminder(String challengeId) async {
+    await _plugin.cancel(id: _groupChallengeReminderId(challengeId));
   }
 
   /// راجع توثيق [_kImsakChannelId] بالأعلى وموقع الاستدعاء بـ[rescheduleUpcoming]

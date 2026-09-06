@@ -169,6 +169,116 @@ class GroupMember {
   }
 }
 
+/// تحدٍ جماعي بموعد نهائي — هدف رقمي واحد (مثلاً "١٠٠ صفحة قرآن") يتنافس/
+/// يتعاون عليه أعضاء المجموعة خلال مدة محدَّدة. مستند واحد بمجموعة فرعية
+/// `groups/{id}/challenges`، وتقدّم كل عضو محفوظ بمستند مستقل بمجموعة فرعية
+/// `challenges/{id}/progress/{userId}` (راجع [ChallengeProgress]) — لا تعارض
+/// كتابة متزامنة بين الأعضاء على نفس المستند.
+///
+/// **الأرشفة**: `archived` يقلبها منشئ التحدي يدوياً فقط (زر صريح بالواجهة)
+/// بعد انتهاء الموعد — لا أرشفة تلقائية صامتة (المستخدم قد يريد مراجعة
+/// النتيجة النهائية قبل نقلها لسجل "تحديات سابقة"). `isEnded` (حساب محلي
+/// بلا كتابة) يفرّق بصرياً بين "منتهٍ بانتظار الأرشفة" و"نشط فعلياً"، بمعزل
+/// عن `archived` نفسها.
+class GroupChallenge {
+  final String id;
+  final String title;
+  final String unit;
+  final int targetValue;
+  final String createdBy;
+  final String createdByName;
+  final DateTime startDate;
+  final DateTime endDate;
+  final DateTime createdAt;
+  final bool archived;
+
+  const GroupChallenge({
+    required this.id,
+    required this.title,
+    required this.unit,
+    required this.targetValue,
+    required this.createdBy,
+    required this.createdByName,
+    required this.startDate,
+    required this.endDate,
+    required this.createdAt,
+    this.archived = false,
+  });
+
+  bool get isEnded => DateTime.now().isAfter(endDate);
+
+  Duration get remaining => endDate.difference(DateTime.now());
+
+  factory GroupChallenge.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>? ?? {};
+    return GroupChallenge(
+      id: doc.id,
+      title: data['title'] as String? ?? 'تحدٍ جماعي',
+      unit: data['unit'] as String? ?? 'نقطة',
+      targetValue: (data['targetValue'] as num?)?.toInt() ?? 1,
+      createdBy: data['createdBy'] as String? ?? '',
+      createdByName: data['createdByName'] as String? ?? 'صاحب همّة',
+      startDate: (data['startDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      endDate: (data['endDate'] as Timestamp?)?.toDate() ??
+          DateTime.now().add(const Duration(days: 7)),
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      archived: data['archived'] as bool? ?? false,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'title': title,
+      'unit': unit,
+      'targetValue': targetValue,
+      'createdBy': createdBy,
+      'createdByName': createdByName,
+      'startDate': Timestamp.fromDate(startDate),
+      'endDate': Timestamp.fromDate(endDate),
+      'createdAt': Timestamp.fromDate(createdAt),
+      'archived': archived,
+    };
+  }
+}
+
+/// تقدّم عضو واحد بتحدٍ جماعي معيّن (راجع [GroupChallenge]).
+class ChallengeProgress {
+  final String userId;
+  final String displayName;
+  final int avatarIndex;
+  final int value;
+  final DateTime updatedAt;
+
+  const ChallengeProgress({
+    required this.userId,
+    required this.displayName,
+    required this.avatarIndex,
+    required this.value,
+    required this.updatedAt,
+  });
+
+  factory ChallengeProgress.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>? ?? {};
+    return ChallengeProgress(
+      userId: doc.id,
+      displayName: data['displayName'] as String? ?? 'صاحب همّة',
+      avatarIndex: (data['avatarIndex'] as num?)?.toInt() ?? 0,
+      value: (data['value'] as num?)?.toInt() ?? 0,
+      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'userId': userId,
+      'displayName': displayName,
+      'avatarIndex': avatarIndex,
+      'value': value,
+      'updatedAt': Timestamp.fromDate(updatedAt),
+    };
+  }
+}
+
 /// رسالة تشجيع ونكزة إيمانية بين الأعضاء
 class GroupNudge {
   final String id;
