@@ -40,6 +40,7 @@ class WeeklyReportData {
     required this.audioMinutesThisMonth,
     required this.khatmaProgressPercent,
     required this.khatmaPagesRemaining,
+    required this.overallScorePercent,
   });
 
   final Map<String, List<bool>> categoryWeeks; // فئة → ٧ أيام ثابتة (السبت..الجمعة)
@@ -57,6 +58,16 @@ class WeeklyReportData {
   /// كونها أحد أكبر ميزتين بالتطبيق (راجع `more_placeholder_screen.dart`).
   final int? khatmaProgressPercent;
   final int khatmaPagesRemaining;
+
+  /// **درجة إيمانية إجمالية موحَّدة (0-100)** تجمع كل الأقسام معاً بنظرة
+  /// واحدة — بطلب صريح بالتودو: "وسّع التقرير الأسبوعي ليشمل كل الأقسام
+  /// معاً (حفظ + ختمة + أذكار + صلوات) بدل إحصائيات كل قسم منفصلة". قبل
+  /// هذا الحقل كان التقرير يعرض كل قسم بصفّه/بطاقته المستقلة بلا أي رقم
+  /// واحد يلخّص الأسبوع ككل. متوسط بسيط (لا وزن تفضيلي لقسم عن آخر) بين:
+  /// نسبة إنجاز الفرائض، الحفظ، متوسط أذكار الصباح/المساء/النوم، قيام
+  /// الليل (الأربعة كنسبة أيام مكتملة من ٧)، وتقدّم خطة الختمة النشطة إن
+  /// وُجدت (مباشرة كنسبة مئوية) — يُحسب بـ`weeklyReportProvider`.
+  final int overallScorePercent;
 
   int get fardCompletedCount =>
       _kFardCategories.fold(0, (sum, c) => sum + (categoryWeeks[c]?.where((d) => d).length ?? 0));
@@ -105,6 +116,32 @@ final weeklyReportProvider = FutureProvider.autoDispose<WeeklyReportData>((ref) 
     khatmaPagesRemaining = (best.totalPagesToRead - read).clamp(0, 604);
   }
 
+  // درجة إجمالية موحَّدة — راجع توثيق [WeeklyReportData.overallScorePercent].
+  double weekRate(String category) {
+    final week = weeks[category];
+    if (week == null || week.isEmpty) return 0;
+    return week.where((d) => d).length / week.length * 100;
+  }
+
+  final fardRate = _kFardCategories.isEmpty
+      ? 0.0
+      : _kFardCategories.map(weekRate).reduce((a, b) => a + b) / _kFardCategories.length;
+  final azkarRate =
+      (weekRate(UserCategories.morningAzkar) +
+          weekRate(UserCategories.eveningAzkar) +
+          weekRate(UserCategories.nightAzkar)) /
+      3;
+  final sectionScores = <double>[
+    fardRate,
+    weekRate(UserCategories.hifz),
+    azkarRate,
+    weekRate(UserCategories.qiyam),
+    if (khatmaProgressPercent != null) khatmaProgressPercent.toDouble(),
+  ];
+  final overallScorePercent = sectionScores.isEmpty
+      ? 0
+      : (sectionScores.reduce((a, b) => a + b) / sectionScores.length).round();
+
   return WeeklyReportData(
     categoryWeeks: weeks,
     qiyamAyahsThisWeek: qiyamAyahs,
@@ -114,6 +151,7 @@ final weeklyReportProvider = FutureProvider.autoDispose<WeeklyReportData>((ref) 
     audioMinutesThisMonth: audioMinutesThisMonth,
     khatmaProgressPercent: khatmaProgressPercent,
     khatmaPagesRemaining: khatmaPagesRemaining,
+    overallScorePercent: overallScorePercent,
   );
 });
 
@@ -145,6 +183,11 @@ class WeeklyReportScreen extends ConsumerWidget {
         data: (data) => ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            // الدرجة الإيمانية الإجمالية — نظرة واحدة على كل الأقسام معاً
+            // (فرائض + حفظ + أذكار + قيام + ختمة)، راجع توثيق
+            // `WeeklyReportData.overallScorePercent`.
+            _OverallScoreCard(percent: data.overallScorePercent),
+            const SizedBox(height: 14),
             // بطاقة التقرير المرئي (Faith Wrapped)
             Container(
               margin: const EdgeInsets.only(bottom: 14),
@@ -265,6 +308,72 @@ class WeeklyReportScreen extends ConsumerWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// بطاقة الدرجة الإجمالية — دائرة تقدّم واحدة تلخّص كل أقسام الأسبوع
+/// (فرائض/حفظ/أذكار/قيام/ختمة) برقم واحد، بدل الاكتفاء بصفوف منفصلة لكل
+/// قسم أسفلها. راجع توثيق `WeeklyReportData.overallScorePercent`.
+class _OverallScoreCard extends StatelessWidget {
+  const _OverallScoreCard({required this.percent});
+  final int percent;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = percent >= 70
+        ? AppColors.tealDeep
+        : (percent >= 40 ? AppColors.goldDeep : AppColors.navy);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 56,
+            height: 56,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CircularProgressIndicator(
+                  value: percent / 100,
+                  strokeWidth: 6,
+                  backgroundColor: color.withValues(alpha: 0.15),
+                  valueColor: AlwaysStoppedAnimation(color),
+                ),
+                Text(
+                  '$percent%',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: color),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'الدرجة الإيمانية الإجمالية لهذا الأسبوع',
+                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'متوسط الفرائض والحفظ والأذكار والقيام وتقدّم الختمة معاً',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
