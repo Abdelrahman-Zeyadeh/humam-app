@@ -151,6 +151,19 @@ class UserPrefs {
     firstDelayMinutes: firstDelayMinutes,
   );
 
+  // --- تنبيه "أذكار بعد الصلاة" (مستقل عن متابعة "هل صليت؟" أعلاه) ---
+
+  bool get postPrayerAzkarEnabled => _repo.postPrayerAzkarEnabled;
+  int get postPrayerAzkarDelayMinutes => _repo.postPrayerAzkarDelayMinutes;
+
+  Future<void> setPostPrayerAzkarSettings({
+    required bool enabled,
+    int? delayMinutes,
+  }) => _repo.setPostPrayerAzkarSettings(
+    enabled: enabled,
+    delayMinutes: delayMinutes,
+  );
+
   // --- لوحة ألوان صفحة المصحف ---
 
   String get mushafPaletteId => _repo.mushafPaletteId;

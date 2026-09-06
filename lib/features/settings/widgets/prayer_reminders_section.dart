@@ -14,6 +14,29 @@ import '../../more/reminders_screen.dart';
 import '../permissions_guide_screen.dart';
 import 'settings_section_helpers.dart';
 
+/// يُعيد جدولة كل إشعارات الصلاة (أذان + متابعة + أذكار بعد الصلاة) بأحدث
+/// الإعدادات — يُستدعى من أكثر من ودجت بهالملف، فاستُخرج دالة حرة بدل تكراره.
+Future<void> _rescheduleAllPrayerNotifications(WidgetRef ref) async {
+  final loc = ref.read(locationPrefsProvider);
+  if (!loc.hasLocation) return;
+  final notifPrefs = ref.read(adhanNotificationPrefsProvider);
+  final userPrefs = ref.read(userPrefsProvider);
+  await AdhanNotificationService.instance.rescheduleUpcoming(
+    lat: loc.lat!,
+    lon: loc.lon!,
+    methodKey: loc.calculationMethod,
+    isEnabled: notifPrefs.effectivelyEnabled,
+    voiceId: userPrefs.adhanVoiceId,
+    getVoiceIdFor: (m) => userPrefs.adhanVoiceFor(m.name),
+    getModeFor: (m) => notifPrefs.notificationModeFor(m),
+    preAdhanMinutes: userPrefs.preAdhanMinutes,
+    checkinEnabled: userPrefs.prayerCheckinEnabled,
+    checkinFirstDelayMinutes: userPrefs.prayerCheckinFirstDelayMinutes,
+    postPrayerAzkarEnabled: userPrefs.postPrayerAzkarEnabled,
+    postPrayerAzkarDelayMinutes: userPrefs.postPrayerAzkarDelayMinutes,
+  );
+}
+
 /// قسم "الصلاة والتذكيرات" — يجمع ٣ أقسام (صوت الأذان، التذكيرات، دقة
 /// الأذان) ببطاقة واحدة بنفس مبدأ بقية أقسام شاشة الإعدادات. استُخرج من
 /// `settings_screen.dart` أثناء تفكيكه بلا أي تغيير سلوكي.
@@ -35,6 +58,8 @@ class PrayerRemindersSection extends StatelessWidget {
           child: Column(
             children: [
               const _AdhanVoiceSection(),
+              const Divider(height: 1),
+              const _PostPrayerAzkarSection(),
               const Divider(height: 1),
               ListTile(
                 leading: Icon(
@@ -146,19 +171,11 @@ class _AdhanVoiceSectionState extends ConsumerState<_AdhanVoiceSection> {
   /// بصمت ويُطبَّق أول جدولة لاحقة (عند فتح شاشة الصلاة أو تحديد الموقع).
   Future<void> _applyReschedule() async {
     try {
-      final loc = ref.read(locationPrefsProvider);
-      if (!loc.hasLocation) return;
-      final notifPrefs = ref.read(adhanNotificationPrefsProvider);
-      final userPrefs = ref.read(userPrefsProvider);
-      await AdhanNotificationService.instance.rescheduleUpcoming(
-        lat: loc.lat!,
-        lon: loc.lon!,
-        methodKey: loc.calculationMethod,
-        isEnabled: notifPrefs.effectivelyEnabled,
-        voiceId: userPrefs.adhanVoiceId,
-        checkinEnabled: userPrefs.prayerCheckinEnabled,
-        checkinFirstDelayMinutes: userPrefs.prayerCheckinFirstDelayMinutes,
-      );
+      // دالة مشتركة (أعلى الملف) بدل تكرار كل المعاملات هون — كانت هالدالة
+      // ما تمرّر `postPrayerAzkarEnabled` إطلاقاً، فتبديل صوت الأذان كان
+      // يُسقِط تنبيه أذكار بعد الصلاة صامتاً لحين إعادة جدولة شاملة لاحقة
+      // (`rescheduleUpcoming` تُعيد جدولة الكل من الصفر بكل استدعاء).
+      await _rescheduleAllPrayerNotifications(ref);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -375,5 +392,103 @@ class _AdhanVoiceSectionState extends ConsumerState<_AdhanVoiceSection> {
         );
       },
     );
+  }
+}
+
+/// تنبيه "أذكار بعد الصلاة" — إعداد مستقل تماماً عن متابعة "هل صليت؟"
+/// وعن إشعار الأذان نفسه (بطلب صريح): إشعار واحد بعد كل صلاة مفروضة، بمدة
+/// قابلة للتخصيص من دخول الوقت، بزرّي "اقرأ الآن"/"×" الفعليين على الإشعار
+/// نفسه. راجع `AdhanNotificationService.rescheduleUpcoming`.
+class _PostPrayerAzkarSection extends ConsumerWidget {
+  const _PostPrayerAzkarSection();
+
+  static const _delayOptions = [3, 5, 10, 15];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final userPrefs = ref.watch(userPrefsProvider);
+    final enabled = userPrefs.postPrayerAzkarEnabled;
+    final delay = userPrefs.postPrayerAzkarDelayMinutes;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.self_improvement_outlined, color: themeAccent(context)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'تنبيه أذكار بعد الصلاة',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: onSurface,
+                  ),
+                ),
+              ),
+              Switch(
+                value: enabled,
+                onChanged: (v) => _apply(context, ref, enabled: v, delay: delay),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 36),
+            child: Text(
+              'إشعار واحد بعد كل صلاة (بزرّي "اقرأ الآن"/"×")، مستقل عن متابعة "هل صليت؟" وعن إشعار الأذان نفسه.',
+              style: TextStyle(fontSize: 11.5, color: onSurface.withValues(alpha: 0.55)),
+            ),
+          ),
+          if (enabled) ...[
+            const SizedBox(height: 10),
+            Padding(
+              padding: const EdgeInsets.only(right: 36),
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  Text(
+                    'بعد دخول الوقت بـ:',
+                    style: TextStyle(fontSize: 12.5, color: onSurface.withValues(alpha: 0.7)),
+                  ),
+                  for (final m in _delayOptions)
+                    ChoiceChip(
+                      label: Text('$m د'),
+                      selected: delay == m,
+                      onSelected: (_) => _apply(context, ref, enabled: true, delay: m),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// **لا يجب أن يرمي هون أي استثناء غير مُمسَك** — نفس قيد
+  /// `PrayerCheckinCard._apply`.
+  Future<void> _apply(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool enabled,
+    required int delay,
+  }) async {
+    final userPrefs = ref.read(userPrefsProvider);
+    await userPrefs.setPostPrayerAzkarSettings(enabled: enabled, delayMinutes: delay);
+    try {
+      if (enabled) await AdhanNotificationService.instance.requestPermissions();
+      await _rescheduleAllPrayerNotifications(ref);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذّر ضبط تنبيه أذكار بعد الصلاة على هذا الجهاز: $e')),
+      );
+    }
   }
 }

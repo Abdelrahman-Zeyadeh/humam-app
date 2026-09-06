@@ -89,6 +89,8 @@ class _AdhanVoiceCardState extends ConsumerState<AdhanVoiceCard> {
       voiceId: userPrefs.adhanVoiceId,
       checkinEnabled: userPrefs.prayerCheckinEnabled,
       checkinFirstDelayMinutes: userPrefs.prayerCheckinFirstDelayMinutes,
+      postPrayerAzkarEnabled: userPrefs.postPrayerAzkarEnabled,
+      postPrayerAzkarDelayMinutes: userPrefs.postPrayerAzkarDelayMinutes,
     );
   }
 

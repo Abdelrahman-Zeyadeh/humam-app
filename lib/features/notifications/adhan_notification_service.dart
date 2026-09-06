@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -65,7 +66,30 @@ const _kCheckinMaxSlots = 10; // يومان × ٥ صلوات — نفس حدّ `
 const _kCheckinMaxRepeatsPerSlot = 6; // ~ساعة تكرار كل ١٠د، يغطي فاصل عشاء-فجر
 const _kCheckinYesAction = 'prayer_checkin_yes';
 const _kCheckinNoAction = 'prayer_checkin_no';
-const _kPostPrayerAzkarNotifId = 9500; // بعيد عن مدى المتابعة (٩٤٠٠-٩٤٩٩) عمداً
+// تنبيه "أذكار بعد الصلاة" — كان هون قبل معرّفاً فردياً واحداً (٩٥٠٠) لإشعار
+// فوري يُطلَق فقط عند ضغط "صليت"؛ صار الآن سلسلة مجدولة مسبقاً (نفس نمط
+// `_kCheckinIdBase`/[_kCheckinMaxSlots]) بمعدَّل واحد لكل صلاة قادمة، مستقلة
+// تماماً عن ردّ "هل صليت؟" — راجع `AdhanNotificationService.rescheduleUpcoming`
+// ومعامل `postPrayerAzkarEnabled`. أبقيتها بنفس المدى القديم (٩٥٠٠+) عمداً
+// (كان معرّفاً فردياً فقط، فبقي المدى بالكامل خالياً تحته).
+const _kPostPrayerAzkarChannelId = 'post_prayer_azkar_ch';
+const _kPostPrayerAzkarChannelName = 'تنبيه أذكار بعد الصلاة';
+const _kPostPrayerAzkarIdBase = 9500;
+const _kPostPrayerAzkarMaxSlots = 10; // يومان × ٥ صلوات — نفس حدّ checkin
+const _kPostPrayerAzkarReadAction = 'post_prayer_azkar_read';
+const _kPostPrayerAzkarDismissAction = 'post_prayer_azkar_dismiss';
+const _kPostPrayerAzkarPayloadPrefix = 'post_prayer_azkar|';
+
+/// يسجّلها `RootShell` لحظة تركيب الشجرة — تفتح شاشة "أذكار بعد الصلاة"
+/// مباشرة لو ضُغط "اقرأ الآن" والتطبيق حيّ فعلاً بنفس الجلسة. تبقى `null`
+/// بحالة الإطلاق البارد (التطبيق لسّا ما انفتح)، فيُعتمَد بدلها على العلم
+/// المحفوظ [kPendingOpenPostPrayerAzkarKey] عند الإقلاع القادم — راجع
+/// [_handlePostPrayerAzkarResponse].
+void Function()? postPrayerAzkarOpenCallback;
+
+/// مفتاح SharedPreferences لعلم "افتح أذكار بعد الصلاة عند الإقلاع القادم" —
+/// يُستهلَك (يُقرأ ثم يُحذَف) مرة واحدة فقط بأول شاشة جذر تُبنى.
+const kPendingOpenPostPrayerAzkarKey = 'pending_open_post_prayer_azkar';
 
 const _kImsakChannelId = 'ramadan_imsak_ch';
 const _kImsakChannelName = 'تذكير السحور/الإمساك (رمضان)';
@@ -271,6 +295,24 @@ void onPrayerCheckinNotificationResponse(NotificationResponse response) {
   final payload = response.payload;
   if (payload == null) return;
 
+  // نفس الدالة الوحيدة مسجَّلة لكل أنواع إشعارات هذا الملف (متابعة "هل
+  // صليت؟" وتنبيه أذكار بعد الصلاة معاً) — التمييز ببادئة الحمولة (payload)
+  // بدل دالتين منفصلتين، لأن `flutter_local_notifications` يسمح بمعالج
+  // واحد فقط مسجَّل بـ`initialize()`.
+  if (payload.startsWith(_kPostPrayerAzkarPayloadPrefix)) {
+    final openReading =
+        actionId == _kPostPrayerAzkarReadAction ||
+        actionId == null ||
+        actionId.isEmpty;
+    unawaited(
+      _handlePostPrayerAzkarResponse(
+        openReading: openReading,
+        notificationId: response.id,
+      ),
+    );
+    return;
+  }
+
   // إذا ضغط المستخدم على زر "صليت" أو ضغط على جسم الإشعار مباشرة (actionId == null)
   final isYes =
       (actionId == _kCheckinYesAction || actionId == null || actionId.isEmpty);
@@ -281,6 +323,33 @@ void onPrayerCheckinNotificationResponse(NotificationResponse response) {
       notificationId: response.id,
     ),
   );
+}
+
+/// معالج رد فعل تنبيه "أذكار بعد الصلاة" — نفس قيد ردّ المتابعة أعلاه (قد
+/// يُستدعى بمعزل خلفي كلياً). "اقرأ الآن" (أو ضغط جسم الإشعار مباشرة) يفتح
+/// شاشة الأذكار بعد الصلاة فوراً لو التطبيق حيّ ([postPrayerAzkarOpenCallback]
+/// مسجَّلة من `RootShell`)، وإلا يُحفَظ علم [kPendingOpenPostPrayerAzkarKey]
+/// يُستهلَك عند الإقلاع القادم. "×" يغلق الإشعار بلا فتح ولا تسجيل أي شيء.
+Future<void> _handlePostPrayerAzkarResponse({
+  required bool openReading,
+  int? notificationId,
+}) async {
+  if (notificationId != null) {
+    try {
+      await FlutterLocalNotificationsPlugin().cancel(id: notificationId);
+    } catch (_) {}
+  }
+  if (!openReading) return;
+
+  final callback = postPrayerAzkarOpenCallback;
+  if (callback != null) {
+    callback();
+    return;
+  }
+  try {
+    final sp = await SharedPreferences.getInstance();
+    await sp.setBool(kPendingOpenPostPrayerAzkarKey, true);
+  } catch (_) {}
 }
 
 Future<void> _handlePrayerCheckinResponse(
@@ -330,6 +399,12 @@ Future<void> _handlePrayerCheckinResponse(
   }
 
   // "صليت" فقط يكتب شيئاً — "لسا" يلغي التكرار بلا تسجيل
+  //
+  // **ملاحظة**: كان هون سابقاً إشعار فوري ثابت "أذكار ما بعد الصلاة" يُطلَق
+  // مباشرة عند الضغط على "صليت" تحديداً. حُذف بالكامل — الميزة الآن مستقلة
+  // كلياً (`postPrayerAzkarEnabled`/`_schedulePostPrayerAzkarOne`، مجدولة
+  // مسبقاً بمدة قابلة للتخصيص من دخول وقت الصلاة نفسه)، بغضّ النظر عن ردّ
+  // "هل صليت؟" من عدمه — راجع توثيق `UserRepository.postPrayerAzkarEnabled`.
   if (prayed) {
     final db = UserDatabase();
     try {
@@ -341,27 +416,6 @@ Future<void> _handlePrayerCheckinResponse(
       debugPrint('تعذّر تسجيل "صليت" من الإشعار: $e');
     } finally {
       await db.close();
-    }
-
-    try {
-      await plugin.show(
-        id: _kPostPrayerAzkarNotifId,
-        title: 'أذكار ما بعد الصلاة',
-        body: 'تقبّل الله طاعتك — لا تنسَ أذكار ما بعد الصلاة 🌿',
-        notificationDetails: const NotificationDetails(
-          android: AndroidNotificationDetails(
-            _kCheckinChannelId,
-            _kCheckinChannelName,
-            channelDescription: 'سؤال متابعة بعد كل صلاة، بزرّي "صليت"/"لسا"',
-            importance: Importance.defaultImportance,
-            priority: Priority.defaultPriority,
-            autoCancel: true,
-          ),
-          iOS: DarwinNotificationDetails(),
-        ),
-      );
-    } catch (e) {
-      debugPrint('تعذّر عرض تذكير أذكار ما بعد الصلاة: $e');
     }
   }
 
@@ -720,6 +774,14 @@ class AdhanNotificationService {
     }
   }
 
+  /// يلغي كل تنبيهات "أذكار بعد الصلاة" المجدولة — نفس نمط
+  /// [cancelAllPrayerCheckins] (واحد لكل صلاة قادمة، لا سلسلة متكررة).
+  Future<void> cancelAllPostPrayerAzkarReminders() async {
+    for (var slot = 0; slot < _kPostPrayerAzkarMaxSlots; slot++) {
+      await _plugin.cancel(id: _kPostPrayerAzkarIdBase + slot);
+    }
+  }
+
   /// يلغي تذكيرَي الإمساك المجدولَين (يومان بحدّ أقصى) — راجع
   /// [_scheduleImsakIfRamadan].
   Future<void> cancelAllImsakReminders() async {
@@ -920,6 +982,11 @@ class AdhanNotificationService {
   /// `checkinEnabled`/`checkinFirstDelayMinutes` (راجع `PrayerCheckinSettings`)
   /// يفعّلان جدولة سلسلة متابعة "هل صليت؟" **إضافية** بجانب إشعار الأذان
   /// نفسه لكل صلاة — إعداد مستقل عمداً (راجع توثيق [_scheduleCheckinSeries]).
+  ///
+  /// `postPrayerAzkarEnabled`/`postPrayerAzkarDelayMinutes` (راجع
+  /// `UserRepository.postPrayerAzkarEnabled`) يفعّلان تنبيه "أذكار بعد
+  /// الصلاة" — **مستقل تماماً** عن متابعة "هل صليت؟" أعلاه (لا يحتاجها ولا
+  /// يتأثر بها)، واحد فقط لكل صلاة قادمة بعد دخول وقتها بالمدة المختارة.
   Future<void> rescheduleUpcoming({
     required double lat,
     required double lon,
@@ -931,10 +998,13 @@ class AdhanNotificationService {
     int preAdhanMinutes = 0,
     bool checkinEnabled = false,
     int checkinFirstDelayMinutes = 15,
+    bool postPrayerAzkarEnabled = false,
+    int postPrayerAzkarDelayMinutes = 5,
   }) async {
     if (!_initialized) await initialize();
     await cancelAll();
     await cancelAllPrayerCheckins();
+    await cancelAllPostPrayerAzkarReminders();
     await cancelAllImsakReminders();
 
     final now = DateTime.now();
@@ -1024,6 +1094,21 @@ class AdhanNotificationService {
           firstDelayMinutes: checkinFirstDelayMinutes,
         );
       }
+
+      // 4. تنبيه "أذكار بعد الصلاة": مستقل عن متابعة "هل صليت؟" وعن تفعيل
+      // إشعار الأذان نفسه، لكن **يحترم نفس تفعيل الصلاة** (`isEnabled`) —
+      // لو عطّل المستخدم صلاة معينة من الإعدادات لا تصله تذكيرها.
+      if (postPrayerAzkarEnabled &&
+          isEnabled(p.moment) &&
+          i < _kPostPrayerAzkarMaxSlots) {
+        await _schedulePostPrayerAzkarOne(
+          slotIndex: i,
+          prayer: p.moment,
+          prayerTime: p.time,
+          boundary: p.boundary,
+          delayMinutes: postPrayerAzkarDelayMinutes,
+        );
+      }
     }
   }
 
@@ -1101,6 +1186,76 @@ class AdhanNotificationService {
           payload: payload,
         );
       }
+    }
+  }
+
+  /// يجدوِل تنبيه "أذكار بعد الصلاة" الواحد لصلاة واحدة — بمدة
+  /// [delayMinutes] بعد دخول وقتها (لا سلسلة متكررة، خلافاً لمتابعة "هل
+  /// صليت؟"). بزرّي إجراء حقيقيين: "اقرأ الآن" يفتح شاشة الأذكار بعد
+  /// الصلاة مباشرة (راجع [_handlePostPrayerAzkarResponse])، و"×" يغلق
+  /// الإشعار بلا فتح ولا تسجيل أي شيء.
+  Future<void> _schedulePostPrayerAzkarOne({
+    required int slotIndex,
+    required PrayerMoment prayer,
+    required DateTime prayerTime,
+    required DateTime boundary,
+    required int delayMinutes,
+  }) async {
+    final fireTime = prayerTime.add(Duration(minutes: delayMinutes));
+    final now = DateTime.now();
+    if (!fireTime.isBefore(boundary)) return; // دخل وقت الصلاة التالية قبلها
+    if (!fireTime.isAfter(now)) return; // لا نجدول مواعيد مضت
+
+    final payload = '$_kPostPrayerAzkarPayloadPrefix$slotIndex';
+    final details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        _kPostPrayerAzkarChannelId,
+        _kPostPrayerAzkarChannelName,
+        channelDescription: 'تنبيه أذكار بعد الصلاة، بزرّي "اقرأ الآن"/"×"',
+        importance: Importance.high,
+        priority: Priority.high,
+        autoCancel: true,
+        actions: const [
+          AndroidNotificationAction(
+            _kPostPrayerAzkarReadAction,
+            'اقرأ الآن',
+            cancelNotification: true,
+          ),
+          AndroidNotificationAction(
+            _kPostPrayerAzkarDismissAction,
+            '×',
+            cancelNotification: true,
+          ),
+        ],
+      ),
+      iOS: const DarwinNotificationDetails(),
+    );
+
+    final scheduled = tz.TZDateTime.from(fireTime, tz.local);
+    final id = _kPostPrayerAzkarIdBase + slotIndex;
+    try {
+      await _plugin.zonedSchedule(
+        id: id,
+        title: 'حان وقت أذكار بعد الصلاة',
+        body: 'تقبّل الله طاعتك — لا تنسَ أذكار ما بعد ${prayer.nameAr} 🌿',
+        scheduledDate: scheduled,
+        notificationDetails: details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        payload: payload,
+      );
+    } catch (e) {
+      debugPrint(
+        'جدولة دقيقة لتنبيه أذكار ${prayer.nameAr} فشلت، تراجع لجدولة تقريبية: $e',
+      );
+      await _plugin.zonedSchedule(
+        id: id,
+        title: 'حان وقت أذكار بعد الصلاة',
+        body: 'تقبّل الله طاعتك — لا تنسَ أذكار ما بعد ${prayer.nameAr} 🌿',
+        scheduledDate: scheduled,
+        notificationDetails: details,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        payload: payload,
+      );
     }
   }
 

@@ -111,6 +111,8 @@ class PrayerScreen extends ConsumerWidget {
             // جدولة **كل** سلاسل المتابعة بكل استدعاء).
             checkinEnabled: userPrefs.prayerCheckinEnabled,
             checkinFirstDelayMinutes: userPrefs.prayerCheckinFirstDelayMinutes,
+            postPrayerAzkarEnabled: userPrefs.postPrayerAzkarEnabled,
+            postPrayerAzkarDelayMinutes: userPrefs.postPrayerAzkarDelayMinutes,
           );
         }
       } else {

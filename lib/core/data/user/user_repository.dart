@@ -226,6 +226,12 @@ class UserRepository {
   String _accentColorId = 'emerald';
   bool _prayerCheckinEnabled = false;
   int _prayerCheckinFirstDelayMinutes = 15;
+  // تنبيه "أذكار بعد الصلاة" — إعداد مستقل تماماً عن متابعة "هل صليت؟"
+  // وعن تنبيه الأذان نفسه (بطلب صريح بالتودو)، بطلق إشعاراً واحداً لكل
+  // صلاة بعد دخول وقتها بمدة [_postPrayerAzkarDelayMinutes] القابلة
+  // للتخصيص، بغضّ النظر عن تفعيل متابعة "هل صليت؟" من عدمه.
+  bool _postPrayerAzkarEnabled = true;
+  int _postPrayerAzkarDelayMinutes = 5;
   List<CustomHabit> _customHabits = [];
   String _userName = '';
   String _userAvatar = '';
@@ -490,6 +496,9 @@ class UserRepository {
     try {
       final sp = await SharedPreferences.getInstance();
       _preAdhanMinutes = sp.getInt('pre_adhan_minutes') ?? 10;
+      _postPrayerAzkarEnabled = sp.getBool('post_prayer_azkar_enabled') ?? true;
+      _postPrayerAzkarDelayMinutes =
+          sp.getInt('post_prayer_azkar_delay_minutes') ?? 5;
       for (final m in ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']) {
         final iq = sp.getInt('iqamah_minutes_$m');
         if (iq != null) _iqamahMinutes[m] = iq;
@@ -1508,6 +1517,27 @@ class UserRepository {
             firstDelayMinutes: Value(_prayerCheckinFirstDelayMinutes),
           ),
         );
+  }
+
+  // --- تنبيه "أذكار بعد الصلاة" (مستقل عن متابعة "هل صليت؟" أعلاه) ---
+
+  bool get postPrayerAzkarEnabled => _postPrayerAzkarEnabled;
+  int get postPrayerAzkarDelayMinutes => _postPrayerAzkarDelayMinutes;
+
+  Future<void> setPostPrayerAzkarSettings({
+    required bool enabled,
+    int? delayMinutes,
+  }) async {
+    _postPrayerAzkarEnabled = enabled;
+    if (delayMinutes != null) _postPrayerAzkarDelayMinutes = delayMinutes;
+    try {
+      final sp = await SharedPreferences.getInstance();
+      await sp.setBool('post_prayer_azkar_enabled', _postPrayerAzkarEnabled);
+      await sp.setInt(
+        'post_prayer_azkar_delay_minutes',
+        _postPrayerAzkarDelayMinutes,
+      );
+    } catch (_) {}
   }
 
   // --- الموقع لمواقيت الصلاة/القبلة ---

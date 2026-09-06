@@ -193,6 +193,8 @@ Future<void> _initAdhanNotificationsInBackground(
         preAdhanMinutes: userPrefs.preAdhanMinutes,
         checkinEnabled: userPrefs.prayerCheckinEnabled,
         checkinFirstDelayMinutes: userPrefs.prayerCheckinFirstDelayMinutes,
+        postPrayerAzkarEnabled: userPrefs.postPrayerAzkarEnabled,
+        postPrayerAzkarDelayMinutes: userPrefs.postPrayerAzkarDelayMinutes,
       );
     }
   } catch (e) {

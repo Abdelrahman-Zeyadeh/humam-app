@@ -155,6 +155,8 @@ class PrayerCheckinCard extends ConsumerWidget {
         voiceId: userPrefs.adhanVoiceId,
         checkinEnabled: enabled,
         checkinFirstDelayMinutes: delay,
+        postPrayerAzkarEnabled: userPrefs.postPrayerAzkarEnabled,
+        postPrayerAzkarDelayMinutes: userPrefs.postPrayerAzkarDelayMinutes,
       );
     } catch (e) {
       if (!context.mounted) return;

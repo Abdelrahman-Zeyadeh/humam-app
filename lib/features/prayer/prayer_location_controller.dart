@@ -115,6 +115,8 @@ class LocationController extends Notifier<AsyncValue<void>> {
         voiceId: userPrefs.adhanVoiceId,
         checkinEnabled: userPrefs.prayerCheckinEnabled,
         checkinFirstDelayMinutes: userPrefs.prayerCheckinFirstDelayMinutes,
+        postPrayerAzkarEnabled: userPrefs.postPrayerAzkarEnabled,
+        postPrayerAzkarDelayMinutes: userPrefs.postPrayerAzkarDelayMinutes,
       );
     } catch (_) {
       // راجع تعليق الدالة — لا نُفشل تحديث الموقع بسبب الإشعارات.
@@ -152,5 +154,7 @@ Future<void> rescheduleAdhanNotifications(
     preAdhanMinutes: userPrefs.preAdhanMinutes,
     checkinEnabled: userPrefs.prayerCheckinEnabled,
     checkinFirstDelayMinutes: userPrefs.prayerCheckinFirstDelayMinutes,
+    postPrayerAzkarEnabled: userPrefs.postPrayerAzkarEnabled,
+    postPrayerAzkarDelayMinutes: userPrefs.postPrayerAzkarDelayMinutes,
   );
 }

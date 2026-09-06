@@ -2,13 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../core/theme/app_colors.dart';
 import '../azkar/azkar_library_screen.dart';
+import '../azkar/post_prayer_azkar_screen.dart';
 import '../groups/providers/groups_providers.dart';
 import '../home/home_screen.dart';
 import '../more/more_placeholder_screen.dart';
 import '../mushaf/mushaf_screen.dart';
 import '../mushaf/mushaf_settings.dart' show mushafChromeVisibleProvider;
+import '../notifications/adhan_notification_service.dart'
+    show kPendingOpenPostPrayerAzkarKey, postPrayerAzkarOpenCallback;
 import '../onboarding/onboarding_screen.dart';
 import '../prayer/prayer_screen.dart';
 import '../widget/home_widget_service.dart' show initHomeWidgetLaunchHandler;
@@ -86,11 +91,44 @@ class _RootShellState extends ConsumerState<RootShell> {
   void initState() {
     super.initState();
     initHomeWidgetLaunchHandler(ref);
+    // "اقرأ الآن" بتنبيه أذكار بعد الصلاة — فتح فوري لو التطبيق حيّ بنفس
+    // الجلسة (راجع توثيق `postPrayerAzkarOpenCallback`)، بلا حاجة إعادة
+    // بناء الشاشة أو انتظار استئناف. تُلغى بالتخلّص (`dispose`) لتفادي
+    // استدعاء `context` بعد التخلّص من هالحالة.
+    postPrayerAzkarOpenCallback = () {
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const PostPrayerAzkarScreen()),
+      );
+    };
+    // حالة الإطلاق البارد: التطبيق كان مغلقاً كلياً وقت ضغط "اقرأ الآن"،
+    // فـ[postPrayerAzkarOpenCallback] ما كانت مسجَّلة بعد — العلم المحفوظ
+    // هون هو البديل الوحيد لمعرفة القصد بعد الإقلاع.
+    _consumePendingPostPrayerAzkarOpen();
     if (widget.startTour) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(tourActiveProvider.notifier).start();
       });
     }
+  }
+
+  Future<void> _consumePendingPostPrayerAzkarOpen() async {
+    try {
+      final sp = await SharedPreferences.getInstance();
+      final pending = sp.getBool(kPendingOpenPostPrayerAzkarKey) ?? false;
+      if (!pending) return;
+      await sp.remove(kPendingOpenPostPrayerAzkarKey);
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const PostPrayerAzkarScreen()),
+      );
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    postPrayerAzkarOpenCallback = null;
+    super.dispose();
   }
 
   Widget _tabAt(int index, BuildContext context) {
