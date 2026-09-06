@@ -206,6 +206,10 @@ class UserRepository {
   // SharedPreferences مباشرة (لا جدول `AudioSettings` الـDrift كـ
   // `liveListenEnabled` — تفادياً لهجرة مخطط جديدة لإعداد بسيط).
   bool _listenOnlyModeEnabled = false;
+  // وضع "لا تُزعجني وقت القراءة" — راجع `lib/core/platform/dnd_service.dart`.
+  // معطَّل افتراضياً عمداً (خلافاً لبقية إعدادات هالملف) — كتم كل إشعارات
+  // الجهاز تأثير نظام واسع يستحق موافقة صريحة أولى لا تفعيلاً ضمنياً.
+  bool _dndWhileReadingEnabled = false;
   double? _lat;
   double? _lon;
   String? _cityName;
@@ -505,6 +509,7 @@ class UserRepository {
       _postPrayerAzkarDelayMinutes =
           sp.getInt('post_prayer_azkar_delay_minutes') ?? 5;
       _listenOnlyModeEnabled = sp.getBool('listen_only_mode_enabled') ?? false;
+      _dndWhileReadingEnabled = sp.getBool('dnd_while_reading_enabled') ?? false;
       for (final m in ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']) {
         final iq = sp.getInt('iqamah_minutes_$m');
         if (iq != null) _iqamahMinutes[m] = iq;
@@ -1266,6 +1271,17 @@ class UserRepository {
     try {
       final sp = await SharedPreferences.getInstance();
       await sp.setBool('listen_only_mode_enabled', value);
+    } catch (_) {}
+  }
+
+  /// وضع "لا تُزعجني وقت القراءة" — راجع `lib/core/platform/dnd_service.dart`.
+  bool get dndWhileReadingEnabled => _dndWhileReadingEnabled;
+
+  Future<void> setDndWhileReadingEnabled(bool value) async {
+    _dndWhileReadingEnabled = value;
+    try {
+      final sp = await SharedPreferences.getInstance();
+      await sp.setBool('dnd_while_reading_enabled', value);
     } catch (_) {}
   }
 

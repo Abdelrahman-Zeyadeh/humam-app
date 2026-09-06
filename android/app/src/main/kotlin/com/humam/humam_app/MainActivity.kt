@@ -1,9 +1,12 @@
 package com.humam.humam_app
 
+import android.app.NotificationManager
 import android.content.ContentValues
+import android.content.Intent
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import android.provider.Settings
 import android.util.Log
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -43,6 +46,60 @@ class MainActivity : AudioServiceActivity() {
                 result.success(saveImageToGallery(bytes, displayName))
             } else {
                 result.notImplemented()
+            }
+        }
+
+        // قناة وضع "لا تُزعجني وقت القراءة" — راجع توثيق إذن
+        // ACCESS_NOTIFICATION_POLICY بـ`AndroidManifest.xml` والجانب
+        // Dart بـ`lib/core/platform/dnd_service.dart`. غير مُختبرة بجهاز
+        // فعلي بعد.
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.humam.humam_app/dnd",
+        ).setMethodCallHandler { call, result ->
+            val notificationManager =
+                getSystemService(NOTIFICATION_SERVICE) as? NotificationManager
+            when (call.method) {
+                "isPolicyAccessGranted" -> {
+                    result.success(notificationManager?.isNotificationPolicyAccessGranted ?: false)
+                }
+                "openPolicyAccessSettings" -> {
+                    try {
+                        startActivity(
+                            Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                        result.success(true)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "فتح إعدادات سياسة الإشعارات فشل", e)
+                        result.success(false)
+                    }
+                }
+                "setDndActive" -> {
+                    val active = call.argument<Boolean>("active") ?: false
+                    if (notificationManager == null ||
+                        notificationManager.isNotificationPolicyAccessGranted != true
+                    ) {
+                        // فشل صامت (`false`) بدل استثناء — الجانب Dart يتحقّق
+                        // من الإذن أولاً أصلاً، هذا فقط حارس أخير.
+                        result.success(false)
+                        return@setMethodCallHandler
+                    }
+                    try {
+                        notificationManager.setInterruptionFilter(
+                            if (active) {
+                                NotificationManager.INTERRUPTION_FILTER_NONE
+                            } else {
+                                NotificationManager.INTERRUPTION_FILTER_ALL
+                            },
+                        )
+                        result.success(true)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "ضبط فلتر المقاطعة فشل", e)
+                        result.success(false)
+                    }
+                }
+                else -> result.notImplemented()
             }
         }
     }

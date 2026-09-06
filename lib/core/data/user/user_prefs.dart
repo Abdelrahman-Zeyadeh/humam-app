@@ -164,6 +164,13 @@ class UserPrefs {
     delayMinutes: delayMinutes,
   );
 
+  // --- وضع "لا تُزعجني وقت القراءة" (راجع dnd_service.dart) ---
+
+  bool get dndWhileReadingEnabled => _repo.dndWhileReadingEnabled;
+
+  Future<void> setDndWhileReadingEnabled(bool value) =>
+      _repo.setDndWhileReadingEnabled(value);
+
   // --- لوحة ألوان صفحة المصحف ---
 
   String get mushafPaletteId => _repo.mushafPaletteId;

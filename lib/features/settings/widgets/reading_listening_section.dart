@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/data/user/user_prefs.dart';
+import '../../../core/platform/dnd_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../audio/audio_downloads_screen.dart';
 import '../../audio/quran_audio_controller.dart';
@@ -78,6 +80,8 @@ class ReadingListeningSection extends ConsumerWidget {
                   ),
                 ),
               ),
+              const Divider(height: 1),
+              const _DndWhileReadingTile(),
               const Divider(height: 1),
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -200,6 +204,66 @@ void _showReciterPickerModal(
       );
     },
   );
+}
+
+/// مفتاح "لا تُزعجني وقت القراءة" — كتم إشعارات الجهاز تلقائياً أثناء فتح
+/// المصحف (راجع `DndService`/`MushafScreen.initState`/`dispose`). تفعيله
+/// أول مرة يطلب تصريح "الوصول لسياسة الإشعارات" الخاص من المستخدم صراحة
+/// (لا رسالة إذن قياسية) — بلا هذا التصريح يبقى المفتاح مفعّلاً بالإعداد
+/// لكن الكتم الفعلي لا يحدث أبداً (`DndService.setActive` تفشل بصمت).
+class _DndWhileReadingTile extends ConsumerWidget {
+  const _DndWhileReadingTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final userPrefs = ref.watch(userPrefsProvider);
+    final enabled = userPrefs.dndWhileReadingEnabled;
+
+    return SwitchListTile.adaptive(
+      secondary: Icon(Icons.do_not_disturb_on_outlined, color: themeAccent(context)),
+      title: const Text('لا تُزعجني وقت القراءة'),
+      subtitle: Text(
+        'يكتم إشعارات الجهاز تلقائياً أثناء فتح المصحف، ويعيدها فور الخروج',
+        style: TextStyle(fontSize: 11.5, color: onSurface.withValues(alpha: 0.6)),
+      ),
+      value: enabled,
+      onChanged: (v) async {
+        if (v) {
+          final granted = await DndService.isPolicyAccessGranted();
+          if (!granted) {
+            if (!context.mounted) return;
+            final proceed = await showDialog<bool>(
+              context: context,
+              builder: (dialogContext) => AlertDialog(
+                title: const Text('إذن إضافي مطلوب'),
+                content: const Text(
+                  'هالميزة تحتاج تصريح "الوصول لسياسة الإشعارات" من إعدادات النظام — سيفتح لك التطبيق شاشة الإعدادات المطلوبة، فعّل هُمَام منها ثم ارجع.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(false),
+                    child: const Text('إلغاء'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(true),
+                    child: const Text('فتح الإعدادات'),
+                  ),
+                ],
+              ),
+            );
+            if (proceed == true) {
+              await DndService.openPolicyAccessSettings();
+            }
+            // ما نفعّل الإعداد قبل رجوع المستخدم من الإعدادات وتأكيد الإذن
+            // فعلياً — يبقى المفتاح مطفياً هون بانتظار محاولة تفعيل تالية.
+            return;
+          }
+        }
+        await ref.read(userPrefsProvider).setDndWhileReadingEnabled(v);
+      },
+    );
+  }
 }
 
 /// شريحة انزلاق دقيقة لحجم خط التفسير والأحاديث والترجمة (وقرآن "قراءة مع

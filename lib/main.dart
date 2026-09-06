@@ -13,6 +13,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/data/hadith/hadith_providers.dart';
+import 'core/platform/dnd_service.dart';
 import 'core/data/user/hifz_prefs.dart';
 import 'core/data/user/location_prefs.dart';
 import 'core/data/user/prefs_migration.dart';
@@ -57,6 +58,16 @@ void main() async {
     await userRepo.preload();
   } catch (e) {
     debugPrint('تحذير: تعذّر التحميل المسبق لبيانات المستخدم: $e');
+  }
+
+  // شبكة أمان لوضع "لا تُزعجني وقت القراءة": لو أُغلق التطبيق (تحطّم/قتل
+  // النظام) أثناء الكتم فعلياً بشاشة المصحف، `MushafScreen.dispose` ما
+  // بتنفَّذ أبداً فيبقى هاتف المستخدم مكتوماً للأبد بلا علمه. استدعاء غير
+  // مشروط هون (بلا انتظار — لا يؤخّر الإقلاع) يُعيد فلتر المقاطعة
+  // للوضع الطبيعي دائماً عند كل إقلاع؛ `DndService.setActive` نفسها آمنة
+  // كلياً لو الإذن غير ممنوح أو لو ماكانت مكتومة أصلاً (فشل صامت).
+  if (!kIsWeb && Platform.isAndroid) {
+    unawaited(DndService.setActive(false));
   }
 
   // حاوية providers نبنيها يدوياً (بدل ProviderScope العادي) لأن

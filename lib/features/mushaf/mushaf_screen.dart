@@ -7,6 +7,7 @@ import '../../core/data/quran/quran_providers.dart';
 import '../../core/data/user/hifz_prefs.dart';
 import '../../core/data/user/khatma_prefs.dart';
 import '../../core/data/user/user_prefs.dart';
+import '../../core/platform/dnd_service.dart';
 import '../../core/data/user/user_repository.dart'
     show BookmarkTypes, UserCategories, UserRepository;
 import '../../core/theme/app_colors.dart';
@@ -181,6 +182,15 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
     ref
         .read(fontDownloadControllerProvider.notifier)
         .requestPageWithPriority(_currentPage);
+
+    // وضع "لا تُزعجني وقت القراءة" — يفعّل الكتم فقط لو الإعداد مفعّل
+    // **والتصريح ممنوح فعلاً** (`DndService` تتحقّق داخلياً وتفشل بصمت
+    // بدونه). لا يُطبَّق بأوضاع اختيار نطاق حفظ فرعية (`pickingHifzRange`)
+    // لأنها شاشة مؤقتة جداً تُفتح وتُغلَق بثوانٍ ضمن تدفّق آخر أصلاً.
+    if (ref.read(userPrefsProvider).dndWhileReadingEnabled &&
+        !widget.pickingHifzRange) {
+      unawaited(DndService.setActive(true));
+    }
   }
 
   @override
@@ -189,6 +199,10 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
     _highlightClearTimer?.cancel();
     _readingLogIdleTimer?.cancel();
     _flushReadingLog();
+    if (ref.read(userPrefsProvider).dndWhileReadingEnabled &&
+        !widget.pickingHifzRange) {
+      unawaited(DndService.setActive(false));
+    }
     if (widget.pickingHifzRange) {
       // نفس قيد Riverpod يشمل `dispose` أيضاً (مذكور صراحة برسالة الخطأ) —
       // لا يمكن نقل هذا لمعالِج زر (التخلّص يحصل أيضاً بزر رجوع النظام/سحبة
