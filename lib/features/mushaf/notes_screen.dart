@@ -63,61 +63,134 @@ class NotesScreen extends ConsumerWidget {
               ),
             );
           }
-          return ListView.separated(
-            padding: const EdgeInsets.only(bottom: 24, top: 8),
+          // بطلب صريح "عدل على شكل ظهور الآيات لو تكون بقالب" — بطاقة
+          // مستقلة لكل ملاحظة بدل `ListTile` مضغوطة (كانت تقصّ نص الآية
+          // بسطرين فقط وتخلط الملاحظة بالنص الفرعي)، بنفس لغة التصميم
+          // المعتمَدة بشاشات مشابهة (`mutashabihat_screen.dart._MutashabihCard`).
+          return ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             itemCount: entries.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (context, index) {
-              final entry = entries[index];
-              return ListTile(
-                title: Text(
-                  // راجع توثيق [stripQuranicMarksForDisplay].
+            itemBuilder: (context, index) => _NoteCard(
+              entry: entries[index],
+              onDelete: () async {
+                await ref.read(userPrefsProvider).clearNoteForAyah(entries[index].ayah.id);
+                ref.read(ayahNoteVersionProvider.notifier).bump();
+              },
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => MushafScreen(initialPage: entries[index].ayah.page)),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _NoteCard extends StatelessWidget {
+  const _NoteCard({required this.entry, required this.onDelete, required this.onTap});
+  final _NoteEntry entry;
+  final VoidCallback onDelete;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? AppColors.lineDark : AppColors.line),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.goldDeep.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${entry.surahName} · آية ${entry.ayah.ayah}',
+                        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: AppColors.goldDeep),
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      'صفحة ${entry.ayah.page}',
+                      style: TextStyle(fontSize: 11, color: onSurface.withValues(alpha: 0.5)),
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                      tooltip: 'حذف الملاحظة',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: onDelete,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // نص الآية كاملاً (لا قصّ بسطرين كالسابق) — راجع توثيق
+                // [stripQuranicMarksForDisplay].
+                Text(
                   stripQuranicMarksForDisplay(entry.ayah.textUthmani),
                   textDirection: TextDirection.rtl,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: onSurface, fontSize: 15, height: 1.6),
+                  textAlign: TextAlign.justify,
+                  style: TextStyle(
+                    fontFamily: 'AmiriQuran',
+                    fontSize: 18,
+                    height: 2.0,
+                    color: onSurface,
+                  ),
                 ),
-                subtitle: Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Column(
+                const SizedBox(height: 12),
+                // الملاحظة بصندوق مستقل بصرياً — لا تختلط بالنص الفرعي كما
+                // كان بالتصميم السابق.
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF162232) : const Color(0xFFF9F7F2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: isDark ? AppColors.lineDark : AppColors.line.withValues(alpha: 0.5)),
+                  ),
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        entry.note.noteText,
-                        textDirection: TextDirection.rtl,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontStyle: FontStyle.italic,
-                          color: onSurface.withValues(alpha: 0.75),
+                      Icon(Icons.edit_note_rounded, size: 18, color: onSurface.withValues(alpha: 0.5)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          entry.note.noteText,
+                          textDirection: TextDirection.rtl,
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            height: 1.6,
+                            color: onSurface.withValues(alpha: 0.85),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${entry.surahName} · آية ${entry.ayah.ayah} · صفحة ${entry.ayah.page}',
-                        style: const TextStyle(fontSize: 12, color: AppColors.inkSoft),
                       ),
                     ],
                   ),
                 ),
-                isThreeLine: true,
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                  tooltip: 'حذف الملاحظة',
-                  onPressed: () async {
-                    await ref.read(userPrefsProvider).clearNoteForAyah(entry.ayah.id);
-                    ref.read(ayahNoteVersionProvider.notifier).bump();
-                  },
-                ),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => MushafScreen(initialPage: entry.ayah.page)),
-                ),
-              );
-            },
-          );
-        },
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
