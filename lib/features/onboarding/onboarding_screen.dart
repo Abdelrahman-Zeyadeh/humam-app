@@ -98,6 +98,19 @@ final List<_TourStep> _kTourSteps = [
         'استمع لأكثر من ١٠ قرّاء مع تكرار الآيات والتحكم بالسرعة والتظليل المتزامن.',
   ),
 
+  // 4.5 المصحف - فهرس السور والتنقّل السريع
+  _TourStep(
+    tabIndex: 1,
+    targetKey: mushafSurahIndexButtonKey,
+    isCircle: true,
+    title: 'فهرس السور والتنقّل السريع',
+    badge: 'المصحف',
+    icon: Icons.list_alt_rounded,
+    accentColor: const Color(0xFF6D4C41),
+    shortDescription:
+        'اقفز مباشرة لأي سورة أو جزء، أو ابحث بالاسم أو بكلمة من الآية.',
+  ),
+
   // 5. الصلاة - بوصلة القبلة
   _TourStep(
     tabIndex: 2,
@@ -160,16 +173,44 @@ final List<_TourStep> _kTourSteps = [
         'وصول سريع للأذكار اليومية بعداد ذكي، ومكتبة حصن المسلم الكاملة (١٣١ قسماً).',
   ),
 
-  // 10. أدواتي - الختمات والمجموعات والأحاديث
+  // 10. أدواتي - خطط الختمة والحفظ (بطلب صريح "خليه تعريف شامل على مزايا
+  // التطبيق" — استُخدمت هون ٣ مفاتيح كانت مُعرَّفة أصلاً بـ
+  // onboarding_target_keys.dart ومربوطة بواجهاتها الحقيقية (more_placeholder_
+  // screen.dart) لكن بلا خطوة جولة تخصّها، فتصفّح خطوة واحدة سابقاً
+  // بلا تركيز دقيق لكل قسم — الآن كل قسم يُظهَر بدائرة تركيز خاصة به).
   _TourStep(
     tabIndex: 4,
     targetKey: toolsKhatmaCardKey,
-    title: 'الختمات والمجموعات والأحاديث',
+    title: 'خطط الختمة والحفظ',
     badge: 'أدواتي',
-    icon: Icons.grid_view_rounded,
+    icon: Icons.menu_book_rounded,
     accentColor: const Color(0xFF9D4EDD),
     shortDescription:
-        'خطط ختم القرآن وحفظه، مجموعات التنافس مع الأصدقاء، وموسوعة الأحاديث النبوية.',
+        'خطط ختم القرآن وحفظه بوتيرة يومية تُحسَب تلقائياً، مع متابعة وتقارير تقدّم.',
+  ),
+
+  // 11. أدواتي - مجموعات الصحبة والمنافسة
+  _TourStep(
+    tabIndex: 4,
+    targetKey: toolsGroupsCardKey,
+    title: 'مجموعات الصحبة والمنافسة',
+    badge: 'أدواتي',
+    icon: Icons.people_alt_rounded,
+    accentColor: const Color(0xFF3F8275),
+    shortDescription:
+        'أنشئ مجموعة مع أصدقائك أو انضم برمز/رابط دعوة مباشر، وتنافسوا بلوحة صدارة وتحديات بموعد نهائي.',
+  ),
+
+  // 12. أدواتي - المكتبة والعلوم (الأحاديث والتفاسير)
+  _TourStep(
+    tabIndex: 4,
+    targetKey: toolsHadithCardKey,
+    title: 'مكتبة الأحاديث والعلوم الشرعية',
+    badge: 'أدواتي',
+    icon: Icons.local_library_rounded,
+    accentColor: const Color(0xFFE07A5F),
+    shortDescription:
+        'موسوعة أحاديث نبوية كاملة قابلة للتنزيل، وأدوات علمية (تجويد، متشابهات، تحقّق من الحديث).',
   ),
 ];
 
