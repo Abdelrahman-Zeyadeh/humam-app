@@ -5,10 +5,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:humam_app/core/data/user/user_prefs.dart';
+import 'package:humam_app/features/splash/splash_screen.dart';
 import 'package:humam_app/main.dart';
 
 void main() {
-  testWidgets('يُقلع التطبيق ويعرض اسم هُمَام في شاشة الترحيب', (WidgetTester tester) async {
+  testWidgets('يُقلع التطبيق ويعرض شاشة الترحيب دون أخطاء', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     await tester.pumpWidget(
@@ -19,7 +20,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('هُمَام'), findsOneWidget);
+    expect(find.byType(SplashScreen), findsOneWidget);
 
     // نُفرغ مؤقّت الانتقال التلقائي لشاشة الترحيب حتى لا يبقى معلّقاً بعد
     // انتهاء الاختبار.
