@@ -15,6 +15,8 @@ import 'widgets/daily_hadith_fawaid_card.dart';
 import 'widgets/daily_hadith_index_sheet.dart';
 import 'widgets/daily_hadith_navigation_bar.dart';
 import 'widgets/daily_hadith_notification_card.dart';
+import '../story_maker/models/story_content.dart';
+import '../story_maker/ui/ayah_story_maker_screen.dart';
 
 // يُعاد تصدير طبقة البيانات هنا حتى تبقى الاستيرادات القديمة من
 // `daily_hadith_screen.dart` (مثل `show kCuratedDailyHadiths`) تعمل دون
@@ -195,6 +197,22 @@ class _DailyHadithScreenState extends ConsumerState<DailyHadithScreen> {
           DailyHadithCard(
             hadith: hadith,
             onCopy: () => _copyHadith(hadith),
+            onDesignCard: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => AyahStoryMakerScreen(
+                    initialContent: HadithContent(
+                      hadithText: hadith.matn,
+                      narrator: hadith.narrator,
+                      sourceBook: '${hadith.source} (${hadith.grade})',
+                      explanation: hadith.fawaid.isNotEmpty
+                          ? hadith.fawaid.first
+                          : null,
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 20),
 
