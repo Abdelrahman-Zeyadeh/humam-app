@@ -16,6 +16,8 @@ import '../hadith/hadith_detail_screen.dart';
 import '../mushaf/mushaf_settings.dart' show mushafJumpRequestProvider;
 import '../shell/root_shell.dart';
 
+import '../../core/data/quran/quran_topics_data.dart';
+
 /// نتيجة أذكار واحدة مطابقة للبحث — الفئة الأصلية (للتنقّل) + الذكر نفسه
 /// (للعرض).
 class _AzkarSearchHit {
@@ -44,6 +46,7 @@ class _UnifiedSearchScreenState extends ConsumerState<UnifiedSearchScreen> {
   Timer? _debounce;
   String _query = '';
 
+  List<QuranTopic> _matchedTopics = [];
   List<AyahSearchResult> _ayahResults = [];
   List<HadithSearchResult> _hadithResults = [];
   List<_AzkarSearchHit> _azkarResults = [];
@@ -62,6 +65,7 @@ class _UnifiedSearchScreenState extends ConsumerState<UnifiedSearchScreen> {
     if (value.trim().length < 2) {
       setState(() {
         _query = value;
+        _matchedTopics = [];
         _ayahResults = [];
         _hadithResults = [];
         _azkarResults = [];
@@ -80,6 +84,8 @@ class _UnifiedSearchScreenState extends ConsumerState<UnifiedSearchScreen> {
     final token = ++_searchToken;
     final quranRepo = ref.read(quranRepositoryProvider);
     final hadithRepo = ref.read(hadithRepositoryProvider);
+
+    final topics = searchQuranTopics(query);
 
     final results = await Future.wait([
       quranRepo.search(query, limit: _kMaxResultsPerSection),
@@ -104,6 +110,7 @@ class _UnifiedSearchScreenState extends ConsumerState<UnifiedSearchScreen> {
     }
 
     setState(() {
+      _matchedTopics = topics;
       _ayahResults = results[0] as List<AyahSearchResult>;
       _hadithResults = results[1] as List<HadithSearchResult>;
       _azkarResults = azkarHits;
@@ -117,13 +124,18 @@ class _UnifiedSearchScreenState extends ConsumerState<UnifiedSearchScreen> {
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
+  void _selectTopic(QuranTopic topic) {
+    _controller.text = topic.title.split(' ').first;
+    _onQueryChanged(_controller.text);
+  }
+
   @override
   Widget build(BuildContext context) {
     // يضمن تحميل مكتبة الأذكار قبل أول بحث فعلي (عادة جاهزة سلفاً —
     // الشاشة الرئيسية تراقبها أصلاً بمكان آخر بالتطبيق).
     ref.watch(azkarLibraryProvider);
     final hasQuery = _query.trim().length >= 2;
-    final hasAnyResult = _ayahResults.isNotEmpty || _hadithResults.isNotEmpty || _azkarResults.isNotEmpty;
+    final hasAnyResult = _matchedTopics.isNotEmpty || _ayahResults.isNotEmpty || _hadithResults.isNotEmpty || _azkarResults.isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(
@@ -132,7 +144,7 @@ class _UnifiedSearchScreenState extends ConsumerState<UnifiedSearchScreen> {
           autofocus: true,
           textInputAction: TextInputAction.search,
           decoration: const InputDecoration(
-            hintText: 'ابحث بالقرآن والحديث والأذكار...',
+            hintText: 'ابحث بالقرآن، المواضيع، الحديث، الأذكار...',
             border: InputBorder.none,
           ),
           onChanged: _onQueryChanged,
@@ -149,9 +161,40 @@ class _UnifiedSearchScreenState extends ConsumerState<UnifiedSearchScreen> {
         ],
       ),
       body: !hasQuery
-          ? const EmptyState(
-              icon: Icons.search_outlined,
-              message: 'اكتب حرفين على الأقل للبحث بالقرآن والحديث والأذكار',
+          ? ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(Icons.topic_outlined, size: 18, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'مواضيع قرآنية شائعة',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final topic in kQuranTopics)
+                      ActionChip(
+                        avatar: Text(topic.icon, style: const TextStyle(fontSize: 14)),
+                        label: Text(topic.title),
+                        onPressed: () => _selectTopic(topic),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 32),
+                const EmptyState(
+                  icon: Icons.search_outlined,
+                  message: 'اكتب موضوعاً أو كلمة للبحث بالقرآن والحديث والأذكار',
+                  subtitle: 'مثال: بر الوالدين، الصبر، التوبة، قيام الليل...',
+                ),
+              ],
             )
           : _isSearching
               ? const Center(child: CircularProgressIndicator())
@@ -163,6 +206,21 @@ class _UnifiedSearchScreenState extends ConsumerState<UnifiedSearchScreen> {
                   : ListView(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                       children: [
+                        if (_matchedTopics.isNotEmpty)
+                          _ResultSection(
+                            title: 'مواضيع قرآنية مطابقة',
+                            icon: Icons.auto_awesome_outlined,
+                            children: [
+                              for (final topic in _matchedTopics)
+                                ListTile(
+                                  leading: Text(topic.icon, style: const TextStyle(fontSize: 22)),
+                                  title: Text(topic.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                                  subtitle: Text(topic.description, style: const TextStyle(fontSize: 12)),
+                                  trailing: const Icon(Icons.chevron_left, size: 18),
+                                  onTap: () => _selectTopic(topic),
+                                ),
+                            ],
+                          ),
                         if (_ayahResults.isNotEmpty)
                           _ResultSection(
                             title: 'القرآن الكريم',
@@ -253,6 +311,12 @@ class _ResultSection extends StatelessWidget {
   }
 }
 
+/// شكل نتيجة آية أرقى (بطلب صريح "شكل الآيات عند البحث") — كانت `ListTile`
+/// مجرّدة بنص خام غير مُنظَّف (`textUthmani` بلا `stripQuranicMarksForDisplay`،
+/// نفس القطع الظاهر بخط AmiriQuran الموثَّق بأماكن أخرى بالمشروع) وبلا شارة
+/// موقع واضحة، بخلاف بطاقة نتائج المصحف المخصَّصة (`mushaf_search_screen.
+/// dart._AyahResultCard`) — الآن نفس مستوى الجودة: نص منظَّف بارتفاع سطر
+/// مريح، وشارة "سورة · آية · صفحة" بدل سطر فرعي عادي.
 class _AyahResultTile extends StatelessWidget {
   const _AyahResultTile({required this.result, required this.onTap});
   final AyahSearchResult result;
@@ -260,19 +324,49 @@ class _AyahResultTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    return InkWell(
       onTap: onTap,
-      title: Text(
-        result.ayah.textUthmani,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontFamily: 'AmiriQuran', fontSize: 15),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              stripQuranicMarksForDisplay(result.ayah.textUthmani),
+              textDirection: TextDirection.rtl,
+              textAlign: TextAlign.justify,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontFamily: 'AmiriQuran', fontSize: 17, height: 1.8, color: onSurface),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.goldDeep.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '${result.surahNameAr} · آية ${result.ayah.ayah}',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.goldDeep),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  'صفحة ${result.ayah.page}',
+                  style: TextStyle(fontSize: 11, color: onSurface.withValues(alpha: 0.5)),
+                ),
+                const SizedBox(width: 4),
+                Icon(Icons.chevron_left, size: 16, color: onSurface.withValues(alpha: 0.4)),
+              ],
+            ),
+          ],
+        ),
       ),
-      subtitle: Text(
-        '${result.surahNameAr} • آية ${result.ayah.ayah}',
-        style: TextStyle(fontSize: 11, color: AppColors.goldDeep),
-      ),
-      trailing: const Icon(Icons.chevron_left, size: 18),
     );
   }
 }
