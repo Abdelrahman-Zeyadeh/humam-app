@@ -10,6 +10,7 @@ import 'widgets/hourly_dhikr_section.dart';
 import 'widgets/qiyam_reminder_row.dart';
 import 'widgets/reminder_section_title.dart';
 import 'widgets/sunnah_reminders_section.dart';
+import 'widgets/weekly_summary_reminder_row.dart';
 
 /// شاشة "التذكيرات" — كل ما يخصّ تذكيرات التطبيق مجمَّعاً بمكان واحد
 /// (كانت موزَّعة داخل شاشة الإعدادات نفسها: تذكيرات يومية، أذكار كل ساعة،
@@ -53,6 +54,8 @@ class RemindersScreen extends StatelessWidget {
                 ),
                 const Divider(height: 1),
                 const EveningSummaryReminderRow(),
+                const Divider(height: 1),
+                const WeeklySummaryReminderRow(),
                 const Divider(height: 1),
                 // بطلب صاحب المشروع "اشعارات التذكير الموجودة بكل مكان
                 // اجمعها بمكان واحد" — تذكير قيام الليل والحفظ كانا مخفيَّين

@@ -30,6 +30,47 @@ const _kFardCategories = [
   UserCategories.isha,
 ];
 
+/// نسبة الأيام المكتملة (0-100) لأسبوع فئة واحدة — `null`/فارغ يُحتسَب
+/// صفراً (لا بيانات = لا إنجاز، لا استبعاد من المتوسط).
+@visibleForTesting
+double weekCompletionRate(List<bool>? week) {
+  if (week == null || week.isEmpty) return 0;
+  return week.where((d) => d).length / week.length * 100;
+}
+
+/// **درجة إيمانية إجمالية موحَّدة (0-100)** — دالة نقية بلا أي اعتماد على
+/// Riverpod/`UserRepository`/الوقت الحالي، مفصولة عمداً عن
+/// `weeklyReportProvider` لتكون قابلة للاختبار مباشرة بمُدخلات جاهزة
+/// (راجع `test/weekly_report_score_test.dart`). التفاصيل الكاملة
+/// (الأقسام الخمسة، الأوزان المتساوية، معنى غياب خطة ختمة) موثّقة بـ
+/// [WeeklyReportData.overallScorePercent] — هذا الملف هو مصدر الحقيقة
+/// الوحيد لصيغة الحساب، لا تُكرَّر بمكان آخر.
+@visibleForTesting
+int computeOverallScorePercent({
+  required Map<String, List<bool>> categoryWeeks,
+  required int? khatmaProgressPercent,
+}) {
+  final fardRate = _kFardCategories.isEmpty
+      ? 0.0
+      : _kFardCategories.map((c) => weekCompletionRate(categoryWeeks[c])).reduce((a, b) => a + b) /
+            _kFardCategories.length;
+  final azkarRate =
+      (weekCompletionRate(categoryWeeks[UserCategories.morningAzkar]) +
+          weekCompletionRate(categoryWeeks[UserCategories.eveningAzkar]) +
+          weekCompletionRate(categoryWeeks[UserCategories.nightAzkar])) /
+      3;
+  final sectionScores = <double>[
+    fardRate,
+    weekCompletionRate(categoryWeeks[UserCategories.hifz]),
+    azkarRate,
+    weekCompletionRate(categoryWeeks[UserCategories.qiyam]),
+    if (khatmaProgressPercent != null) khatmaProgressPercent.toDouble(),
+  ];
+  return sectionScores.isEmpty
+      ? 0
+      : (sectionScores.reduce((a, b) => a + b) / sectionScores.length).round();
+}
+
 class WeeklyReportData {
   const WeeklyReportData({
     required this.categoryWeeks,
@@ -73,11 +114,16 @@ class WeeklyReportData {
       _kFardCategories.fold(0, (sum, c) => sum + (categoryWeeks[c]?.where((d) => d).length ?? 0));
 }
 
-/// يجمع بيانات التقرير للأسبوع الحالي الثابت (من السبت إلى الجمعة)
-final weeklyReportProvider = FutureProvider.autoDispose<WeeklyReportData>((ref) async {
-  ref.watch(categoryStreakVersionProvider);
-  final prefs = ref.watch(userPrefsProvider);
-
+/// يجمع بيانات التقرير للأسبوع الحالي الثابت (من السبت إلى الجمعة) — دالة
+/// عادية (لا `ref`) لتكون قابلة للاستدعاء أيضاً من خارج شجرة Riverpod
+/// (`weekly_summary_text.dart` بـ`main.dart` عند إعادة جدولة إشعار "ملخّص
+/// الأسبوع" بكل إقلاع، بنفس نمط `buildEveningSummaryBodyFor`). مصدر
+/// الحقيقة الوحيد لبيانات التقرير — [weeklyReportProvider] تحته مجرّد
+/// غلاف Riverpod رقيق.
+Future<WeeklyReportData> loadWeeklyReportData(
+  UserPrefs prefs,
+  KhatmaPrefs khatmaPrefs,
+) async {
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
   final daysSinceSaturday = (today.weekday % 7 + 1) % 7;
@@ -99,7 +145,7 @@ final weeklyReportProvider = FutureProvider.autoDispose<WeeklyReportData>((ref) 
 
   // خطة الختمة الأكثر تقدّماً بين خطط المستخدم النشطة (لو أكثر من خطة) —
   // لا معنى لجمع تقدّم خطط متعددة، فنعرض الأبرز فقط.
-  final khatmaPlans = ref.watch(khatmaPrefsProvider).activePlans;
+  final khatmaPlans = khatmaPrefs.activePlans;
   int? khatmaProgressPercent;
   var khatmaPagesRemaining = 0;
   if (khatmaPlans.isNotEmpty) {
@@ -116,31 +162,14 @@ final weeklyReportProvider = FutureProvider.autoDispose<WeeklyReportData>((ref) 
     khatmaPagesRemaining = (best.totalPagesToRead - read).clamp(0, 604);
   }
 
-  // درجة إجمالية موحَّدة — راجع توثيق [WeeklyReportData.overallScorePercent].
-  double weekRate(String category) {
-    final week = weeks[category];
-    if (week == null || week.isEmpty) return 0;
-    return week.where((d) => d).length / week.length * 100;
-  }
-
-  final fardRate = _kFardCategories.isEmpty
-      ? 0.0
-      : _kFardCategories.map(weekRate).reduce((a, b) => a + b) / _kFardCategories.length;
-  final azkarRate =
-      (weekRate(UserCategories.morningAzkar) +
-          weekRate(UserCategories.eveningAzkar) +
-          weekRate(UserCategories.nightAzkar)) /
-      3;
-  final sectionScores = <double>[
-    fardRate,
-    weekRate(UserCategories.hifz),
-    azkarRate,
-    weekRate(UserCategories.qiyam),
-    if (khatmaProgressPercent != null) khatmaProgressPercent.toDouble(),
-  ];
-  final overallScorePercent = sectionScores.isEmpty
-      ? 0
-      : (sectionScores.reduce((a, b) => a + b) / sectionScores.length).round();
+  // درجة إجمالية موحَّدة — راجع توثيق [WeeklyReportData.overallScorePercent]
+  // ودالة [computeOverallScorePercent] النقية (مفصولة عمداً لتكون قابلة
+  // للاختبار بلا محاكاة Riverpod/`UserRepository` كاملَين — راجع
+  // `test/weekly_report_score_test.dart`).
+  final overallScorePercent = computeOverallScorePercent(
+    categoryWeeks: weeks,
+    khatmaProgressPercent: khatmaProgressPercent,
+  );
 
   return WeeklyReportData(
     categoryWeeks: weeks,
@@ -153,6 +182,14 @@ final weeklyReportProvider = FutureProvider.autoDispose<WeeklyReportData>((ref) 
     khatmaPagesRemaining: khatmaPagesRemaining,
     overallScorePercent: overallScorePercent,
   );
+}
+
+/// غلاف Riverpod رقيق حول [loadWeeklyReportData] — راجع توثيقها.
+final weeklyReportProvider = FutureProvider.autoDispose<WeeklyReportData>((ref) async {
+  ref.watch(categoryStreakVersionProvider);
+  final prefs = ref.watch(userPrefsProvider);
+  final khatmaPrefs = ref.watch(khatmaPrefsProvider);
+  return loadWeeklyReportData(prefs, khatmaPrefs);
 });
 
 /// تقرير أسبوعي منظم بأيام ثابتة من السبت إلى الجمعة

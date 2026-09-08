@@ -101,6 +101,11 @@ const _kEveningSummaryChannelName = 'الملخّص المسائي';
 const _kEveningSummaryNotifId =
     9650; // بين مدى الإمساك (٩٦٠٠+) ومدى السنن (٩٧٠٠+) عمداً
 
+const _kWeeklySummaryChannelId = 'weekly_summary_ch';
+const _kWeeklySummaryChannelName = 'ملخّص الأسبوع';
+const _kWeeklySummaryNotifId =
+    9660; // بين الملخّص المسائي (٩٦٥٠) ومدى السنن (٩٧٠٠+) عمداً
+
 const _kSunnahChannelId = 'sunnah_reminder_ch';
 const _kSunnahChannelName = 'تذكير السنن والأيام الفاضلة';
 const _kKahfNotifId = 9700;
@@ -1009,6 +1014,7 @@ class AdhanNotificationService {
     int checkinFirstDelayMinutes = 15,
     bool postPrayerAzkarEnabled = false,
     int postPrayerAzkarDelayMinutes = 5,
+    int Function(PrayerMoment)? getIqamahMinutesFor,
   }) async {
     if (!_initialized) await initialize();
     await cancelAll();
@@ -1104,16 +1110,17 @@ class AdhanNotificationService {
         );
       }
 
-      // 4. تنبيه "أذكار بعد الصلاة": مستقل عن متابعة "هل صليت؟" وعن تفعيل
-      // إشعار الأذان نفسه، لكن **يحترم نفس تفعيل الصلاة** (`isEnabled`) —
-      // لو عطّل المستخدم صلاة معينة من الإعدادات لا تصله تذكيرها.
+      // 4. تنبيه "أذكار بعد الصلاة": يبدأ حسابه بعد الإقامة (أو وقت الأذان + مدة الإقامة)
+      // بطلب المستخدم صراحة ("بعد الاقامة مش الاذان").
       if (postPrayerAzkarEnabled &&
           isEnabled(p.moment) &&
           i < _kPostPrayerAzkarMaxSlots) {
+        final iqamahMins = getIqamahMinutesFor?.call(p.moment) ?? 15;
+        final iqamahTime = p.time.add(Duration(minutes: iqamahMins));
         await _schedulePostPrayerAzkarOne(
           slotIndex: i,
           prayer: p.moment,
-          prayerTime: p.time,
+          prayerTime: iqamahTime,
           boundary: p.boundary,
           delayMinutes: postPrayerAzkarDelayMinutes,
         );
@@ -1793,6 +1800,66 @@ class AdhanNotificationService {
 
   Future<void> cancelEveningSummary() async {
     await _plugin.cancel(id: _kEveningSummaryNotifId);
+  }
+
+  /// ملخّص نهاية الأسبوع — نفس فكرة [scheduleEveningSummary] بالضبط
+  /// (محتوى محسوب فعلياً وقت الاستدعاء، لا نص ثابت، فلا `matchDateTimeComponents:
+  /// .time`؛ جدولة **مرّة واحدة فقط** لأقرب [weekday] قادم، ويُعاد استدعاؤها
+  /// بكل إقلاع من `main.dart` لتحديث المحتوى — راجع نفس القيد الموثَّق هناك).
+  /// [weekday] يطابق ثوابت `DateTime.friday` وغيرها؛ الافتراضي الجمعة لأنها
+  /// نهاية الأسبوع الثابت المستخدَم بـ`weekly_report_screen.dart`
+  /// (السبت..الجمعة).
+  Future<void> scheduleWeeklySummary({
+    required int hour,
+    required int minute,
+    required String body,
+    int weekday = DateTime.friday,
+  }) async {
+    if (!_initialized) await initialize();
+
+    final now = tz.TZDateTime.now(tz.local);
+    var scheduled = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      hour,
+      minute,
+    );
+    while (scheduled.weekday != weekday || !scheduled.isAfter(now)) {
+      scheduled = scheduled.add(const Duration(days: 1));
+    }
+
+    final details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        _kWeeklySummaryChannelId,
+        _kWeeklySummaryChannelName,
+        channelDescription: 'ملخّص أسبوعي للدرجة الإيمانية الموحَّدة (فرائض/حفظ/أذكار/قيام/ختمة)',
+        importance: Importance.defaultImportance,
+        priority: Priority.defaultPriority,
+      ),
+      iOS: const DarwinNotificationDetails(),
+    );
+
+    Future<void> schedule(AndroidScheduleMode mode) => _plugin.zonedSchedule(
+      id: _kWeeklySummaryNotifId,
+      title: 'ملخّص أسبوعك 📊',
+      body: body,
+      scheduledDate: scheduled,
+      notificationDetails: details,
+      androidScheduleMode: mode,
+    );
+
+    try {
+      await schedule(AndroidScheduleMode.exactAllowWhileIdle);
+    } catch (e) {
+      debugPrint('جدولة دقيقة لملخّص الأسبوع فشلت، تراجع لجدولة تقريبية: $e');
+      await schedule(AndroidScheduleMode.inexactAllowWhileIdle);
+    }
+  }
+
+  Future<void> cancelWeeklySummary() async {
+    await _plugin.cancel(id: _kWeeklySummaryNotifId);
   }
 
   /// تذكير يومي لعادة مخصّصة واحدة (`habitId`) — راجع توثيق

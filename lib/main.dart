@@ -15,6 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'core/data/hadith/hadith_providers.dart';
 import 'core/platform/dnd_service.dart';
 import 'core/data/user/hifz_prefs.dart';
+import 'core/data/user/khatma_prefs.dart';
 import 'core/data/user/location_prefs.dart';
 import 'core/data/user/prefs_migration.dart';
 import 'core/data/user/user_database.dart';
@@ -30,6 +31,7 @@ import 'features/notifications/adhan_notification_service.dart';
 import 'features/notifications/evening_summary_text.dart';
 import 'features/notifications/reminder_messages.dart';
 import 'features/notifications/smart_reminder_sync.dart';
+import 'features/notifications/weekly_summary_text.dart';
 import 'features/prayer/prayer_location_controller.dart';
 import 'features/splash/splash_screen.dart';
 
@@ -206,6 +208,7 @@ Future<void> _initAdhanNotificationsInBackground(
         checkinFirstDelayMinutes: userPrefs.prayerCheckinFirstDelayMinutes,
         postPrayerAzkarEnabled: userPrefs.postPrayerAzkarEnabled,
         postPrayerAzkarDelayMinutes: userPrefs.postPrayerAzkarDelayMinutes,
+        getIqamahMinutesFor: (m) => userPrefs.iqamahMinutesFor(m.name),
       );
     }
   } catch (e) {
@@ -401,6 +404,26 @@ Future<void> _initAdhanNotificationsInBackground(
     debugPrint('إعادة جدولة الملخّص المسائي فشلت: $e');
   }
 
+  // ملخّص الأسبوع: نفس فكرة الملخّص المسائي أعلاه بالضبط (محتوى حيّ يحتاج
+  // إعادة تعبئة بكل إقلاع) لكن على مستوى الأسبوع — راجع توثيق
+  // `scheduleWeeklySummary`/`buildWeeklySummaryBodyFor`.
+  try {
+    final userPrefs = container.read(userPrefsProvider);
+    const category = 'weekly_summary';
+    final hour = userPrefs.reminderHourFor(category);
+    if (userPrefs.reminderEnabledFor(category) && hour != null) {
+      final khatmaPrefs = container.read(khatmaPrefsProvider);
+      final body = await buildWeeklySummaryBodyFor(userPrefs, khatmaPrefs);
+      await AdhanNotificationService.instance.scheduleWeeklySummary(
+        hour: hour,
+        minute: userPrefs.reminderMinuteFor(category),
+        body: body,
+      );
+    }
+  } catch (e) {
+    debugPrint('إعادة جدولة ملخّص الأسبوع فشلت: $e');
+  }
+
   // تذكير "الورد اليومي" الذكي — يُلغى تلقائياً لو المستخدم قرأ اليوم
   // فعلاً (بدل تذكير أعمى يتكرر بلا وعي بالإنجاز)، راجع توثيق
   // `syncDailyWirdReminder` الكامل.
@@ -447,6 +470,7 @@ class HumamApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
+    final isAmoled = ref.watch(amoledDarkModeProvider);
     ref.watch(accentColorVersionProvider);
     final accent = appAccentColorById(
       ref.read(userPrefsProvider).accentColorId,
@@ -455,7 +479,7 @@ class HumamApp extends ConsumerWidget {
       title: 'هُمَام',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(accent: accent),
-      darkTheme: AppTheme.dark(accent: accent),
+      darkTheme: AppTheme.dark(accent: accent, isAmoled: isAmoled),
       themeMode: themeMode,
       locale: const Locale('ar'),
       supportedLocales: const [Locale('ar')],
