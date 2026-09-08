@@ -138,23 +138,31 @@ class DuroosRepository {
   /// بحث midad.com عن اسم الشيخ — يرجع محاضرات مفردة فقط (نتجاهل نوع
   /// "collection" لأنها تحتاج جلباً إضافياً لعناصرها الفرعية، وخارج نطاق
   /// هذه الميزة حالياً). لا `audioUrl` هنا عمداً — يُجلب لاحقاً لحظة فتح
-  /// المحاضرة تحديداً عبر [fetchMidadLessonAudio] (راجع سبب ذلك بتوثيق
+  /// المحاضرة تحديداً عبر [fetchMidadEntryAudio] (راجع سبب ذلك بتوثيق
   /// `DuroosSourceKind.midad`).
-  Future<DuroosPage> fetchMidadSearch(String query) async {
-    // `entry_type` **بلا** `recitation` عمداً — بطلب صريح ("رابط السعيدان
-    // وعامر بهجت مش شغال، اتاكد منهم"): تحقّقت فعلياً بمتصفح حقيقي على
-    // midad.com، والسبب مزدوج:
+  /// [isRecitation] يبحث عن **تلاوات قرآن** (`/recitation/<id>`، بطلب
+  /// صريح "التلاوات ممكن تضيفها لقسم الاستماع") بدل محاضرات علمية عادية
+  /// (`/lesson/<id>`، الافتراضي). راجع `DuroosSource.midadIsRecitation`.
+  Future<DuroosPage> fetchMidadSearch(
+    String query, {
+    bool isRecitation = false,
+  }) async {
+    // `entry_type` **بلا** `recitation` للمحاضرات العادية عمداً — بطلب
+    // صريح ("رابط السعيدان وعامر بهجت مش شغال، اتاكد منهم"): تحقّقت فعلياً
+    // بمتصفح حقيقي على midad.com، والسبب مزدوج:
     // ١. إدراج `recitation` بالقائمة كان يُغرق نتائج الشيوخ الذين سجّلوا
     //    ختمة قرآن أيضاً (كالسعيدان) بمئات نتائج "سورة كذا" (تلاوة، لا
     //    محاضرة أصلاً)، تتصدّر ترتيب النتائج فتزيح المحاضرات الفعلية خارج
-    //    أول ٢٠ نتيجة المضمَّنة بالصفحة — يتحقّق منها المسار الفرعي التالي.
+    //    أول ٢٠ نتيجة المضمَّنة بالصفحة. [isRecitation] يعكس هذا: يطلب
+    //    "recitation" فقط بدل استبعادها — لسور المصحف المرتَّل نفسه.
     // ٢. `_extractInertiaJson` كان يقرأ `props.data.data.hits` (مستويان
     //    `data`) — الصحيح فعلياً `props.data.data.data.hits` (**ثلاثة**
     //    مستويات)، تحقّقت منه مباشرة بمحتوى الصفحة الحقيقي. لو تغيّر بنية
     //    الموقع لاحقاً (ربما كان صحيحاً سابقاً وتغيّر)، هذا أول موضع يُراجَع.
+    final entryType = isRecitation ? 'recitation' : 'lesson-article-audiobook-video';
     final url = 'https://midad.com/search'
         '?q=${Uri.encodeQueryComponent(query)}'
-        '&entry_type=lesson-article-audiobook-video'
+        '&entry_type=$entryType'
         '&type=collection-entry';
     final response = await _dio.get<String>(
       url,
@@ -166,42 +174,53 @@ class DuroosRepository {
         (json?['props']?['data']?['data']?['data']?['hits'] as List?) ??
         const [];
 
+    final entryPathSegment = isRecitation ? 'recitation' : 'lesson';
+    final idRe = RegExp('/$entryPathSegment/(\\d+)');
     final lectures = <DuroosLecture>[];
     final seen = <int>{};
     for (final hit in hits) {
       if (hit is! Map) continue;
       if (hit['type'] != 'entry') continue; // نتجاهل "collection" — راجع التوثيق أعلاه
-      final lessonUrl = hit['url'] as String? ?? '';
-      final idMatch = RegExp(r'/lesson/(\d+)').firstMatch(lessonUrl);
+      final entryUrl = hit['url'] as String? ?? '';
+      final idMatch = idRe.firstMatch(entryUrl);
       if (idMatch == null) continue;
       final id = int.parse(idMatch.group(1)!);
       if (!seen.add(id)) continue;
       final rawTitle = (hit['title'] as String? ?? '').replaceAll(_emTagRe, '');
       final title = _decodeEntities(rawTitle.trim());
       if (title.isEmpty) continue;
-      lectures.add(DuroosLecture(title: title, midadLessonId: id));
+      lectures.add(
+        DuroosLecture(title: title, midadLessonId: id, midadIsRecitation: isRecitation),
+      );
     }
 
     if (lectures.isEmpty) {
-      throw const DuroosParseException(
-        'تعذّر العثور على محاضرات لهذا الشيخ (ربما تغيّرت بنية الموقع أو لا نتائج) — أعد المحاولة.',
+      throw DuroosParseException(
+        isRecitation
+            ? 'تعذّر العثور على تلاوات لهذا الشيخ (ربما تغيّرت بنية الموقع أو لا نتائج) — أعد المحاولة.'
+            : 'تعذّر العثور على محاضرات لهذا الشيخ (ربما تغيّرت بنية الموقع أو لا نتائج) — أعد المحاولة.',
       );
     }
     return DuroosPage(categories: const [], lectures: lectures);
   }
 
-  /// رابط الصوت الفعلي لمحاضرة midad محدَّدة — **موقّع ومؤقت** (AWS S3
-  /// signed URL، صلاحيته أسبوع تقريباً وقت الجلب)، لذا يُطلَب هنا لحظياً
-  /// عند فتح المحاضرة لا وقت البحث — يضمن رابطاً صالحاً دوماً بلا تخزين
-  /// أو تحديث يدوي (راجع توثيق `DuroosSourceKind.midad`).
-  Future<String> fetchMidadLessonAudio(int lessonId) async {
+  /// رابط الصوت الفعلي لمحاضرة/تلاوة midad محدَّدة — **موقّع ومؤقت** (AWS
+  /// S3 signed URL، صلاحيته أسبوع تقريباً وقت الجلب)، لذا يُطلَب هنا لحظياً
+  /// عند فتح العنصر لا وقت البحث — يضمن رابطاً صالحاً دوماً بلا تخزين
+  /// أو تحديث يدوي (راجع توثيق `DuroosSourceKind.midad`). [isRecitation]
+  /// يبدّل مسار الصفحة (`/recitation/` بدل `/lesson/`) **و** مفتاح JSON
+  /// المقروء (`recitation` بدل `lesson`) — تحقّقت من الاختلافين معاً
+  /// مباشرة بمتصفح حقيقي (بنيتا الاستجابة متشابهتان لكن غير متطابقتين).
+  Future<String> fetchMidadEntryAudio(int entryId, {bool isRecitation = false}) async {
+    final pathSegment = isRecitation ? 'recitation' : 'lesson';
+    final jsonKey = isRecitation ? 'recitation' : 'lesson';
     final response = await _dio.get<String>(
-      'https://midad.com/lesson/$lessonId',
+      'https://midad.com/$pathSegment/$entryId',
       options: Options(responseType: ResponseType.plain),
     );
     final html = response.data ?? '';
     final json = _extractInertiaJson(html);
-    final resources = (json?['props']?['data']?['lesson']?['resources'] as List?) ?? const [];
+    final resources = (json?['props']?['data']?[jsonKey]?['resources'] as List?) ?? const [];
 
     String? mp3Url;
     String? anyAudioUrl;

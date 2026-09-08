@@ -99,7 +99,10 @@ class _DuroosLecturesScreenState extends ConsumerState<DuroosLecturesScreen> {
           final lectures = await _repository.fetchRss(widget.source.feedUrl!);
           return _LoadResult(categories: const [], lectures: lectures);
         case DuroosSourceKind.midad:
-          final page = await _repository.fetchMidadSearch(widget.source.midadQuery!);
+          final page = await _repository.fetchMidadSearch(
+            widget.source.midadQuery!,
+            isRecitation: widget.source.midadIsRecitation,
+          );
           return _LoadResult(categories: page.categories, lectures: page.lectures);
       }
     } catch (e, st) {
@@ -201,11 +204,14 @@ class _DuroosLecturesScreenState extends ConsumerState<DuroosLecturesScreen> {
       setState(() => _isLoading = true);
       activeNotifier.set(lecture);
       if (isNewLecture) {
-        // midad: الرابط المخزَّن بالمحاضرة `null` عمداً (موقّع ومؤقت) —
-        // يُجلَب هنا لحظياً قبل التشغيل مباشرة (راجع توثيق
-        // `DuroosSourceKind.midad` و`fetchMidadLessonAudio`).
+        // midad: الرابط المخزَّن بالمحاضرة/التلاوة `null` عمداً (موقّع
+        // ومؤقت) — يُجلَب هنا لحظياً قبل التشغيل مباشرة (راجع توثيق
+        // `DuroosSourceKind.midad` و`fetchMidadEntryAudio`).
         final audioUrl = widget.source.kind == DuroosSourceKind.midad
-            ? await _repository.fetchMidadLessonAudio(lecture.midadLessonId!)
+            ? await _repository.fetchMidadEntryAudio(
+                lecture.midadLessonId!,
+                isRecitation: lecture.midadIsRecitation,
+              )
             : lecture.audioUrl!;
         // CDN إسلام ويب (Azure) يحمي ملفاته من hotlinking — بلا Referer
         // صحيح يرجّع 307 لصفحة الموقع الرئيسية بدل الصوت (تحقّقت بـcurl:

@@ -15,7 +15,7 @@ enum DuroosSourceKind {
   /// مضمّنة بوسم `<script id="app">` — لا حاجة لمتصفح كامل). بعكس
   /// islamweb وrss، رابط الصوت هنا **موقّع ومؤقت** (صلاحية أسبوع تقريباً
   /// عبر AWS S3 signed URL) فلا يُجلب مع نتائج البحث، بل عند فتح كل
-  /// محاضرة بعينها (`DuroosRepository.fetchMidadLessonAudio`) — يضمن هذا
+  /// محاضرة بعينها (`DuroosRepository.fetchMidadEntryAudio`) — يضمن هذا
   /// رابطاً صالحاً دوماً بلا تحديث يدوي مستقبلاً. راجع `duroos_repository.dart`.
   midad,
 }
@@ -37,6 +37,7 @@ class DuroosSource {
     this.initialLg = 0,
     this.feedUrl,
     this.midadQuery,
+    this.midadIsRecitation = false,
     this.imageAsset,
   });
 
@@ -74,6 +75,14 @@ class DuroosSource {
   /// اسم الشيخ/عبارة البحث بموقع midad.com (مطلوب لـ`kind == midad`) —
   /// نفس النص يُمرَّر لبحث الموقع (`/search?q=...`).
   final String? midadQuery;
+
+  /// `true` لمصدر **تلاوة قرآن كاملة** (سور مرتَّلة، `/recitation/<id>`)
+  /// بدل محاضرات علمية عادية (`/lesson/<id>`) — بطلب صريح "التلاوات
+  /// ممكن تضيفها لقسم الاستماع": بعض الشيوخ المُدرَجين هنا أصلاً (بحثاً عن
+  /// midadQuery) عندهم أيضاً مصحف مرتَّل كامل مسجَّل على نفس الموقع
+  /// (اكتُشف أثناء تشخيص "رابط السعيدان مش شغال" — راجع `duroos_repository.
+  /// dart.fetchMidadSearch`). `false` افتراضياً (محاضرات، السلوك الأصلي).
+  final bool midadIsRecitation;
 }
 
 /// تصنيف فرعي (سلسلة دروس) ضمن صفحة عالِم بـislamweb — يُفتح بتصنيف
@@ -90,11 +99,20 @@ class DuroosCategory {
 /// عند فتح المحاضرة فعلياً (`audioUrl == null` و`midadLessonId` محدَّد
 /// بدله؛ راجع `DuroosSourceKind.midad`).
 class DuroosLecture {
-  const DuroosLecture({required this.title, this.audioUrl, this.midadLessonId})
-      : assert(audioUrl != null || midadLessonId != null);
+  const DuroosLecture({
+    required this.title,
+    this.audioUrl,
+    this.midadLessonId,
+    this.midadIsRecitation = false,
+  }) : assert(audioUrl != null || midadLessonId != null);
   final String title;
   final String? audioUrl;
   final int? midadLessonId;
+
+  /// `true` لو [midadLessonId] يشير لصفحة `/recitation/<id>` (تلاوة سورة)
+  /// بدل `/lesson/<id>` (محاضرة عادية) — راجع `DuroosSource.midadIsRecitation`
+  /// وتوثيق `DuroosRepository.fetchMidadEntryAudio`.
+  final bool midadIsRecitation;
 
   /// معرِّف تشغيل مستقر يميّز بين المحاضرات حتى لو كانت `audioUrl` بعدها
   /// `null` (كل محاضرات midad قبل فتحها) — لا نقارن بـ`audioUrl` مباشرة
@@ -119,6 +137,10 @@ class DuroosCategoryIds {
   static const scholars = 'scholars'; // كبار العلماء والأئمة
   static const mutoon = 'mutoon'; // شروح المتون والفقه
   static const seerahGeneral = 'seerah_general'; // السيرة والفتاوى العامة
+
+  /// تلاوات قرآن كاملة (لا محاضرات) — بطلب صريح "التلاوات ممكن تضيفها
+  /// لقسم الاستماع"، اكتُشفت أثناء تشخيص مصدر السعيدان (`midadIsRecitation`).
+  static const recitations = 'recitations';
 }
 
 const List<DuroosSource> kDuroosSources = [
@@ -266,6 +288,20 @@ const List<DuroosSource> kDuroosSources = [
     category: DuroosCategoryIds.mutoon,
     kind: DuroosSourceKind.midad,
     midadQuery: 'وليد بن راشد السعيدان',
+  ),
+  DuroosSource(
+    // تحقّقت مباشرة: نفس الشيخ له مصحف كامل مرتَّل مسجَّل على مِداد (١٤٣٥هـ)
+    // بجانب محاضراته العلمية أعلاه — مصدر منفصل عمداً (`midadIsRecitation:
+    // true` يبدّل نوع البحث ومسار الصفحة كلياً، راجع `duroos_repository.
+    // dart`)، بطلب صريح "التلاوات ممكن تضيفها لقسم الاستماع".
+    id: 'waleed_saeedan_recitation',
+    title: 'مصحف الشيخ وليد السعيدان (مرتَّل)',
+    subtitle: 'تلاوة القرآن الكريم كاملاً — حفص عن عاصم، من موقع مِداد',
+    icon: Icons.auto_stories_outlined,
+    category: DuroosCategoryIds.recitations,
+    kind: DuroosSourceKind.midad,
+    midadQuery: 'وليد بن راشد السعيدان',
+    midadIsRecitation: true,
   ),
   DuroosSource(
     id: 'saleh_fawzan',

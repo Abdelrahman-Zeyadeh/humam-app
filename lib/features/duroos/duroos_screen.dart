@@ -199,6 +199,12 @@ class _DuroosScreenState extends State<DuroosScreen> {
                 isSelected: _selectedCategory == DuroosCategoryIds.seerahGeneral,
                 onTap: () => setState(() => _selectedCategory = DuroosCategoryIds.seerahGeneral),
               ),
+              const SizedBox(width: 8),
+              _FilterChip(
+                label: 'تلاوات قرآن كاملة (${_countFor(DuroosCategoryIds.recitations)})',
+                isSelected: _selectedCategory == DuroosCategoryIds.recitations,
+                onTap: () => setState(() => _selectedCategory = DuroosCategoryIds.recitations),
+              ),
             ],
           ),
         ),
