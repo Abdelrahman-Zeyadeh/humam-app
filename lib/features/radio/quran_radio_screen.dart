@@ -4,9 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
+import '../../core/theme/app_card.dart';
 import '../../core/theme/app_colors.dart';
 import '../audio/quran_audio_handler.dart';
 import 'radio_audio_providers.dart';
+
+/// خيارات مدة مؤقّت النوم
+const List<int> _kRadioSleepTimerMinutes = [10, 20, 30, 45, 60, 90];
 
 /// نموذج بيانات محطة إذاعية قرآنية
 class QuranRadioStation {
@@ -339,7 +343,10 @@ String _categoryLabel(String category) => switch (category) {
 };
 
 class QuranRadioScreen extends ConsumerStatefulWidget {
-  const QuranRadioScreen({super.key});
+  const QuranRadioScreen({super.key, this.isStandalone = true});
+
+  /// إذا كانت الشاشة بمفردها (مع AppBar ومؤقت نوم) أو داخل تبويب مدمج
+  final bool isStandalone;
 
   @override
   ConsumerState<QuranRadioScreen> createState() => _QuranRadioScreenState();
@@ -348,6 +355,9 @@ class QuranRadioScreen extends ConsumerStatefulWidget {
 class _QuranRadioScreenState extends ConsumerState<QuranRadioScreen> {
   late final AudioPlayer _player;
   StreamSubscription<PlayerState>? _playerStateSub;
+  Timer? _sleepFireTimer;
+  Timer? _sleepTickTimer;
+  DateTime? _sleepEndsAt;
   bool _isPlaying = false;
   bool _isLoading = false;
   String _searchQuery = '';
@@ -381,12 +391,108 @@ class _QuranRadioScreenState extends ConsumerState<QuranRadioScreen> {
 
   @override
   void dispose() {
+    _sleepFireTimer?.cancel();
+    _sleepTickTimer?.cancel();
     // لا نتخلّص من `_player` هنا — مشغّل مشترك بعمر التطبيق (راجع
     // radioAudioPlayerProvider) يستمر بالتشغيل بالخلفية حتى لو أُغلقت هذه
     // الشاشة بالذات؛ يُتخلَّص منه مرة واحدة فقط عبر `ref.onDispose` بذاك
     // الـprovider (تفكيك التطبيق نفسه).
     _playerStateSub?.cancel();
     super.dispose();
+  }
+
+  void _startSleepTimer(int minutes) {
+    _sleepFireTimer?.cancel();
+    _sleepTickTimer?.cancel();
+    setState(() => _sleepEndsAt = DateTime.now().add(Duration(minutes: minutes)));
+
+    _sleepFireTimer = Timer(Duration(minutes: minutes), () {
+      ref.read(radioAudioPlayerProvider).pause();
+      if (mounted) setState(() => _sleepEndsAt = null);
+    });
+
+    _sleepTickTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  void _cancelSleepTimer() {
+    _sleepFireTimer?.cancel();
+    _sleepTickTimer?.cancel();
+    setState(() => _sleepEndsAt = null);
+  }
+
+  void _showSleepTimerSheet() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (sheetCtx) {
+        final onSurface = Theme.of(sheetCtx).colorScheme.onSurface;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.bedtime_outlined, color: themeAccent(sheetCtx)),
+                    const SizedBox(width: 10),
+                    Text(
+                      'مؤقّت النوم للإذاعة',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'يوقف البث المباشر تلقائياً بعد المدة المحددة لتوفير البطارية والبيانات',
+                  style: TextStyle(fontSize: 12, color: onSurface.withValues(alpha: 0.6)),
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    for (final m in _kRadioSleepTimerMinutes)
+                      ChoiceChip(
+                        label: Text('$m د'),
+                        selected: false,
+                        onSelected: (_) {
+                          _startSleepTimer(m);
+                          Navigator.of(sheetCtx).pop();
+                        },
+                      ),
+                  ],
+                ),
+                if (_sleepEndsAt != null) ...[
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      _cancelSleepTimer();
+                      Navigator.of(sheetCtx).pop();
+                    },
+                    icon: const Icon(Icons.timer_off_outlined, size: 18),
+                    label: const Text('إلغاء المؤقّت الحالي'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFC0392B),
+                      side: const BorderSide(color: Color(0xFFC0392B)),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _togglePlay(QuranRadioStation station) async {
@@ -469,15 +575,89 @@ class _QuranRadioScreenState extends ConsumerState<QuranRadioScreen> {
       return matchesCat && matchesQuery;
     }).toList();
 
-    // بلا `AppBar` خاص بها عمداً — تُستخدَم كتبويب داخل `RadioAndDuroosScreen`
-    // (راجع `radio_and_duroos_screen.dart`)، هي المزوِّد الوحيد للـ`AppBar`
-    // الآن. `Scaffold` نفسه لسا لازم (يوفّر موضع `bottomSheet` للمشغّل
-    // العائم أدناه) — Scaffold متداخل بلا AppBar سلوك مدعوم رسمياً بفلَتر.
-    return Scaffold(
-      body: Column(
-        children: [
-          // شريط البحث
-          Padding(
+    final remaining = _sleepEndsAt?.difference(DateTime.now());
+    final remainingMinutes = remaining == null
+        ? null
+        : (remaining.inSeconds / 60).ceil().clamp(0, 999);
+
+    final content = Column(
+      children: [
+        if (widget.isStandalone)
+          // بطاقة عليا مميزة للبث المباشر المتاح
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              gradient: LinearGradient(
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+                colors: isDark
+                    ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+                    : [AppColors.navy.withValues(alpha: 0.08), AppColors.tealDeep.withValues(alpha: 0.08)],
+              ),
+              border: Border.all(
+                color: isDark ? AppColors.lineDark : AppColors.tealDeep.withValues(alpha: 0.25),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.tealDeep.withValues(alpha: 0.15),
+                  ),
+                  child: const Icon(Icons.podcasts_rounded, color: AppColors.tealDeep, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          // نقطة حمراء "مباشر" — مقصورة عمداً على هذا العنصر
+                          // الصغير فقط (اصطلاح عالمي معروف لـ"بث حي")، لا
+                          // تُستخدَم كلون مهيمن بالبطاقة/الـAppBar (كانا كذلك
+                          // سابقاً وتعارضا مع الهوية اللونية الموحَّدة
+                          // navy/teal بباقي التطبيق — بطلب صريح "شكل الإذاعة
+                          // بدائي وغريب").
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Color(0xFFE74C3C),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'إذاعات القرآن والبث المباشر',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13.5,
+                              color: onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'استماع حي لإذاعات الحرمين، كبار القراء، الفتاوى، وإذاعة القرآن الكريم 24/7',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: onSurface.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        // شريط البحث
+        Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             child: TextField(
               onChanged: (q) => setState(() => _searchQuery = q),
@@ -692,7 +872,32 @@ class _QuranRadioScreenState extends ConsumerState<QuranRadioScreen> {
             ),
           ),
         ],
-      ),
+      );
+
+    return Scaffold(
+      appBar: widget.isStandalone
+          ? GradientAppBar(
+              title: 'الإذاعات والبث المباشر',
+              // navy/teal — نفس هوية بقية شاشات التشغيل الصوتي (`duroos_
+              // lectures_screen`)، بدل الأحمر السابق المتعارض مع الهوية
+              // اللونية الموحَّدة (راجع تعليق البطاقة العليا أسفل نفس السبب).
+              colors: const [AppColors.tealDeep, AppColors.navy],
+              actions: [
+                IconButton(
+                  tooltip: 'مؤقّت النوم',
+                  onPressed: _showSleepTimerSheet,
+                  icon: remainingMinutes == null
+                      ? const Icon(Icons.bedtime_outlined)
+                      : Badge(
+                          label: Text('$remainingMinutes'),
+                          backgroundColor: AppColors.gold,
+                          child: const Icon(Icons.bedtime),
+                        ),
+                ),
+              ],
+            )
+          : null,
+      body: content,
 
       // المشغل السفلي العائم عند تشغيل محطة
       bottomSheet: activeStation == null
