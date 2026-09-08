@@ -87,26 +87,59 @@ class PrayerCountdownCard extends ConsumerWidget {
     final statusBadge = _computeTimeStatusBadge(now, dayTimes);
 
     final content = Padding(
-      padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
       child: Column(
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
-                Icons.calendar_today_outlined,
-                size: 13,
-                color: Colors.white70,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                todayHijriWithDayArabic(now),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
+              if (showChecklistLink)
+                Material(
+                  color: Colors.white.withValues(alpha: 0.16),
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const PrayerChecklistScreen(),
+                      ),
+                    ),
+                    child: const Tooltip(
+                      message: 'الصلوات والعبادات',
+                      child: Padding(
+                        padding: EdgeInsets.all(6),
+                        child: Icon(
+                          Icons.checklist_rounded,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                const SizedBox(width: 28),
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.calendar_today_outlined,
+                      size: 13,
+                      color: Colors.white70,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      todayHijriWithDayArabic(now),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              const SizedBox(width: 28), // balance header
             ],
           ),
           const SizedBox(height: 10),
@@ -181,56 +214,6 @@ class PrayerCountdownCard extends ConsumerWidget {
           const SizedBox(height: 14),
           _MiniDayTimeline(dayTimes: dayTimes, activeMoment: activeMoment),
 
-          // بطلب صاحب المشروع: مدخل واضح لشاشة "الصلوات والعبادات" —
-          // كانت الطريقة الوحيدة مربّعاً صغيراً وسط شبكة سلاسل الاستمرار
-          // بالرئيسية ("مختفية وضايعة")، صار زرّاً صريحاً هون ضمن بطاقة
-          // الصلاة الرئيسية نفسها.
-          if (showChecklistLink) ...[
-            const SizedBox(height: 10),
-            Material(
-              color: Colors.white.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(14),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(14),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const PrayerChecklistScreen(),
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.checklist_outlined,
-                        color: Colors.white,
-                        size: 17,
-                      ),
-                      const SizedBox(width: 8),
-                      const Expanded(
-                        child: Text(
-                          'سجّل صلواتك وعباداتك',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      Icon(
-                        Icons.chevron_left,
-                        color: Colors.white.withValues(alpha: 0.8),
-                        size: 18,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
 
           if (footer != null) ...[
             const SizedBox(height: 12),

@@ -91,6 +91,7 @@ class _AdhanVoiceCardState extends ConsumerState<AdhanVoiceCard> {
       checkinFirstDelayMinutes: userPrefs.prayerCheckinFirstDelayMinutes,
       postPrayerAzkarEnabled: userPrefs.postPrayerAzkarEnabled,
       postPrayerAzkarDelayMinutes: userPrefs.postPrayerAzkarDelayMinutes,
+      getIqamahMinutesFor: (m) => userPrefs.iqamahMinutesFor(m.name),
     );
   }
 

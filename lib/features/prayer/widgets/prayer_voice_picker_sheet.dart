@@ -182,22 +182,26 @@ class _VoicePickerContentState extends ConsumerState<_VoicePickerContent> {
                             ref
                                 .read(adhanNotificationVersionProvider.notifier)
                                 .bump();
-                            if (context.mounted)
+                            if (context.mounted) {
                               Navigator.of(widget.sheetCtx).pop();
-                            if (widget.prefs.hasLocation)
+                            }
+                            if (widget.prefs.hasLocation) {
                               unawaited(
                                 rescheduleAdhanNotifications(
                                   ref,
                                   widget.prefs,
                                 ),
                               );
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'تم اعتماد مؤذن "${voice.label}" لجميع الصلوات الخمس 🕌',
+                            }
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'تم اعتماد مؤذن "${voice.label}" لجميع الصلوات الخمس 🕌',
+                                  ),
                                 ),
-                              ),
-                            );
+                              );
+                            }
                           },
                         ),
                       ],
@@ -210,11 +214,14 @@ class _VoicePickerContentState extends ConsumerState<_VoicePickerContent> {
                       ref
                           .read(adhanNotificationVersionProvider.notifier)
                           .bump();
-                      if (context.mounted) Navigator.of(widget.sheetCtx).pop();
-                      if (widget.prefs.hasLocation)
+                      if (context.mounted) {
+                        Navigator.of(widget.sheetCtx).pop();
+                      }
+                      if (widget.prefs.hasLocation) {
                         unawaited(
                           rescheduleAdhanNotifications(ref, widget.prefs),
                         );
+                      }
                     },
                   );
                 },

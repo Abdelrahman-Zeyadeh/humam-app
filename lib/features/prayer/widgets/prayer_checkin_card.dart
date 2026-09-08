@@ -157,6 +157,7 @@ class PrayerCheckinCard extends ConsumerWidget {
         checkinFirstDelayMinutes: delay,
         postPrayerAzkarEnabled: userPrefs.postPrayerAzkarEnabled,
         postPrayerAzkarDelayMinutes: userPrefs.postPrayerAzkarDelayMinutes,
+        getIqamahMinutesFor: (m) => userPrefs.iqamahMinutesFor(m.name),
       );
     } catch (e) {
       if (!context.mounted) return;

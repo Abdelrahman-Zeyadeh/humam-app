@@ -113,6 +113,7 @@ class PrayerScreen extends ConsumerWidget {
             checkinFirstDelayMinutes: userPrefs.prayerCheckinFirstDelayMinutes,
             postPrayerAzkarEnabled: userPrefs.postPrayerAzkarEnabled,
             postPrayerAzkarDelayMinutes: userPrefs.postPrayerAzkarDelayMinutes,
+            getIqamahMinutesFor: (m) => userPrefs.iqamahMinutesFor(m.name),
           );
         }
       } else {
