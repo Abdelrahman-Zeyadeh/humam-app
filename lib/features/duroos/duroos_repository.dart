@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 
 import 'duroos_models.dart';
@@ -110,6 +112,119 @@ class DuroosRepository {
     }
 
     return DuroosPage(categories: categories, lectures: lectures);
+  }
+
+  /// موقع midad.com تطبيق Inertia.js — كل الاستجابة HTML عادي، لكن
+  /// البيانات الفعلية (نتائج البحث، تفاصيل الدرس) مضمّنة كـJSON كامل
+  /// داخل `<script id="app" type="application/json">...</script>`، لا
+  /// تحتاج تشغيل JS لقراءتها. راجع توثيق `DuroosSourceKind.midad`.
+  static const _midadInertiaMarker = 'data-page="app" type="application/json">';
+
+  Map<String, dynamic>? _extractInertiaJson(String html) {
+    final start = html.indexOf(_midadInertiaMarker);
+    if (start == -1) return null;
+    final jsonStart = start + _midadInertiaMarker.length;
+    final jsonEnd = html.indexOf('</script>', jsonStart);
+    if (jsonEnd == -1) return null;
+    try {
+      return jsonDecode(html.substring(jsonStart, jsonEnd)) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static final _emTagRe = RegExp(r'</?em>');
+
+  /// بحث midad.com عن اسم الشيخ — يرجع محاضرات مفردة فقط (نتجاهل نوع
+  /// "collection" لأنها تحتاج جلباً إضافياً لعناصرها الفرعية، وخارج نطاق
+  /// هذه الميزة حالياً). لا `audioUrl` هنا عمداً — يُجلب لاحقاً لحظة فتح
+  /// المحاضرة تحديداً عبر [fetchMidadLessonAudio] (راجع سبب ذلك بتوثيق
+  /// `DuroosSourceKind.midad`).
+  Future<DuroosPage> fetchMidadSearch(String query) async {
+    // `entry_type` **بلا** `recitation` عمداً — بطلب صريح ("رابط السعيدان
+    // وعامر بهجت مش شغال، اتاكد منهم"): تحقّقت فعلياً بمتصفح حقيقي على
+    // midad.com، والسبب مزدوج:
+    // ١. إدراج `recitation` بالقائمة كان يُغرق نتائج الشيوخ الذين سجّلوا
+    //    ختمة قرآن أيضاً (كالسعيدان) بمئات نتائج "سورة كذا" (تلاوة، لا
+    //    محاضرة أصلاً)، تتصدّر ترتيب النتائج فتزيح المحاضرات الفعلية خارج
+    //    أول ٢٠ نتيجة المضمَّنة بالصفحة — يتحقّق منها المسار الفرعي التالي.
+    // ٢. `_extractInertiaJson` كان يقرأ `props.data.data.hits` (مستويان
+    //    `data`) — الصحيح فعلياً `props.data.data.data.hits` (**ثلاثة**
+    //    مستويات)، تحقّقت منه مباشرة بمحتوى الصفحة الحقيقي. لو تغيّر بنية
+    //    الموقع لاحقاً (ربما كان صحيحاً سابقاً وتغيّر)، هذا أول موضع يُراجَع.
+    final url = 'https://midad.com/search'
+        '?q=${Uri.encodeQueryComponent(query)}'
+        '&entry_type=lesson-article-audiobook-video'
+        '&type=collection-entry';
+    final response = await _dio.get<String>(
+      url,
+      options: Options(responseType: ResponseType.plain),
+    );
+    final html = response.data ?? '';
+    final json = _extractInertiaJson(html);
+    final hits =
+        (json?['props']?['data']?['data']?['data']?['hits'] as List?) ??
+        const [];
+
+    final lectures = <DuroosLecture>[];
+    final seen = <int>{};
+    for (final hit in hits) {
+      if (hit is! Map) continue;
+      if (hit['type'] != 'entry') continue; // نتجاهل "collection" — راجع التوثيق أعلاه
+      final lessonUrl = hit['url'] as String? ?? '';
+      final idMatch = RegExp(r'/lesson/(\d+)').firstMatch(lessonUrl);
+      if (idMatch == null) continue;
+      final id = int.parse(idMatch.group(1)!);
+      if (!seen.add(id)) continue;
+      final rawTitle = (hit['title'] as String? ?? '').replaceAll(_emTagRe, '');
+      final title = _decodeEntities(rawTitle.trim());
+      if (title.isEmpty) continue;
+      lectures.add(DuroosLecture(title: title, midadLessonId: id));
+    }
+
+    if (lectures.isEmpty) {
+      throw const DuroosParseException(
+        'تعذّر العثور على محاضرات لهذا الشيخ (ربما تغيّرت بنية الموقع أو لا نتائج) — أعد المحاولة.',
+      );
+    }
+    return DuroosPage(categories: const [], lectures: lectures);
+  }
+
+  /// رابط الصوت الفعلي لمحاضرة midad محدَّدة — **موقّع ومؤقت** (AWS S3
+  /// signed URL، صلاحيته أسبوع تقريباً وقت الجلب)، لذا يُطلَب هنا لحظياً
+  /// عند فتح المحاضرة لا وقت البحث — يضمن رابطاً صالحاً دوماً بلا تخزين
+  /// أو تحديث يدوي (راجع توثيق `DuroosSourceKind.midad`).
+  Future<String> fetchMidadLessonAudio(int lessonId) async {
+    final response = await _dio.get<String>(
+      'https://midad.com/lesson/$lessonId',
+      options: Options(responseType: ResponseType.plain),
+    );
+    final html = response.data ?? '';
+    final json = _extractInertiaJson(html);
+    final resources = (json?['props']?['data']?['lesson']?['resources'] as List?) ?? const [];
+
+    String? mp3Url;
+    String? anyAudioUrl;
+    for (final r in resources) {
+      if (r is! Map) continue;
+      if (r['type'] != 'audio') continue;
+      final path = r['path'] as String?;
+      if (path == null || path.isEmpty) continue;
+      anyAudioUrl ??= path;
+      // قد يتوفّر نفس الدرس بصيغة `rm` قديمة إضافة لـmp3 — نفضّل mp3
+      // دوماً حين متاحاً (راجع مثال حقيقي بالتعليق أعلى الملف).
+      if (Uri.parse(path).path.toLowerCase().endsWith('.mp3')) {
+        mp3Url = path;
+        break;
+      }
+    }
+    final resolved = mp3Url ?? anyAudioUrl;
+    if (resolved == null) {
+      throw const DuroosParseException(
+        'تعذّر العثور على رابط صوتي لهذه المحاضرة (ربما تغيّرت بنية الموقع) — أعد المحاولة.',
+      );
+    }
+    return resolved;
   }
 
   static final _rssItemRe = RegExp(r'<item>(.*?)</item>', dotAll: true);
