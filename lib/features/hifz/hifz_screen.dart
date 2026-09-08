@@ -15,8 +15,10 @@ import '../mushaf/mushaf_screen.dart';
 import '../mushaf/mushaf_settings.dart' show hifzPickerProvider;
 import '../notifications/adhan_notification_service.dart';
 import '../notifications/reminder_messages.dart' show hifzReminderMessages;
+import 'hifz_quiz_screen.dart';
 import 'hifz_range_picker_sheet.dart';
 import 'hifz_review_screen.dart';
+import 'mutashabihat_screen.dart';
 
 Color _textSoft(BuildContext c) => Theme.of(c).brightness == Brightness.dark
     ? AppColors.inkSoftOnDark
@@ -112,9 +114,25 @@ class HifzScreen extends ConsumerWidget {
       // [AppColors.blue, AppColors.navy]) — كان هون وحده بنفسجي/كحلي (`purple`)
       // بلا سبب، يكسر الهوية اللونية الموحّدة بين شاشات التطبيق. `purple`
       // بقي كلون تمييز محلي (بطاقة الفضل/شريط التقدّم بأسفل هالملف) لا كخلفية هيدر.
-      appBar: const GradientAppBar(
+      appBar: GradientAppBar(
         title: 'قسم الحفظ',
-        colors: [AppColors.blue, AppColors.navy],
+        colors: const [AppColors.blue, AppColors.navy],
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.compare_arrows_rounded),
+            tooltip: 'متشابهات القرآن',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const MutashabihatScreen()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.quiz_outlined),
+            tooltip: 'إختبر حفظك',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const HifzQuizScreen()),
+            ),
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),
@@ -123,6 +141,91 @@ class HifzScreen extends ConsumerWidget {
           const SizedBox(height: 16),
           const StreakStatusRow(category: UserCategories.hifz),
           const SizedBox(height: 16),
+
+          // بطاقتان رئيسيتان لأدوات الحفظ: إختبر حفظك + المتشابهات
+          Row(
+            children: [
+              Expanded(
+                child: Card(
+                  color: AppColors.purple.withValues(alpha: 0.1),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: AppColors.purple.withValues(alpha: 0.3)),
+                  ),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const HifzQuizScreen()),
+                    ),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: AppColors.purple,
+                            radius: 18,
+                            child: Icon(Icons.psychology_rounded, color: Colors.white, size: 20),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'إختبر حفظك 🎯',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'اختبار الآيات وإكمالها',
+                            style: TextStyle(fontSize: 11, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Card(
+                  color: AppColors.teal.withValues(alpha: 0.1),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: AppColors.teal.withValues(alpha: 0.3)),
+                  ),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const MutashabihatScreen()),
+                    ),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: AppColors.teal,
+                            radius: 18,
+                            child: Icon(Icons.compare_arrows_rounded, color: Colors.white, size: 20),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'المتشابهات 📖',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'ضبط وتثبيت المتشابه',
+                            style: TextStyle(fontSize: 11, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
           if (plans.isEmpty)
             _EmptyState(onStart: () => _startNewPlan(context, ref))
           else ...[
