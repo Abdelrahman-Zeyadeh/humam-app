@@ -11,6 +11,8 @@ import 'duroos_audio_providers.dart';
 import 'duroos_models.dart';
 import 'duroos_repository.dart';
 
+const _kDuroosSleepTimerMinutes = [10, 20, 30, 45, 60, 90];
+
 /// شاشة تصفّح/تشغيل واحدة تخدم كِلا نوعي المصدر (islamweb وrss) —
 /// islamweb قد يعطي تصنيفات فرعية (`lg`) تفتح نسخة جديدة من نفس
 /// الشاشة، أو محاضرات مباشرة قابلة للتشغيل؛ rss يعطي محاضرات مباشرة
@@ -44,6 +46,13 @@ class _DuroosLecturesScreenState extends ConsumerState<DuroosLecturesScreen> {
   bool _isPlaying = false;
   bool _isLoading = false;
 
+  // بحث محلي بعناوين محاضرات هذا العالِم/القسم — بطلب صريح ("ما ضفت قسم
+  // البحث بالمحاضرات"). فلترة على القائمة المُحمَّلة أصلاً بلا أي طلب
+  // شبكة إضافي (بعكس بحث عبر كل المشايخ معاً، يحتاج جلب قوائم الجميع
+  // أولاً — خارج نطاق هذا الإصلاح، راجع التعليق أعلى `_buildSearchField`).
+  final _lectureSearchCtrl = TextEditingController();
+  String _lectureSearchQuery = '';
+
   @override
   void initState() {
     super.initState();
@@ -76,6 +85,7 @@ class _DuroosLecturesScreenState extends ConsumerState<DuroosLecturesScreen> {
     // بالخلفية حتى لو أُغلقت هذه الشاشة بالذات؛ يُتخلَّص منه مرة واحدة
     // فقط عبر `ref.onDispose` بذاك الـprovider (تفكيك التطبيق نفسه).
     _playerStateSub?.cancel();
+    _lectureSearchCtrl.dispose();
     super.dispose();
   }
 
@@ -88,6 +98,9 @@ class _DuroosLecturesScreenState extends ConsumerState<DuroosLecturesScreen> {
         case DuroosSourceKind.rss:
           final lectures = await _repository.fetchRss(widget.source.feedUrl!);
           return _LoadResult(categories: const [], lectures: lectures);
+        case DuroosSourceKind.midad:
+          final page = await _repository.fetchMidadSearch(widget.source.midadQuery!);
+          return _LoadResult(categories: page.categories, lectures: page.lectures);
       }
     } catch (e, st) {
       // تشخيص مؤقت: الرسالة العامة بالواجهة كانت تخفي السبب الحقيقي (قد
@@ -99,24 +112,107 @@ class _DuroosLecturesScreenState extends ConsumerState<DuroosLecturesScreen> {
     }
   }
 
+  /// نفس شيت `QuranRadioScreen._showSleepTimerSheet` بالضبط (بنية/نصوص)،
+  /// لكن يستدعي [duroosSleepTimerProvider] المشترك بدل حالة شاشة محلية —
+  /// راجع توثيقه لسبب ذلك.
+  void _showSleepTimerSheet(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (sheetCtx) {
+        final onSurface = Theme.of(sheetCtx).colorScheme.onSurface;
+        final active = ref.read(duroosSleepTimerProvider) != null;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.bedtime_outlined, color: themeAccent(sheetCtx)),
+                    const SizedBox(width: 10),
+                    Text(
+                      'مؤقّت النوم للدروس',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'يوقف المحاضرة تلقائياً بعد المدة المحددة لتوفير البطارية والبيانات',
+                  style: TextStyle(fontSize: 12, color: onSurface.withValues(alpha: 0.6)),
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    for (final m in _kDuroosSleepTimerMinutes)
+                      ChoiceChip(
+                        label: Text('$m د'),
+                        selected: false,
+                        onSelected: (_) {
+                          ref.read(duroosSleepTimerProvider.notifier).start(Duration(minutes: m));
+                          Navigator.of(sheetCtx).pop();
+                        },
+                      ),
+                  ],
+                ),
+                if (active) ...[
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      ref.read(duroosSleepTimerProvider.notifier).cancel();
+                      Navigator.of(sheetCtx).pop();
+                    },
+                    icon: const Icon(Icons.timer_off_outlined, size: 18),
+                    label: const Text('إلغاء المؤقّت الحالي'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFC0392B),
+                      side: const BorderSide(color: Color(0xFFC0392B)),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _togglePlay(DuroosLecture lecture) async {
     final activeNotifier = ref.read(activeDuroosLectureProvider.notifier);
     final active = ref.read(activeDuroosLectureProvider);
-    if (active?.audioUrl == lecture.audioUrl && _isPlaying) {
+    if (active?.playbackKey == lecture.playbackKey && _isPlaying) {
       await _player.pause();
       return;
     }
-    final isNewLecture = active?.audioUrl != lecture.audioUrl;
+    final isNewLecture = active?.playbackKey != lecture.playbackKey;
     try {
       setState(() => _isLoading = true);
       activeNotifier.set(lecture);
       if (isNewLecture) {
+        // midad: الرابط المخزَّن بالمحاضرة `null` عمداً (موقّع ومؤقت) —
+        // يُجلَب هنا لحظياً قبل التشغيل مباشرة (راجع توثيق
+        // `DuroosSourceKind.midad` و`fetchMidadLessonAudio`).
+        final audioUrl = widget.source.kind == DuroosSourceKind.midad
+            ? await _repository.fetchMidadLessonAudio(lecture.midadLessonId!)
+            : lecture.audioUrl!;
         // CDN إسلام ويب (Azure) يحمي ملفاته من hotlinking — بلا Referer
         // صحيح يرجّع 307 لصفحة الموقع الرئيسية بدل الصوت (تحقّقت بـcurl:
         // 307 بلا الترويسة → 206 audio/mpeg معها). لا ضرر بإرسالها لمصادر
-        // rss أيضاً، لكنها غير ضرورية هناك.
+        // rss/midad أيضاً، لكنها غير ضرورية هناك.
         await _player.setUrl(
-          lecture.audioUrl,
+          audioUrl,
           headers: widget.source.kind == DuroosSourceKind.islamweb
               ? const {'Referer': 'https://audio.islamweb.net/'}
               : null,
@@ -133,7 +229,7 @@ class _DuroosLecturesScreenState extends ConsumerState<DuroosLecturesScreen> {
         ref.read(quranAudioHandlerProvider).attachExternalSession(
           _player,
           MediaItem(
-            id: 'duroos-${widget.source.id}-${lecture.audioUrl.hashCode}',
+            id: 'duroos-${widget.source.id}-${lecture.playbackKey.hashCode}',
             title: lecture.title,
             artist: widget.source.title,
             duration: _player.duration,
@@ -141,7 +237,7 @@ class _DuroosLecturesScreenState extends ConsumerState<DuroosLecturesScreen> {
         );
       }
     } catch (e) {
-      debugPrint('DuroosLecturesScreen[${widget.source.id}]: play failed for ${lecture.audioUrl}: $e');
+      debugPrint('DuroosLecturesScreen[${widget.source.id}]: play failed for ${lecture.playbackKey}: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('تعذّر تشغيل المحاضرة: يرجى التحقق من اتصال الإنترنت')),
@@ -155,9 +251,30 @@ class _DuroosLecturesScreenState extends ConsumerState<DuroosLecturesScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     // حالة مشتركة بين كل شاشات الدروس المفتوحة — راجع duroos_audio_providers.dart.
     final activeLecture = ref.watch(activeDuroosLectureProvider);
+    final sleepEndsAt = ref.watch(duroosSleepTimerProvider);
+    ref.watch(duroosSleepTimerTickProvider); // راجع توثيقه — يفرض تحديث العدّاد كل دقيقة
+    final sleepRemainingMinutes = sleepEndsAt == null
+        ? null
+        : sleepEndsAt.difference(DateTime.now()).inMinutes + 1;
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis), elevation: 0),
+      appBar: AppBar(
+        title: Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: 'مؤقّت النوم',
+            onPressed: () => _showSleepTimerSheet(context, ref),
+            icon: sleepRemainingMinutes == null
+                ? const Icon(Icons.bedtime_outlined)
+                : Badge(
+                    label: Text('$sleepRemainingMinutes'),
+                    backgroundColor: AppColors.gold,
+                    child: const Icon(Icons.bedtime),
+                  ),
+          ),
+        ],
+      ),
       body: FutureBuilder<_LoadResult>(
         future: _future,
         builder: (context, snapshot) {
@@ -204,9 +321,56 @@ class _DuroosLecturesScreenState extends ConsumerState<DuroosLecturesScreen> {
             );
           }
 
+          // فلترة محلية بعنوان المحاضرة — لا تمسّ التصنيفات (قليلة العدد
+          // عادة، تصفّحها المباشر أسهل من البحث فيها).
+          final q = _lectureSearchQuery.trim();
+          final filteredLectures = q.isEmpty
+              ? result.lectures
+              : result.lectures.where((l) => l.title.contains(q)).toList();
+
           return ListView(
             padding: EdgeInsets.fromLTRB(16, 12, 16, activeLecture != null ? 100 : 16),
             children: [
+              // شريط بحث بعناوين محاضرات هذا القسم — يظهر فقط لو فيه فعلاً
+              // عدد محاضرات يستحق البحث (بلا داعٍ لقسم بمحاضرة أو اثنتين).
+              if (result.lectures.length > 5) ...[
+                TextField(
+                  controller: _lectureSearchCtrl,
+                  onChanged: (v) => setState(() => _lectureSearchQuery = v),
+                  decoration: InputDecoration(
+                    hintText: 'ابحث بعنوان المحاضرة...',
+                    hintStyle: TextStyle(fontSize: 12.5, color: onSurface.withValues(alpha: 0.5)),
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    suffixIcon: _lectureSearchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.close, size: 18),
+                            onPressed: () {
+                              _lectureSearchCtrl.clear();
+                              setState(() => _lectureSearchQuery = '');
+                            },
+                          )
+                        : null,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF1E293B) : Colors.grey.shade100,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (q.isNotEmpty && filteredLectures.isEmpty && result.categories.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: Text(
+                      'لا توجد محاضرة بعنوان مطابق',
+                      style: TextStyle(color: onSurface.withValues(alpha: 0.6), fontSize: 13),
+                    ),
+                  ),
+                ),
               for (final category in result.categories)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
@@ -228,7 +392,7 @@ class _DuroosLecturesScreenState extends ConsumerState<DuroosLecturesScreen> {
                     ),
                   ),
                 ),
-              for (final lecture in result.lectures)
+              for (final lecture in filteredLectures)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: _ListTile(
@@ -236,9 +400,9 @@ class _DuroosLecturesScreenState extends ConsumerState<DuroosLecturesScreen> {
                     onSurface: onSurface,
                     icon: Icons.play_circle_outline,
                     title: lecture.title,
-                    isActive: activeLecture?.audioUrl == lecture.audioUrl,
-                    isPlaying: activeLecture?.audioUrl == lecture.audioUrl && _isPlaying,
-                    isBuffering: activeLecture?.audioUrl == lecture.audioUrl && _isLoading,
+                    isActive: activeLecture?.playbackKey == lecture.playbackKey,
+                    isPlaying: activeLecture?.playbackKey == lecture.playbackKey && _isPlaying,
+                    isBuffering: activeLecture?.playbackKey == lecture.playbackKey && _isLoading,
                     onTap: () => _togglePlay(lecture),
                   ),
                 ),
@@ -254,9 +418,11 @@ class _DuroosLecturesScreenState extends ConsumerState<DuroosLecturesScreen> {
               isPlaying: _isPlaying,
               isLoading: _isLoading,
               isDark: isDark,
-              sourceCredit: widget.source.kind == DuroosSourceKind.islamweb
-                  ? 'محاضرات وفتاوى صوتية من أرشيف إسلام ويب'
-                  : 'بودكاست رسمي (روابط صوتية مباشرة)',
+              sourceCredit: switch (widget.source.kind) {
+                DuroosSourceKind.islamweb => 'محاضرات وفتاوى صوتية من أرشيف إسلام ويب',
+                DuroosSourceKind.rss => 'بودكاست رسمي (روابط صوتية مباشرة)',
+                DuroosSourceKind.midad => 'دروس ومحاضرات من موقع مِداد',
+              },
               onTogglePlay: () => _togglePlay(activeLecture),
               onClose: () {
                 _player.stop();
