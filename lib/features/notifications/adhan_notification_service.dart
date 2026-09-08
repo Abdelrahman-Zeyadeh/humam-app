@@ -80,6 +80,13 @@ const _kPostPrayerAzkarReadAction = 'post_prayer_azkar_read';
 const _kPostPrayerAzkarDismissAction = 'post_prayer_azkar_dismiss';
 const _kPostPrayerAzkarPayloadPrefix = 'post_prayer_azkar|';
 
+/// تذكير السنن الرواتب — مستقل تماماً عن "أذكار بعد الصلاة" أعلاه (تفعيل
+/// منفصل، ونص مختلف يذكر عدد ركعات السنة تحديداً بدل نص أذكار عام).
+const _kRawatibChannelId = 'rawatib_reminder_ch';
+const _kRawatibChannelName = 'تذكير السنن الرواتب';
+const _kRawatibIdBase = 9520; // بين مدى أذكار بعد الصلاة (٩٥٠٠-٩٥٠٩) والإمساك (٩٦٠٠+)
+const _kRawatibMaxSlots = 10; // يومان × ٥ صلوات — نفس حدّ أذكار بعد الصلاة
+
 /// يسجّلها `RootShell` لحظة تركيب الشجرة — تفتح شاشة "أذكار بعد الصلاة"
 /// مباشرة لو ضُغط "اقرأ الآن" والتطبيق حيّ فعلاً بنفس الجلسة. تبقى `null`
 /// بحالة الإطلاق البارد (التطبيق لسّا ما انفتح)، فيُعتمَد بدلها على العلم
@@ -796,6 +803,14 @@ class AdhanNotificationService {
     }
   }
 
+  /// يلغي كل تذكيرات "السنن الرواتب" المجدولة — نفس نمط
+  /// [cancelAllPostPrayerAzkarReminders] بالضبط.
+  Future<void> cancelAllRawatibReminders() async {
+    for (var slot = 0; slot < _kRawatibMaxSlots; slot++) {
+      await _plugin.cancel(id: _kRawatibIdBase + slot);
+    }
+  }
+
   /// يلغي تذكيرَي الإمساك المجدولَين (يومان بحدّ أقصى) — راجع
   /// [_scheduleImsakIfRamadan].
   Future<void> cancelAllImsakReminders() async {
@@ -1014,12 +1029,14 @@ class AdhanNotificationService {
     int checkinFirstDelayMinutes = 15,
     bool postPrayerAzkarEnabled = false,
     int postPrayerAzkarDelayMinutes = 5,
+    bool rawatibEnabled = false,
     int Function(PrayerMoment)? getIqamahMinutesFor,
   }) async {
     if (!_initialized) await initialize();
     await cancelAll();
     await cancelAllPrayerCheckins();
     await cancelAllPostPrayerAzkarReminders();
+    await cancelAllRawatibReminders();
     await cancelAllImsakReminders();
 
     final now = DateTime.now();
@@ -1125,6 +1142,21 @@ class AdhanNotificationService {
           delayMinutes: postPrayerAzkarDelayMinutes,
         );
       }
+
+      // 5. تذكير السنن الرواتب: لصلوات الظهر/المغرب/العشاء فقط (سنن مؤكَّدة
+      // بعد الفرض)، بعد ١٠ دقائق ثابتة من دخول الوقت — راجع توثيق
+      // [_schedulePostPrayerAzkarOne] لنفس آلية الجدولة والتحقق من الحدود.
+      if (rawatibEnabled &&
+          isEnabled(p.moment) &&
+          i < _kRawatibMaxSlots &&
+          _kRawatibTexts.containsKey(p.moment)) {
+        await _scheduleRawatibOne(
+          slotIndex: i,
+          prayer: p.moment,
+          prayerTime: p.time,
+          boundary: p.boundary,
+        );
+      }
     }
   }
 
@@ -1202,6 +1234,67 @@ class AdhanNotificationService {
           payload: payload,
         );
       }
+    }
+  }
+
+  /// الصلوات ذات السنن الرواتب المؤكَّدة بعد الفرض (الفجر لها سنة **قبل**
+  /// الفرض فقط، والعصر بلا سنة راتبة مؤكَّدة — فلا تُدرَجان هنا عمداً).
+  static const _kRawatibTexts = {
+    PrayerMoment.dhuhr: 'لا تنسَ ركعتين بعد الظهر (من السنن الرواتب المؤكَّدة)',
+    PrayerMoment.maghrib: 'لا تنسَ ركعتين بعد المغرب (من السنن الرواتب المؤكَّدة)',
+    PrayerMoment.isha: 'لا تنسَ ركعتين بعد العشاء (من السنن الرواتب المؤكَّدة)',
+  };
+
+  /// يجدوِل تذكير "السنن الرواتب" الواحد لصلاة واحدة — بعد ١٠ دقائق ثابتة
+  /// من دخول الوقت (كافية عادةً لإتمام الفرض والإقامة قبل الراتبة)، بنفس
+  /// آلية التحقق من الحدود بـ[_schedulePostPrayerAzkarOne] تماماً لكن بلا
+  /// أزرار إجراء (لا شاشة مخصَّصة تُفتَح، تذكير بسيط فقط).
+  Future<void> _scheduleRawatibOne({
+    required int slotIndex,
+    required PrayerMoment prayer,
+    required DateTime prayerTime,
+    required DateTime boundary,
+  }) async {
+    final fireTime = prayerTime.add(const Duration(minutes: 10));
+    final now = DateTime.now();
+    if (!fireTime.isBefore(boundary)) return;
+    if (!fireTime.isAfter(now)) return;
+
+    final body = _kRawatibTexts[prayer];
+    if (body == null) return;
+
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        _kRawatibChannelId,
+        _kRawatibChannelName,
+        channelDescription: 'تذكير بأداء السنن الرواتب بعد الفرض',
+        importance: Importance.defaultImportance,
+        priority: Priority.defaultPriority,
+      ),
+      iOS: DarwinNotificationDetails(),
+    );
+
+    final scheduled = tz.TZDateTime.from(fireTime, tz.local);
+    final id = _kRawatibIdBase + slotIndex;
+    try {
+      await _plugin.zonedSchedule(
+        id: id,
+        title: 'السنن الرواتب',
+        body: body,
+        scheduledDate: scheduled,
+        notificationDetails: details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      );
+    } catch (e) {
+      debugPrint('جدولة دقيقة لتذكير رواتب ${prayer.nameAr} فشلت، تراجع لجدولة تقريبية: $e');
+      await _plugin.zonedSchedule(
+        id: id,
+        title: 'السنن الرواتب',
+        body: body,
+        scheduledDate: scheduled,
+        notificationDetails: details,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      );
     }
   }
 

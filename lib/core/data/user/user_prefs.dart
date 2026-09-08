@@ -167,6 +167,11 @@ class UserPrefs {
     delayMinutes: delayMinutes,
   );
 
+  // --- تذكير "السنن الرواتب" (مستقل عن أذكار بعد الصلاة أعلاه) ---
+
+  bool get rawatibEnabled => _repo.rawatibEnabled;
+  Future<void> setRawatibEnabled(bool enabled) => _repo.setRawatibEnabled(enabled);
+
   // --- وضع "لا تُزعجني وقت القراءة" (راجع dnd_service.dart) ---
 
   bool get dndWhileReadingEnabled => _repo.dndWhileReadingEnabled;

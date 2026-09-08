@@ -34,6 +34,8 @@ Future<void> _rescheduleAllPrayerNotifications(WidgetRef ref) async {
     checkinFirstDelayMinutes: userPrefs.prayerCheckinFirstDelayMinutes,
     postPrayerAzkarEnabled: userPrefs.postPrayerAzkarEnabled,
     postPrayerAzkarDelayMinutes: userPrefs.postPrayerAzkarDelayMinutes,
+    rawatibEnabled: userPrefs.rawatibEnabled,
+    getIqamahMinutesFor: (m) => userPrefs.iqamahMinutesFor(m.name),
   );
 }
 
@@ -60,6 +62,8 @@ class PrayerRemindersSection extends StatelessWidget {
               const _AdhanVoiceSection(),
               const Divider(height: 1),
               const _PostPrayerAzkarSection(),
+              const Divider(height: 1),
+              const _RawatibSection(),
               const Divider(height: 1),
               ListTile(
                 leading: Icon(
@@ -439,7 +443,7 @@ class _PostPrayerAzkarSection extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.only(right: 36),
             child: Text(
-              'إشعار واحد بعد كل صلاة (بزرّي "اقرأ الآن"/"×")، مستقل عن متابعة "هل صليت؟" وعن إشعار الأذان نفسه.',
+              'إشعار واحد بعد إقامة كل صلاة (بزرّي "اقرأ الآن"/"×")، يُحسب توقيته بعد وقت الإقامة الفعلي لكل صلاة.',
               style: TextStyle(fontSize: 11.5, color: onSurface.withValues(alpha: 0.55)),
             ),
           ),
@@ -453,7 +457,7 @@ class _PostPrayerAzkarSection extends ConsumerWidget {
                 runSpacing: 6,
                 children: [
                   Text(
-                    'بعد دخول الوقت بـ:',
+                    'بعد الإقامة بـ:',
                     style: TextStyle(fontSize: 12.5, color: onSurface.withValues(alpha: 0.7)),
                   ),
                   for (final m in _delayOptions)
@@ -488,6 +492,72 @@ class _PostPrayerAzkarSection extends ConsumerWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('تعذّر ضبط تنبيه أذكار بعد الصلاة على هذا الجهاز: $e')),
+      );
+    }
+  }
+}
+
+/// قسم "تذكير السنن الرواتب" — نفس بنية [_PostPrayerAzkarSection] لكن
+/// أبسط (لا خيار مدة تأخير، ثابتة ١٠ دقائق بعد دخول الوقت — راجع
+/// `AdhanNotificationService._scheduleRawatibOne`)، معطَّل افتراضياً.
+class _RawatibSection extends ConsumerWidget {
+  const _RawatibSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final userPrefs = ref.watch(userPrefsProvider);
+    final enabled = userPrefs.rawatibEnabled;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.repeat_rounded, color: themeAccent(context)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'تذكير السنن الرواتب',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: onSurface,
+                  ),
+                ),
+              ),
+              Switch(
+                value: enabled,
+                onChanged: (v) => _apply(context, ref, v),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 36),
+            child: Text(
+              'تذكير بركعتَي السنة بعد الظهر/المغرب/العشاء، مستقل عن تنبيه أذكار بعد الصلاة أعلاه.',
+              style: TextStyle(fontSize: 11.5, color: onSurface.withValues(alpha: 0.55)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// **لا يجب أن يرمي هون أي استثناء غير مُمسَك** — نفس قيد
+  /// `_PostPrayerAzkarSection._apply`.
+  Future<void> _apply(BuildContext context, WidgetRef ref, bool enabled) async {
+    final userPrefs = ref.read(userPrefsProvider);
+    await userPrefs.setRawatibEnabled(enabled);
+    try {
+      if (enabled) await AdhanNotificationService.instance.requestPermissions();
+      await _rescheduleAllPrayerNotifications(ref);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذّر ضبط تذكير السنن الرواتب على هذا الجهاز: $e')),
       );
     }
   }

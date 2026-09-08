@@ -242,6 +242,10 @@ class UserRepository {
   // للتخصيص، بغضّ النظر عن تفعيل متابعة "هل صليت؟" من عدمه.
   bool _postPrayerAzkarEnabled = true;
   int _postPrayerAzkarDelayMinutes = 5;
+  // تذكير "السنن الرواتب" — إعداد مستقل عن أذكار بعد الصلاة أعلاه، معطَّل
+  // افتراضياً (خلافاً لأذكار بعد الصلاة) لأنه إضافة جديدة لم يخترها المستخدم
+  // بعد، بخلاف "أذكار بعد الصلاة" الموجودة أصلاً بالتطبيق ومفعَّلة افتراضياً.
+  bool _rawatibEnabled = false;
   List<CustomHabit> _customHabits = [];
   String _userName = '';
   String _userAvatar = '';
@@ -509,6 +513,7 @@ class UserRepository {
       _postPrayerAzkarEnabled = sp.getBool('post_prayer_azkar_enabled') ?? true;
       _postPrayerAzkarDelayMinutes =
           sp.getInt('post_prayer_azkar_delay_minutes') ?? 5;
+      _rawatibEnabled = sp.getBool('rawatib_reminder_enabled') ?? false;
       _listenOnlyModeEnabled = sp.getBool('listen_only_mode_enabled') ?? false;
       _dndWhileReadingEnabled = sp.getBool('dnd_while_reading_enabled') ?? false;
       _autoCloudBackupEnabled = sp.getBool('auto_cloud_backup_enabled') ?? true;
@@ -1604,6 +1609,18 @@ class UserRepository {
         'post_prayer_azkar_delay_minutes',
         _postPrayerAzkarDelayMinutes,
       );
+    } catch (_) {}
+  }
+
+  // --- تذكير "السنن الرواتب" (مستقل عن أذكار بعد الصلاة أعلاه) ---
+
+  bool get rawatibEnabled => _rawatibEnabled;
+
+  Future<void> setRawatibEnabled(bool enabled) async {
+    _rawatibEnabled = enabled;
+    try {
+      final sp = await SharedPreferences.getInstance();
+      await sp.setBool('rawatib_reminder_enabled', _rawatibEnabled);
     } catch (_) {}
   }
 
