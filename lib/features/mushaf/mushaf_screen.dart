@@ -1,5 +1,6 @@
 import 'dart:async' show Timer, unawaited;
 
+import 'package:flutter/gestures.dart' show kMinFlingVelocity;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -25,6 +26,24 @@ import 'tafsir_reading_screen.dart';
 import 'widgets/mushaf_chrome_bars.dart';
 
 const int kMushafPageCount = 604;
+
+/// فيزياء تقليب أخفّ مقاومة — بطلب صريح: "عند القلب من صفحة لأخرى السحب
+/// لازم يكون بقوة". `PageScrollPhysics` الافتراضية تتطلّب إمّا سحباً
+/// يتجاوز نصف عرض الصفحة (وإلا ترتدّ للصفحة الحالية) أو سرعة "رمي" كافية
+/// عند رفع الإصبع — تجربة قراءة يومية سريعة (نقلة صفحة بسيطة، لا تصفّح
+/// معرض صور) تستحق عتبة أقل بكثير من الافتراضي. `minFlingVelocity` أقل
+/// يجعل حتى سحبة قصيرة سريعة (لا داعي لسرعة عالية فعلياً) كافية لإتمام
+/// التقليب بدل الحاجة لسحب كامل العرض تقريباً.
+class _EasySwipePageScrollPhysics extends PageScrollPhysics {
+  const _EasySwipePageScrollPhysics({super.parent});
+
+  @override
+  _EasySwipePageScrollPhysics applyTo(ScrollPhysics? ancestor) =>
+      _EasySwipePageScrollPhysics(parent: buildParent(ancestor));
+
+  @override
+  double get minFlingVelocity => kMinFlingVelocity / 2; // أقل من نصف الافتراضي — رمية أخفّ تكفي
+}
 
 /// مفتاح "طيّ" شريط تنبيه تنزيل الخطوط الباقية — **محفوظ بين الجلسات**
 /// (كان قبلاً `bool` محلي بالودجت فقط، يرجع يظهر كل فتح تطبيق جديد رغم
@@ -561,8 +580,8 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
         !bulkRunningForCurrentEdition && downloadedCountAsync.hasValue && missingPages > 0;
     final showDownloadBanner =
         downloadBannerRelevant && !_collapsedFontDownloadBanners.contains(currentFontEdition.name);
-    final showCollapsedDownloadIcon =
-        downloadBannerRelevant && _collapsedFontDownloadBanners.contains(currentFontEdition.name);
+    // عند إغلاق الشريط لا نريد إبقاء أيقونة عائمة تأخذ مساحة من الشاشة كما طلب المستخدم
+    final showCollapsedDownloadIcon = false;
 
     return Scaffold(
       backgroundColor: bg,
@@ -736,6 +755,7 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
                   onTap: _handlePageTap,
                   child: PageView.builder(
                     controller: _controller,
+                    physics: const _EasySwipePageScrollPhysics(),
                     itemCount: kMushafPageCount,
                     onPageChanged: _onPageChanged,
                     itemBuilder: (context, index) {
