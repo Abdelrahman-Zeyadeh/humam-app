@@ -246,6 +246,11 @@ class UserRepository {
   // افتراضياً (خلافاً لأذكار بعد الصلاة) لأنه إضافة جديدة لم يخترها المستخدم
   // بعد، بخلاف "أذكار بعد الصلاة" الموجودة أصلاً بالتطبيق ومفعَّلة افتراضياً.
   bool _rawatibEnabled = false;
+  // "تحدي شخصي يومي عشوائي" — راجع `daily_challenge.dart` بمجلد `home/`
+  // لمنطق اختيار نص التحدي نفسه (دالة نقية بلا تخزين). هون فقط علم "أُنجز
+  // اليوم؟" بنفس نمط `readToday` أعلاه (مقارنة تاريخ اليوم بآخر تاريخ إنجاز
+  // مخزَّن) — لا حاجة لتخزين نص التحدي نفسه، يُعاد اشتقاقه من التاريخ حتماً.
+  String? _dailyChallengeCompletedDateKey;
   List<CustomHabit> _customHabits = [];
   String _userName = '';
   String _userAvatar = '';
@@ -514,6 +519,7 @@ class UserRepository {
       _postPrayerAzkarDelayMinutes =
           sp.getInt('post_prayer_azkar_delay_minutes') ?? 5;
       _rawatibEnabled = sp.getBool('rawatib_reminder_enabled') ?? false;
+      _dailyChallengeCompletedDateKey = sp.getString('daily_challenge_completed_date');
       _listenOnlyModeEnabled = sp.getBool('listen_only_mode_enabled') ?? false;
       _dndWhileReadingEnabled = sp.getBool('dnd_while_reading_enabled') ?? false;
       _autoCloudBackupEnabled = sp.getBool('auto_cloud_backup_enabled') ?? true;
@@ -1621,6 +1627,22 @@ class UserRepository {
     try {
       final sp = await SharedPreferences.getInstance();
       await sp.setBool('rawatib_reminder_enabled', _rawatibEnabled);
+    } catch (_) {}
+  }
+
+  // --- "تحدي شخصي يومي عشوائي" (راجع `home/daily_challenge.dart`) ---
+
+  bool get dailyChallengeCompletedToday =>
+      _dailyChallengeCompletedDateKey == _dateKey(DateTime.now());
+
+  Future<void> markDailyChallengeCompletedToday() async {
+    _dailyChallengeCompletedDateKey = _dateKey(DateTime.now());
+    try {
+      final sp = await SharedPreferences.getInstance();
+      await sp.setString(
+        'daily_challenge_completed_date',
+        _dailyChallengeCompletedDateKey!,
+      );
     } catch (_) {}
   }
 

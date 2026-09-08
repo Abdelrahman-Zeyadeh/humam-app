@@ -172,6 +172,11 @@ class UserPrefs {
   bool get rawatibEnabled => _repo.rawatibEnabled;
   Future<void> setRawatibEnabled(bool enabled) => _repo.setRawatibEnabled(enabled);
 
+  // --- "تحدي شخصي يومي عشوائي" ---
+
+  bool get dailyChallengeCompletedToday => _repo.dailyChallengeCompletedToday;
+  Future<void> markDailyChallengeCompletedToday() => _repo.markDailyChallengeCompletedToday();
+
   // --- وضع "لا تُزعجني وقت القراءة" (راجع dnd_service.dart) ---
 
   bool get dndWhileReadingEnabled => _repo.dndWhileReadingEnabled;

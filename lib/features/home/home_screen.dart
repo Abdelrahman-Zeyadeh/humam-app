@@ -17,6 +17,7 @@ import 'home_dashboard_data.dart';
 import 'home_widget_sync.dart';
 import 'weekly_report_screen.dart';
 import 'widgets/home_daily_hadith_name_card.dart';
+import 'widgets/home_daily_challenge_card.dart';
 import 'widgets/home_goals_group.dart';
 import 'widgets/home_header.dart';
 import 'widgets/home_misc_cards.dart';
@@ -65,6 +66,9 @@ class HomeScreen extends ConsumerWidget {
       );
     }
 
+    final dashboardCards = ref.watch(dashboardCardsPrefsProvider);
+    final showPeriodVerseInPrayer = dashboardCards.contains('period_ayah');
+
     final Widget heroCard;
     if (locationPrefs.hasLocation) {
       heroCard = PrayerCountdownCard(
@@ -72,19 +76,19 @@ class HomeScreen extends ConsumerWidget {
         lon: locationPrefs.lon!,
         methodKey: locationPrefs.calculationMethod,
         onTap: () => ref.read(rootTabIndexProvider.notifier).select(2),
-        footer: dashboardAsync.value == null
-            ? null
-            : PeriodVerseFooter(data: dashboardAsync.value!),
+        footer: (showPeriodVerseInPrayer && dashboardAsync.value != null)
+            ? PeriodVerseFooter(data: dashboardAsync.value!)
+            : null,
       );
     } else {
       heroCard = NoLocationPrayerCard(
-        footer: dashboardAsync.value == null
-            ? null
-            : PeriodVerseFooter(data: dashboardAsync.value!),
+        footer: (showPeriodVerseInPrayer && dashboardAsync.value != null)
+            ? PeriodVerseFooter(data: dashboardAsync.value!)
+            : null,
       );
     }
 
-    final dashboardCards = ref.watch(dashboardCardsPrefsProvider);
+    final isMinimal = ref.watch(dashboardMinimalModeProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -100,16 +104,41 @@ class HomeScreen extends ConsumerWidget {
               offset: const Offset(0, -18),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  children: [
-                    if (hijriOccasionFor(now) case final occasion?) ...[
-                      HomeOccasionCard(occasion: occasion),
-                      const SizedBox(height: 12),
-                    ],
-                    if (dashboardCards.contains('prayer_hero')) ...[
-                      heroCard,
-                      const SizedBox(height: 12),
-                    ],
+                child: isMinimal
+                    ? Column(
+                        children: [
+                          heroCard,
+                          const SizedBox(height: 12),
+                          GoalsGroupCard(
+                            khatmaPlan: khatmaPrefs.activePlans.isNotEmpty
+                                ? khatmaPrefs.activePlans.first
+                                : null,
+                            hifzPlan: hifzPrefs.plans.isNotEmpty
+                                ? hifzPrefs.plans.first
+                                : null,
+                            continueReadingSurah:
+                                dashboardAsync.value?.continueReadingSurah,
+                          ),
+                          const SizedBox(height: 12),
+                          PillActionButton(
+                            icon: Icons.tune_rounded,
+                            label: 'العودة للواجهة الكاملة',
+                            onTap: () => ref
+                                .read(dashboardMinimalModeProvider.notifier)
+                                .toggle(),
+                          ),
+                        ],
+                      )
+                    : Column(
+                        children: [
+                          if (hijriOccasionFor(now) case final occasion?) ...[
+                            HomeOccasionCard(occasion: occasion),
+                            const SizedBox(height: 12),
+                          ],
+                          if (dashboardCards.contains('prayer_hero')) ...[
+                            heroCard,
+                            const SizedBox(height: 12),
+                          ],
                     if (dayTimes != null) ...[
                       LeadingCard(dayTimes: dayTimes, now: now),
                       const SizedBox(height: 12),
@@ -151,6 +180,11 @@ class HomeScreen extends ConsumerWidget {
                           ? dashboardAsync.value?.continueReadingSurah
                           : null,
                     ),
+                    // "تحدي اليوم" — مهمة صغيرة عشوائية إضافية (راجع
+                    // `daily_challenge.dart`)، بلا شرط تخصيص داشبورد (خلافاً
+                    // للبطاقات أعلاه): لا ترتبط بخطة موجودة مسبقاً فتظهر
+                    // للجميع دائماً، بعكس بطاقات مرتبطة ببيانات فعلية.
+                    const DailyChallengeCard(),
                     const SizedBox(height: 12),
                     if (dashboardCards.contains('start_plan_cta') &&
                         (khatmaPrefs.activePlans.isEmpty ||
