@@ -273,6 +273,25 @@ class ActivityBookmarks extends Table {
   Set<Column> get primaryKey => {type};
 }
 
+/// **تصنيف ملوَّن حرّ لعدد غير محدود من الآيات لكل نوع** — بخلاف
+/// [ActivityBookmarks] (فاصلة واحدة فقط لكل نوع، "آخر آية وصلتها") و
+/// [Bookmarks] (علامات مرجعية حرّة لكن بلا تصنيف/لون، وقيد `ayahId.unique()`
+/// يمنع أكثر من علامة واحدة لنفس الآية أصلاً). بطلب صريح: "تحديد لون تمييز
+/// الآية بس لون واحد وآية وحدة... خليها زي نظام العلامات المرجعية بس أكثر
+/// من لون وكل لون بيسع أكثر من آية (حفظ/تلاوة/مراجعة/تدبر)". مفتاح أساسي
+/// مركَّب (`type`+`ayahId`) يسمح بنفس الآية عندها أكثر من تصنيف معاً (مثلاً
+/// "حفظ" و"تدبر" لنفس الآية)، وبأي عدد آيات لكل نوع. راجع `BookmarkTypes`
+/// لقيم `type` (نفس الأربعة المستخدَمة أصلاً بـ`ActivityBookmarks`/
+/// `kMarkerMeta`).
+class AyahColorTags extends Table {
+  TextColumn get type => text()();
+  IntColumn get ayahId => integer().named('ayah_id')();
+  DateTimeColumn get taggedAt => dateTime().named('tagged_at')();
+
+  @override
+  Set<Column> get primaryKey => {type, ayahId};
+}
+
 /// صف وحيد ثابت: لون تمييز التطبيق العام — بطلب صاحب المشروع "ضيف على
 /// الاعدادات المستخدم بختار لون التطبيق اللي بده اياه"، ثم "لا لون التطبيق
 /// كامل مش بس الايقونات". يبدّل تمييز الثيم (`ThemeData.colorScheme.

@@ -44,6 +44,7 @@ part 'user_database.g.dart';
     ReadingLog,
     AudioLog,
     TasbihLog,
+    AyahColorTags,
   ],
 )
 class UserDatabase extends _$UserDatabase {
@@ -53,10 +54,10 @@ class UserDatabase extends _$UserDatabase {
   @visibleForTesting
   UserDatabase.forTesting(super.executor);
 
-  // رُفعت لـ٢٠ لإضافة عمود `liveListenEnabled` على `AudioSettings` — وضع
-  // "سماع مباشر" (راجع `quran_audio_controller.dart`).
+  // رُفعت لـ٢١ لإضافة جدول `AyahColorTags` — تصنيف ملوَّن حرّ متعدّد الآيات
+  // (راجع توثيقه بـ`user_tables.dart`).
   @override
-  int get schemaVersion => 20;
+  int get schemaVersion => 21;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -144,6 +145,9 @@ class UserDatabase extends _$UserDatabase {
           await m.addColumn(audioSettings, audioSettings.liveListenEnabled);
         } catch (_) {}
       }
+      if (from < 21) {
+        await m.createTable(ayahColorTags);
+      }
     },
     beforeOpen: (details) async {
       // شبكة أمان دفاعية لضمان وجود الجداول حتى لو تم تخطي الهجرة أو حدث انقطاع
@@ -209,6 +213,14 @@ class UserDatabase extends _$UserDatabase {
           "azkar_key" TEXT NOT NULL,
           "count" INTEGER NOT NULL DEFAULT 0,
           "completed_at" INTEGER NOT NULL
+        );
+      ''');
+      await customStatement('''
+        CREATE TABLE IF NOT EXISTS "ayah_color_tags" (
+          "type" TEXT NOT NULL,
+          "ayah_id" INTEGER NOT NULL,
+          "tagged_at" INTEGER NOT NULL,
+          PRIMARY KEY ("type", "ayah_id")
         );
       ''');
     },

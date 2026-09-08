@@ -119,6 +119,13 @@ class UserPrefs {
   Future<void> clearActivityBookmark(String type) =>
       _repo.clearActivityBookmark(type);
 
+  // --- تصنيف ملوَّن حرّ متعدّد الآيات (راجع AyahColorTags) ---
+
+  Set<int> ayahColorTagsFor(String type) => _repo.ayahColorTagsFor(type);
+  Set<String> colorTagsForAyah(int ayahId) => _repo.colorTagsForAyah(ayahId);
+  Future<void> toggleAyahColorTag(String type, int ayahId) =>
+      _repo.toggleAyahColorTag(type, ayahId);
+
   // --- أقسام مفضَّلة من مكتبة حصن المسلم ---
 
   bool isAzkarFavorite(int categoryId) => _repo.isAzkarFavorite(categoryId);
@@ -386,6 +393,19 @@ class ActivityBookmarkVersionNotifier extends Notifier<int> {
 final activityBookmarkVersionProvider =
     NotifierProvider<ActivityBookmarkVersionNotifier, int>(
       ActivityBookmarkVersionNotifier.new,
+    );
+
+/// نفس النمط — إجبار إعادة بناء الودجتات المراقِبة للتصنيف الملوَّن الحرّ
+/// (`AyahColorTags`) بعد تبديل أي تصنيف على أي آية.
+class AyahColorTagVersionNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+  void bump() => state++;
+}
+
+final ayahColorTagVersionProvider =
+    NotifierProvider<AyahColorTagVersionNotifier, int>(
+      AyahColorTagVersionNotifier.new,
     );
 
 /// نفس النمط — إجبار إعادة بناء صفحة المصحف عند تبديل لوحة الألوان

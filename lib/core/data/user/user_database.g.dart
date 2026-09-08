@@ -8361,6 +8361,268 @@ class TasbihLogCompanion extends UpdateCompanion<TasbihLogData> {
   }
 }
 
+class $AyahColorTagsTable extends AyahColorTags
+    with TableInfo<$AyahColorTagsTable, AyahColorTag> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AyahColorTagsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _ayahIdMeta = const VerificationMeta('ayahId');
+  @override
+  late final GeneratedColumn<int> ayahId = GeneratedColumn<int>(
+    'ayah_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _taggedAtMeta = const VerificationMeta(
+    'taggedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> taggedAt = GeneratedColumn<DateTime>(
+    'tagged_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [type, ayahId, taggedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'ayah_color_tags';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<AyahColorTag> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_typeMeta);
+    }
+    if (data.containsKey('ayah_id')) {
+      context.handle(
+        _ayahIdMeta,
+        ayahId.isAcceptableOrUnknown(data['ayah_id']!, _ayahIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_ayahIdMeta);
+    }
+    if (data.containsKey('tagged_at')) {
+      context.handle(
+        _taggedAtMeta,
+        taggedAt.isAcceptableOrUnknown(data['tagged_at']!, _taggedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_taggedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {type, ayahId};
+  @override
+  AyahColorTag map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AyahColorTag(
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
+      ayahId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}ayah_id'],
+      )!,
+      taggedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}tagged_at'],
+      )!,
+    );
+  }
+
+  @override
+  $AyahColorTagsTable createAlias(String alias) {
+    return $AyahColorTagsTable(attachedDatabase, alias);
+  }
+}
+
+class AyahColorTag extends DataClass implements Insertable<AyahColorTag> {
+  final String type;
+  final int ayahId;
+  final DateTime taggedAt;
+  const AyahColorTag({
+    required this.type,
+    required this.ayahId,
+    required this.taggedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['type'] = Variable<String>(type);
+    map['ayah_id'] = Variable<int>(ayahId);
+    map['tagged_at'] = Variable<DateTime>(taggedAt);
+    return map;
+  }
+
+  AyahColorTagsCompanion toCompanion(bool nullToAbsent) {
+    return AyahColorTagsCompanion(
+      type: Value(type),
+      ayahId: Value(ayahId),
+      taggedAt: Value(taggedAt),
+    );
+  }
+
+  factory AyahColorTag.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AyahColorTag(
+      type: serializer.fromJson<String>(json['type']),
+      ayahId: serializer.fromJson<int>(json['ayahId']),
+      taggedAt: serializer.fromJson<DateTime>(json['taggedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'type': serializer.toJson<String>(type),
+      'ayahId': serializer.toJson<int>(ayahId),
+      'taggedAt': serializer.toJson<DateTime>(taggedAt),
+    };
+  }
+
+  AyahColorTag copyWith({String? type, int? ayahId, DateTime? taggedAt}) =>
+      AyahColorTag(
+        type: type ?? this.type,
+        ayahId: ayahId ?? this.ayahId,
+        taggedAt: taggedAt ?? this.taggedAt,
+      );
+  AyahColorTag copyWithCompanion(AyahColorTagsCompanion data) {
+    return AyahColorTag(
+      type: data.type.present ? data.type.value : this.type,
+      ayahId: data.ayahId.present ? data.ayahId.value : this.ayahId,
+      taggedAt: data.taggedAt.present ? data.taggedAt.value : this.taggedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AyahColorTag(')
+          ..write('type: $type, ')
+          ..write('ayahId: $ayahId, ')
+          ..write('taggedAt: $taggedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(type, ayahId, taggedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AyahColorTag &&
+          other.type == this.type &&
+          other.ayahId == this.ayahId &&
+          other.taggedAt == this.taggedAt);
+}
+
+class AyahColorTagsCompanion extends UpdateCompanion<AyahColorTag> {
+  final Value<String> type;
+  final Value<int> ayahId;
+  final Value<DateTime> taggedAt;
+  final Value<int> rowid;
+  const AyahColorTagsCompanion({
+    this.type = const Value.absent(),
+    this.ayahId = const Value.absent(),
+    this.taggedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AyahColorTagsCompanion.insert({
+    required String type,
+    required int ayahId,
+    required DateTime taggedAt,
+    this.rowid = const Value.absent(),
+  }) : type = Value(type),
+       ayahId = Value(ayahId),
+       taggedAt = Value(taggedAt);
+  static Insertable<AyahColorTag> custom({
+    Expression<String>? type,
+    Expression<int>? ayahId,
+    Expression<DateTime>? taggedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (type != null) 'type': type,
+      if (ayahId != null) 'ayah_id': ayahId,
+      if (taggedAt != null) 'tagged_at': taggedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AyahColorTagsCompanion copyWith({
+    Value<String>? type,
+    Value<int>? ayahId,
+    Value<DateTime>? taggedAt,
+    Value<int>? rowid,
+  }) {
+    return AyahColorTagsCompanion(
+      type: type ?? this.type,
+      ayahId: ayahId ?? this.ayahId,
+      taggedAt: taggedAt ?? this.taggedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (ayahId.present) {
+      map['ayah_id'] = Variable<int>(ayahId.value);
+    }
+    if (taggedAt.present) {
+      map['tagged_at'] = Variable<DateTime>(taggedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AyahColorTagsCompanion(')
+          ..write('type: $type, ')
+          ..write('ayahId: $ayahId, ')
+          ..write('taggedAt: $taggedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$UserDatabase extends GeneratedDatabase {
   _$UserDatabase(QueryExecutor e) : super(e);
   $UserDatabaseManager get managers => $UserDatabaseManager(this);
@@ -8411,6 +8673,7 @@ abstract class _$UserDatabase extends GeneratedDatabase {
   late final $ReadingLogTable readingLog = $ReadingLogTable(this);
   late final $AudioLogTable audioLog = $AudioLogTable(this);
   late final $TasbihLogTable tasbihLog = $TasbihLogTable(this);
+  late final $AyahColorTagsTable ayahColorTags = $AyahColorTagsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -8444,6 +8707,7 @@ abstract class _$UserDatabase extends GeneratedDatabase {
     readingLog,
     audioLog,
     tasbihLog,
+    ayahColorTags,
   ];
 }
 
@@ -13444,6 +13708,168 @@ typedef $$TasbihLogTableProcessedTableManager =
       TasbihLogData,
       PrefetchHooks Function()
     >;
+typedef $$AyahColorTagsTableCreateCompanionBuilder =
+    AyahColorTagsCompanion Function({
+      required String type,
+      required int ayahId,
+      required DateTime taggedAt,
+      Value<int> rowid,
+    });
+typedef $$AyahColorTagsTableUpdateCompanionBuilder =
+    AyahColorTagsCompanion Function({
+      Value<String> type,
+      Value<int> ayahId,
+      Value<DateTime> taggedAt,
+      Value<int> rowid,
+    });
+
+class $$AyahColorTagsTableFilterComposer
+    extends Composer<_$UserDatabase, $AyahColorTagsTable> {
+  $$AyahColorTagsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get ayahId => $composableBuilder(
+    column: $table.ayahId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get taggedAt => $composableBuilder(
+    column: $table.taggedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$AyahColorTagsTableOrderingComposer
+    extends Composer<_$UserDatabase, $AyahColorTagsTable> {
+  $$AyahColorTagsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get ayahId => $composableBuilder(
+    column: $table.ayahId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get taggedAt => $composableBuilder(
+    column: $table.taggedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$AyahColorTagsTableAnnotationComposer
+    extends Composer<_$UserDatabase, $AyahColorTagsTable> {
+  $$AyahColorTagsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<int> get ayahId =>
+      $composableBuilder(column: $table.ayahId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get taggedAt =>
+      $composableBuilder(column: $table.taggedAt, builder: (column) => column);
+}
+
+class $$AyahColorTagsTableTableManager
+    extends
+        RootTableManager<
+          _$UserDatabase,
+          $AyahColorTagsTable,
+          AyahColorTag,
+          $$AyahColorTagsTableFilterComposer,
+          $$AyahColorTagsTableOrderingComposer,
+          $$AyahColorTagsTableAnnotationComposer,
+          $$AyahColorTagsTableCreateCompanionBuilder,
+          $$AyahColorTagsTableUpdateCompanionBuilder,
+          (
+            AyahColorTag,
+            BaseReferences<_$UserDatabase, $AyahColorTagsTable, AyahColorTag>,
+          ),
+          AyahColorTag,
+          PrefetchHooks Function()
+        > {
+  $$AyahColorTagsTableTableManager(_$UserDatabase db, $AyahColorTagsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AyahColorTagsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AyahColorTagsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$AyahColorTagsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> type = const Value.absent(),
+                Value<int> ayahId = const Value.absent(),
+                Value<DateTime> taggedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AyahColorTagsCompanion(
+                type: type,
+                ayahId: ayahId,
+                taggedAt: taggedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String type,
+                required int ayahId,
+                required DateTime taggedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => AyahColorTagsCompanion.insert(
+                type: type,
+                ayahId: ayahId,
+                taggedAt: taggedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$AyahColorTagsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$UserDatabase,
+      $AyahColorTagsTable,
+      AyahColorTag,
+      $$AyahColorTagsTableFilterComposer,
+      $$AyahColorTagsTableOrderingComposer,
+      $$AyahColorTagsTableAnnotationComposer,
+      $$AyahColorTagsTableCreateCompanionBuilder,
+      $$AyahColorTagsTableUpdateCompanionBuilder,
+      (
+        AyahColorTag,
+        BaseReferences<_$UserDatabase, $AyahColorTagsTable, AyahColorTag>,
+      ),
+      AyahColorTag,
+      PrefetchHooks Function()
+    >;
 
 class $UserDatabaseManager {
   final _$UserDatabase _db;
@@ -13507,4 +13933,6 @@ class $UserDatabaseManager {
       $$AudioLogTableTableManager(_db, _db.audioLog);
   $$TasbihLogTableTableManager get tasbihLog =>
       $$TasbihLogTableTableManager(_db, _db.tasbihLog);
+  $$AyahColorTagsTableTableManager get ayahColorTags =>
+      $$AyahColorTagsTableTableManager(_db, _db.ayahColorTags);
 }

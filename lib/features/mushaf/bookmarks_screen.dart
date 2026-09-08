@@ -31,6 +31,18 @@ final _markerAyahProvider = FutureProvider.family<({Ayah ayah, String surahName}
   return (ayah: ayah, surahName: surah.nameArPlain);
 });
 
+/// كل آيات نوع تصنيف ملوَّن واحد (`AyahColorTags`) — بخلاف
+/// [_markerAyahProvider] (آية واحدة فقط)، عدد غير محدود مرتَّب بمعرّف
+/// الآية.
+final _colorTaggedAyahsProvider = FutureProvider.family<List<Ayah>, String>((ref, type) async {
+  ref.watch(ayahColorTagVersionProvider);
+  final ids = ref.watch(userPrefsProvider).ayahColorTagsFor(type);
+  final repo = ref.watch(quranRepositoryProvider);
+  final ayahs = await Future.wait(ids.map(repo.ayahById));
+  ayahs.sort((a, b) => a.id.compareTo(b.id));
+  return ayahs;
+});
+
 /// شاشتان بشاشة واحدة: **الفواصل** (٤ فتحات أحادية — راجع [BookmarkTypes]،
 /// كل نوع فاصلة واحدة فقط بأي لحظة، تُضبَط من شيت إجراءات الآية) فوق
 /// **العلامات المرجعية** الحرّة القديمة (عدد غير محدود). بطلب صاحب المشروع
@@ -56,6 +68,25 @@ class BookmarksScreen extends ConsumerWidget {
             ),
           ),
           for (final type in BookmarkTypes.all) _MarkerRow(type: type),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Text('التصنيف الملوَّن', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: onSurface.withValues(alpha: 0.6))),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                'كل تصنيف يسع أي عدد من الآيات (اضغط مطوّلاً على آية بالمصحف ثم "تصنيف وتلوين الآية")',
+                textAlign: TextAlign.right,
+                style: TextStyle(fontSize: 11, color: AppColors.inkSoft),
+              ),
+            ),
+          ),
+          for (final type in BookmarkTypes.all) _ColorTagSection(type: type),
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 20, 16, 8),
             child: Align(
@@ -164,6 +195,66 @@ class _MarkerRow extends ConsumerWidget {
               : () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => MushafScreen(initialPage: marker.ayah.page)),
                   ),
+        );
+      },
+    );
+  }
+}
+
+/// قسم قابل للطي (ExpansionTile) لآيات نوع تصنيف واحد — عدد غير محدود
+/// بخلاف [_MarkerRow] (آية واحدة). يُخفى تلقائياً لو النوع بلا أي آية بعد
+/// (لا داعي لعرض ٤ أقسام فارغة لمستخدم جديد لم يصنِّف شيئاً).
+class _ColorTagSection extends ConsumerWidget {
+  const _ColorTagSection({required this.type});
+  final String type;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ayahsAsync = ref.watch(_colorTaggedAyahsProvider(type));
+    final meta = kMarkerMeta[type]!;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    return ayahsAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (e, _) => const SizedBox.shrink(),
+      data: (ayahs) {
+        if (ayahs.isEmpty) return const SizedBox.shrink();
+        return Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            leading: Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(color: meta.color.withValues(alpha: 0.14), shape: BoxShape.circle),
+              child: Icon(meta.icon, size: 18, color: meta.color),
+            ),
+            title: Text('${meta.label} (${ayahs.length})', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+            children: [
+              for (final a in ayahs)
+                ListTile(
+                  contentPadding: const EdgeInsets.only(right: 20, left: 16),
+                  title: Text(
+                    stripQuranicMarksForDisplay(a.textUthmani),
+                    textDirection: TextDirection.rtl,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: onSurface, fontSize: 14.5, height: 1.6),
+                  ),
+                  subtitle: Text('سورة ${a.surah} · آية ${a.ayah} · صفحة ${a.page}', style: const TextStyle(fontSize: 11.5, color: AppColors.inkSoft)),
+                  trailing: IconButton(
+                    icon: Icon(Icons.close, color: meta.color, size: 20),
+                    tooltip: 'إزالة التصنيف',
+                    onPressed: () async {
+                      await ref.read(userPrefsProvider).toggleAyahColorTag(type, a.id);
+                      ref.read(ayahColorTagVersionProvider.notifier).bump();
+                    },
+                  ),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => MushafScreen(initialPage: a.page)),
+                  ),
+                ),
+            ],
+          ),
         );
       },
     );

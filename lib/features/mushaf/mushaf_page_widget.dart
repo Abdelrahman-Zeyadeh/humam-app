@@ -52,6 +52,24 @@ final _notedAyahIdsProvider = FutureProvider<Set<int>>((ref) async {
   return ref.watch(userPrefsProvider).notedAyahIds();
 });
 
+/// آية → لون تصنيفها (راجع `AyahColorTags`/`kMarkerMeta` بـ
+/// `ayah_actions_sheet.dart`) — بطلب صريح "نظام تصنيف ملوَّن يسع أكثر من
+/// آية لكل لون". قراءة مباشرة (لا `Future` حقيقي، `colorTagsForAyah`
+/// بالذاكرة أصلاً) لكن `Provider` عادي كافٍ — مصدر واحد يُبنى مرة واحدة
+/// لكل صفحة بدل تكرار المنطق بكل سطر. لو تعدَّدت تصنيفات نفس الآية، يفوز
+/// أول نوع بترتيب `kMarkerMeta` (لا مزج ألوان — أبسط بصرياً).
+final _ayahColorTagMapProvider = Provider<Map<int, Color>>((ref) {
+  ref.watch(ayahColorTagVersionProvider);
+  final prefs = ref.watch(userPrefsProvider);
+  final map = <int, Color>{};
+  for (final entry in kMarkerMeta.entries.toList().reversed) {
+    for (final ayahId in prefs.ayahColorTagsFor(entry.key)) {
+      map[ayahId] = entry.value.color;
+    }
+  }
+  return map;
+});
+
 /// رسم صفحة مصحف واحدة: يحمّل تخطيطها وخطها الخاص (`p{page}.ttf`)، ثم
 /// يرسم أسطرها الخمسة عشر بالترتيب. حالة تحميل/خطأ مستقلة عن باقي التطبيق.
 class MushafPageWidget extends ConsumerWidget {
@@ -94,6 +112,7 @@ class MushafPageWidget extends ConsumerWidget {
     final mushafPage = layoutAsync.value!;
     final textSize = ref.watch(mushafTextSizeProvider);
     final noteAyahIds = ref.watch(_notedAyahIdsProvider).value ?? const <int>{};
+    final ayahTagColors = ref.watch(_ayahColorTagMapProvider);
     final isDarkTheme = Theme.of(context).brightness == Brightness.dark;
 
     final content = Padding(
@@ -113,6 +132,7 @@ class MushafPageWidget extends ConsumerWidget {
                 fontFamily: family,
                 pickingHifz: pickingHifz,
                 noteAyahIds: noteAyahIds,
+                ayahTagColors: ayahTagColors,
               ),
             ),
         ],
@@ -194,6 +214,7 @@ class _PageLineWidget extends ConsumerWidget {
     required this.fontFamily,
     this.pickingHifz = false,
     this.noteAyahIds = const {},
+    this.ayahTagColors = const {},
   });
   final MushafPageLineInfo line;
   final List<MushafWord> words;
@@ -202,6 +223,9 @@ class _PageLineWidget extends ConsumerWidget {
 
   /// معرّفات آيات عليها ملاحظة — راجع `_notedAyahIdsProvider` أعلى الملف.
   final Set<int> noteAyahIds;
+
+  /// آية → لون تصنيفها — راجع `_ayahColorTagMapProvider` أعلى الملف.
+  final Map<int, Color> ayahTagColors;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -362,6 +386,7 @@ class _PageLineWidget extends ConsumerWidget {
               pickingHifz: pickingHifz,
               noteAyahIds: noteAyahIds,
               noteMarkerColor: themeAccent(context),
+              ayahTagColors: ayahTagColors,
               style: TextStyle(
                 fontFamily: fontFamily,
                 fontSize: 28,
@@ -395,9 +420,16 @@ class _TappableAyahLine extends ConsumerStatefulWidget {
     this.pickingHifz = false,
     this.noteAyahIds = const {},
     this.noteMarkerColor,
+    this.ayahTagColors = const {},
   });
   final List<MushafWord> words;
   final TextStyle style;
+
+  /// آية → لون تصنيفها — راجع `_ayahColorTagMapProvider` أعلى الملف. خلفية
+  /// دائمة (بلا انتظار تشغيل صوتي أو قفز مؤقت)، أضعف شفافية من
+  /// [highlightAyahId] (`0.22`) كي لا تطغى على التمييز اللحظي لو تصادفا
+  /// بنفس الآية.
+  final Map<int, Color> ayahTagColors;
 
   /// معرّفات آيات عليها ملاحظة — تُرسَم علامة صغيرة عند رمز نهاية الآية
   /// لكل واحدة منها (راجع `_notedAyahIdsProvider`).
@@ -461,6 +493,10 @@ class _TappableAyahLineState extends ConsumerState<_TappableAyahLine> {
           widget.highlightAyahId != null &&
           word.ayahId == widget.highlightAyahId;
       final isPendingStart = pendingFrom != null && word.ayahId == pendingFrom;
+      // لون التصنيف الدائم لهذه الآية (لو مصنَّفة) — يُعرَض فقط لو ما في
+      // تظليل لحظي أقوى (تشغيل/قفز) أو بداية اختيار نطاق حفظ فوقه، بنفس
+      // ترتيب أولوية `buildWordSpan` أدناه.
+      final tagColor = widget.ayahTagColors[word.ayahId];
       final isHidden =
           widget.memorizationOn && !widget.revealedAyahs.contains(word.ayahId);
 
@@ -476,7 +512,9 @@ class _TappableAyahLineState extends ConsumerState<_TappableAyahLine> {
           style: TextStyle(
             backgroundColor: isPendingStart
                 ? pendingColor
-                : (isHighlighted ? highlightColor : null),
+                : (isHighlighted
+                      ? highlightColor
+                      : (tagColor?.withValues(alpha: 0.22))),
           ),
         );
       }
@@ -557,7 +595,9 @@ class _TappableAyahLineState extends ConsumerState<_TappableAyahLine> {
             text: ' ',
             style: isHighlighted
                 ? TextStyle(backgroundColor: highlightColor)
-                : null,
+                : (tagColor != null
+                      ? TextStyle(backgroundColor: tagColor.withValues(alpha: 0.22))
+                      : null),
           ),
         );
       }

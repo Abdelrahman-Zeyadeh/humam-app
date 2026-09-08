@@ -230,6 +230,10 @@ class UserRepository {
   int _hifzMinute = 0;
   String _adhanVoiceId = 'system';
   final Map<String, int> _activityBookmarks = {};
+  // نوع → مجموعة معرّفات آيات مصنَّفة بهذا اللون — راجع توثيق
+  // `AyahColorTags` بـ`user_tables.dart` لسبب وجود هذا بجانب
+  // `_activityBookmarks`/`_bookmarks` أعلاه بدل توحيدهم.
+  final Map<String, Set<int>> _ayahColorTags = {};
   final Map<String, bool> _adhanNotifEnabled = {};
   String _mushafPaletteId = 'default';
   String _mushafNightMode = 'auto';
@@ -349,6 +353,7 @@ class UserRepository {
       _db.adhanSettings,
     )..where((t) => t.id.equals(1))).getSingleOrNull();
     final activityBookmarksF = _db.select(_db.activityBookmarks).get();
+    final ayahColorTagsF = _db.select(_db.ayahColorTags).get();
     final adhanNotifF = _db.select(_db.adhanNotificationSettings).get();
     final mushafColorF = (_db.select(
       _db.mushafColorSettings,
@@ -480,6 +485,11 @@ class UserRepository {
     final activityBookmarkRows = await activityBookmarksF;
     for (final row in activityBookmarkRows) {
       _activityBookmarks[row.type] = row.ayahId;
+    }
+
+    final ayahColorTagRows = await ayahColorTagsF;
+    for (final row in ayahColorTagRows) {
+      _ayahColorTags.putIfAbsent(row.type, () => {}).add(row.ayahId);
     }
 
     final adhanNotifRows = await adhanNotifF;
@@ -1387,6 +1397,43 @@ class UserRepository {
     await (_db.delete(
       _db.activityBookmarks,
     )..where((t) => t.type.equals(type))).go();
+  }
+
+  // --- تصنيف ملوَّن حرّ متعدّد الآيات (راجع AyahColorTags) ---
+
+  /// كل معرّفات الآيات المصنَّفة بنوع [type] — عدد غير محدود، بخلاف
+  /// [activityBookmarkAyah] (آية واحدة فقط).
+  Set<int> ayahColorTagsFor(String type) => _ayahColorTags[type] ?? const {};
+
+  /// كل أنواع التصنيف المطبَّقة على آية واحدة (قد تكون أكثر من نوع معاً —
+  /// مثلاً "حفظ" و"تدبر" لنفس الآية).
+  Set<String> colorTagsForAyah(int ayahId) => {
+    for (final type in BookmarkTypes.all)
+      if (_ayahColorTags[type]?.contains(ayahId) ?? false) type,
+  };
+
+  /// يبدّل تصنيف [type] على [ayahId]: يضيفه لو غائب، يزيله لو موجود —
+  /// بخلاف [setActivityBookmark] (يستبدل دائماً، لا تبديل).
+  Future<void> toggleAyahColorTag(String type, int ayahId) async {
+    final current = _ayahColorTags.putIfAbsent(type, () => {});
+    if (current.contains(ayahId)) {
+      current.remove(ayahId);
+      await (_db.delete(_db.ayahColorTags)..where(
+            (t) => t.type.equals(type) & t.ayahId.equals(ayahId),
+          ))
+          .go();
+    } else {
+      current.add(ayahId);
+      await _db
+          .into(_db.ayahColorTags)
+          .insertOnConflictUpdate(
+            AyahColorTagsCompanion.insert(
+              type: type,
+              ayahId: ayahId,
+              taggedAt: DateTime.now(),
+            ),
+          );
+    }
   }
 
   // --- تفعيل إشعارات الأذان — بمفتاح `prayer` ('master' + خمس صلوات) ---
