@@ -104,12 +104,24 @@ class _ActiveChallengeCard extends ConsumerWidget {
       _challengeProgressStreamProvider((groupId: groupId, challengeId: challenge.id)),
     );
 
-    final daysLeft = challenge.remaining.inHours / 24;
-    final endedLabel = challenge.isEnded
-        ? 'انتهت المهلة'
-        : daysLeft < 1
-            ? 'باقي أقل من يوم'
-            : 'باقي ${daysLeft.ceil()} يوم';
+    final remaining = challenge.remaining;
+    final isEnded = challenge.isEnded;
+    
+    final String endedLabel;
+    final Color statusColor;
+    if (isEnded) {
+      endedLabel = 'انتهت المهلة';
+      statusColor = Colors.redAccent;
+    } else if (remaining.inDays >= 1) {
+      endedLabel = 'باقي ${remaining.inDays} يوم و${remaining.inHours % 24} ساعة';
+      statusColor = remaining.inDays > 2 ? accent : Colors.orangeAccent;
+    } else if (remaining.inHours >= 1) {
+      endedLabel = 'باقي ${remaining.inHours} ساعة و${remaining.inMinutes % 60} دقيقة';
+      statusColor = Colors.orangeAccent;
+    } else {
+      endedLabel = 'باقي ${remaining.inMinutes} دقيقة فقط!';
+      statusColor = Colors.redAccent;
+    }
 
     return AppCard(
       child: Padding(
@@ -128,16 +140,28 @@ class _ActiveChallengeCard extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: (challenge.isEnded ? Colors.red : accent).withValues(alpha: 0.12),
+                    color: statusColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: statusColor.withValues(alpha: 0.3)),
                   ),
-                  child: Text(
-                    endedLabel,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: challenge.isEnded ? Colors.red : accent,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isEnded ? Icons.timer_off_outlined : Icons.timer_outlined,
+                        size: 13,
+                        color: statusColor,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        endedLabel,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: statusColor,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -152,18 +176,29 @@ class _ActiveChallengeCard extends ConsumerWidget {
               data: (progressList) {
                 final mine = progressList.where((p) => p.userId == currentUid).toList();
                 final myValue = mine.isEmpty ? 0 : mine.first.value;
+                final myPercent = (myValue / challenge.targetValue).clamp(0.0, 1.0);
+
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'تقدّمك: $myValue / ${challenge.targetValue} ${challenge.unit}',
-                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: accent),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'تقدّمك: $myValue / ${challenge.targetValue} ${challenge.unit}',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: accent),
+                        ),
+                        Text(
+                          '${(myPercent * 100).toInt()}%',
+                          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: accent),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 6),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(6),
                       child: LinearProgressIndicator(
-                        value: (myValue / challenge.targetValue).clamp(0.0, 1.0),
+                        value: myPercent,
                         minHeight: 8,
                         backgroundColor: onSurface.withValues(alpha: 0.08),
                         valueColor: AlwaysStoppedAnimation(accent),
@@ -171,7 +206,7 @@ class _ActiveChallengeCard extends ConsumerWidget {
                     ),
                     const SizedBox(height: 16),
                     const Text(
-                      'ترتيب أعضاء التحدي',
+                      'لوحة شرف وإنجاز الأعضاء',
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
@@ -190,10 +225,16 @@ class _ActiveChallengeCard extends ConsumerWidget {
                           child: Row(
                             children: [
                               Text(
-                                '${i + 1}.',
-                                style: TextStyle(fontSize: 12, color: onSurface.withValues(alpha: 0.5)),
+                                i == 0
+                                    ? '🥇'
+                                    : i == 1
+                                        ? '🥈'
+                                        : i == 2
+                                            ? '🥉'
+                                            : '${i + 1}.',
+                                style: const TextStyle(fontSize: 13),
                               ),
-                              const SizedBox(width: 6),
+                              const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   progressList[i].displayName,
@@ -202,13 +243,18 @@ class _ActiveChallengeCard extends ConsumerWidget {
                                     fontWeight: progressList[i].userId == currentUid
                                         ? FontWeight.w800
                                         : FontWeight.w500,
+                                    color: progressList[i].userId == currentUid ? accent : onSurface,
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               Text(
-                                '${progressList[i].value} / ${challenge.targetValue}',
-                                style: TextStyle(fontSize: 12, color: onSurface.withValues(alpha: 0.6)),
+                                '${progressList[i].value} ${challenge.unit}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: onSurface.withValues(alpha: 0.75),
+                                ),
                               ),
                             ],
                           ),
@@ -228,7 +274,7 @@ class _ActiveChallengeCard extends ConsumerWidget {
                 Expanded(
                   child: FilledButton.icon(
                     icon: const Icon(Icons.add_task_rounded, size: 18),
-                    label: const Text('أضف تقدّمك'),
+                    label: const Text('تسجيل إنجاز'),
                     onPressed: () => _showContributeDialog(context, ref, groupId, challenge),
                   ),
                 ),
