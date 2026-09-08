@@ -8,7 +8,19 @@ import '../audio/audio_download_service.dart';
 import '../audio/quran_audio_controller.dart';
 import '../audio/reciters.dart';
 
+import '../audio/ayah_audio_service.dart';
+
 const List<double> _kSpeedSteps = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+
+String _formatAudioDuration(Duration d) {
+  final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+  final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+  if (d.inHours > 0) {
+    final hours = d.inHours.toString().padLeft(2, '0');
+    return '$hours:$minutes:$seconds';
+  }
+  return '$minutes:$seconds';
+}
 
 final _barSurahProvider = FutureProvider.family<Surah, int>((ref, id) {
   return ref.watch(quranRepositoryProvider).surahById(id);
@@ -37,168 +49,296 @@ class QuranAudioBar extends ConsumerWidget {
 
     final accent = themeAccent(context);
     final dividerColor = isDark ? AppColors.lineDark : AppColors.line;
+    final player = ref.watch(ayahAudioPlayerProvider);
 
-    // بطلب صاحب المشروع (٢٠٢٦-٠٩-٠١: "حاسها معجوقة، هات شكل حيوي وأسهل
-    // وأجمل") — أعدنا تصميم محتوى الشريط بلا تغيير ارتفاعه العام (يبقى
-    // مضغوطاً لتراص `_PageNavStrip` فوقه، القيد الأصلي الذي دفع للتصغير
-    // أول مرة): فاصل رأسي يفصل بصرياً معلومات القارئ عن أزرار التشغيل،
-    // وأزرار التشغيل صارت بكبسولة مستديرة خاصة بها مع فراغات حقيقية
-    // بينها (كانت متلاصقة بلا أي `SizedBox` — هذا أكبر سبب "التعجيق")،
-    // وزر التشغيل/الإيقاف صار دائرة معبّأة بلون التمييز (بؤرة العين
-    // الواضحة) بدل أيقونة تغرق وسط بقية الأزرار.
     return SafeArea(
       top: false,
       child: Container(
+        margin: const EdgeInsets.fromLTRB(4, 0, 4, 4),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: bg,
-          border: Border(top: BorderSide(color: dividerColor)),
-          boxShadow: const [
+          color: isDark ? const Color(0xFF1E2836) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
             BoxShadow(
-              color: Color(0x22000000),
-              blurRadius: 8,
-              offset: Offset(0, -2),
+              color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.14),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
             ),
           ],
+          border: Border.all(
+            color: isDark ? AppColors.lineDark : const Color(0xFFE8DECF),
+            width: 1.2,
+          ),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        // شاشات ضيّقة (أو تسمية تكرار طويلة، راجع `RepeatOption.labelAr`)
-        // كانت تفيض بصمت (Row واحد بعشر عناصر ثابتة العرض تقريباً وعنصر
-        // مرن وحيد بينها) — لُفّت بتمرير أفقي بدل تقييد/حذف أي زر، فتبقى
-        // كل الأزرار وصولاً بسحبة بسيطة بدل فيضان مقصوص. `Expanded` تحوّل
-        // لـ`SizedBox` عرض ثابت لأن الالتفاف داخل تمرير أفقي يجعل عرض
-        // الـRow غير محدود (`Expanded` تفشل ببناء بلا عرض محدود).
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              _CompactIconButton(
-                icon: Icons.close,
-                color: fg.withValues(alpha: 0.6),
-                onPressed: controller.stop,
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 128,
-                child: GestureDetector(
-                  onTap: () => _showReciterPicker(context, ref),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _AudioBarLabel(audio: audio, fg: fg),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // صف القارئ والأصل وإغلاق المشغل (Header)
+            Row(
+              children: [
+                _CompactIconButton(
+                  icon: Icons.close_rounded,
+                  color: fg.withValues(alpha: 0.55),
+                  size: 20,
+                  onPressed: controller.stop,
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () => _showReciterPicker(context, ref),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      child: Row(
                         children: [
-                          Flexible(
-                            child: Text(
-                              reciter.nameAr,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: fg.withValues(alpha: 0.6),
-                              ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _AudioBarLabel(audio: audio, fg: fg),
+                                const SizedBox(height: 1),
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        reciter.nameAr,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: accent,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Icon(
+                                      Icons.keyboard_arrow_down_rounded,
+                                      size: 16,
+                                      color: accent.withValues(alpha: 0.8),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
-                          if (audio.liveListenEnabled) ...[
-                            const SizedBox(width: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4,
-                                vertical: 1,
-                              ),
-                              decoration: BoxDecoration(
-                                color: accent.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                'مباشر',
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                _CompactIconButton(
+                  icon: Icons.more_vert_rounded,
+                  color: fg.withValues(alpha: 0.7),
+                  size: 20,
+                  onPressed: () =>
+                      _MoreOptionsSheet.show(context, audio: audio, fg: fg),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+
+            // شريط التقدم والوقت (Seek bar with elapsed and remaining duration)
+            StreamBuilder<Duration>(
+              stream: player.positionStream,
+              builder: (context, posSnap) {
+                final pos = posSnap.data ?? Duration.zero;
+                return StreamBuilder<Duration?>(
+                  stream: player.durationStream,
+                  builder: (context, durSnap) {
+                    final dur = durSnap.data ?? Duration.zero;
+                    final maxSec = dur.inMilliseconds > 0 ? dur.inMilliseconds.toDouble() : 1.0;
+                    final curSec = pos.inMilliseconds.clamp(0, maxSec.toInt()).toDouble();
+
+                    final posText = _formatAudioDuration(pos);
+                    final remDuration = dur > pos ? dur - pos : Duration.zero;
+                    final remText = dur.inMilliseconds > 0 ? '-${_formatAudioDuration(remDuration)}' : '--:--';
+
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: 3.5,
+                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                            overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+                            activeTrackColor: const Color(0xFF8D6E63),
+                            inactiveTrackColor: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
+                            thumbColor: const Color(0xFF6D4C41),
+                          ),
+                          child: Slider(
+                            value: curSec,
+                            max: maxSec,
+                            onChanged: (val) {
+                              player.seek(Duration(milliseconds: val.toInt()));
+                            },
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                posText,
                                 style: TextStyle(
-                                  fontSize: 8.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: accent,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: fg.withValues(alpha: 0.6),
                                 ),
                               ),
-                            ),
-                          ],
-                        ],
+                              Text(
+                                remText,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: fg.withValues(alpha: 0.6),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
+            const SizedBox(height: 4),
+
+            // صف أزرار التحكم بالصوت (الصورة 1)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                // زر التكرار
+                _CompactIconButton(
+                  icon: audio.repeat != RepeatOption.off
+                      ? Icons.repeat_one_rounded
+                      : Icons.repeat_rounded,
+                  color: audio.repeat != RepeatOption.off ? accent : fg.withValues(alpha: 0.6),
+                  size: 22,
+                  onPressed: () {
+                    controller.setRepeat(audio.repeat.nextOption);
+                  },
+                ),
+
+                // زر تأخير 10 ثوانٍ (-10)
+                IconButton(
+                  icon: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      const Icon(Icons.rotate_left_rounded, size: 28),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          '10',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: fg,
+                          ),
+                        ),
                       ),
                     ],
                   ),
+                  color: fg.withValues(alpha: 0.8),
+                  tooltip: 'تأخير 10 ثوانٍ',
+                  onPressed: () {
+                    final newPos = player.position - const Duration(seconds: 10);
+                    player.seek(newPos < Duration.zero ? Duration.zero : newPos);
+                  },
                 ),
-              ),
-              const SizedBox(width: 6),
-              // زر "المزيد" الوحيد يجمع التنزيل/التكرار/السرعة/مؤقت النوم —
-              // بدل أربعة أزرار دائمة الظهور بجانب أزرار التشغيل الأساسية
-              // (بطلب صاحب المشروع تبسيط الشريط).
-              _CompactIconButton(
-                icon: Icons.more_horiz_rounded,
-                color: fg,
-                onPressed: () =>
-                    _MoreOptionsSheet.show(context, audio: audio, fg: fg),
-              ),
-              const SizedBox(width: 6),
-              Container(width: 1, height: 30, color: dividerColor),
-              const SizedBox(width: 6),
-              // مجموعة التشغيل: كبسولة مستديرة تفصلها بصرياً عن باقي
-              // الشريط، وزر التشغيل بؤرتها الواضحة.
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                decoration: BoxDecoration(
-                  color: (isDark ? Colors.white : Colors.black).withValues(
-                    alpha: 0.04,
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _CompactIconButton(
-                      icon: Icons.skip_previous_rounded,
-                      color: fg,
-                      size: 22,
-                      onPressed: controller.previous,
+
+                // زر التشغيل / الإيقاف الرئيسي البارز
+                if (audio.isLoading)
+                  const SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: Padding(
+                      padding: EdgeInsets.all(10),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation(Color(0xFF6D4C41)),
+                      ),
                     ),
-                    const SizedBox(width: 2),
-                    if (audio.isLoading)
-                      const Padding(
-                        padding: EdgeInsets.all(7),
-                        child: SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2.4),
+                  )
+                else
+                  Material(
+                    color: const Color(0xFF6D4C41),
+                    shape: const CircleBorder(),
+                    elevation: 3,
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: controller.togglePlayPause,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Icon(
+                          audio.isPlaying
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
+                          color: Colors.white,
+                          size: 28,
                         ),
-                      )
-                    else
-                      Material(
-                        color: accent,
-                        shape: const CircleBorder(),
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: controller.togglePlayPause,
-                          child: Padding(
-                            padding: const EdgeInsets.all(7),
-                            child: Icon(
-                              audio.isPlaying
-                                  ? Icons.pause_rounded
-                                  : Icons.play_arrow_rounded,
-                              color: Colors.white,
-                              size: 22,
-                            ),
+                      ),
+                    ),
+                  ),
+
+                // زر تقديم 10 ثوانٍ (+10)
+                IconButton(
+                  icon: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      const Icon(Icons.rotate_right_rounded, size: 28),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          '10',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: fg,
                           ),
                         ),
                       ),
-                    const SizedBox(width: 2),
-                    _CompactIconButton(
-                      icon: Icons.skip_next_rounded,
-                      color: fg,
-                      size: 22,
-                      onPressed: controller.next,
-                    ),
-                  ],
+                    ],
+                  ),
+                  color: fg.withValues(alpha: 0.8),
+                  tooltip: 'تقديم 10 ثوانٍ',
+                  onPressed: () {
+                    final maxDur = player.duration ?? Duration.zero;
+                    final newPos = player.position + const Duration(seconds: 10);
+                    player.seek(newPos > maxDur ? maxDur : newPos);
+                  },
                 ),
-              ),
-            ],
-          ),
+
+                // زر سرعة التشغيل
+                InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () {
+                    final i = _kSpeedSteps.indexOf(audio.speed);
+                    final next = _kSpeedSteps[(i < 0 ? 0 : i + 1) % _kSpeedSteps.length];
+                    controller.setSpeed(next);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${audio.speed}x',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: audio.speed != 1.0 ? accent : fg.withValues(alpha: 0.75),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -219,51 +359,93 @@ class QuranAudioBar extends ConsumerWidget {
       builder: (sheetContext) {
         final onSurface = Theme.of(sheetContext).colorScheme.onSurface;
         final accent = themeAccent(sheetContext);
+        // بحث محلي بالاسم — بطلب صاحب المشروع "ضيف بحث عند القراء": ٤١ قارئاً
+        // (راجع `kReciters`) صار التمرير اليدوي بينهم بطيئاً لإيجاد قارئ
+        // معيّن. `StatefulBuilder` بدل تحويل الشيت كامل لودجت مستقلة — حالة
+        // البحث محلية بحتة (نص فلترة فقط)، لا داعي لملف/StatefulWidget جديد.
+        var query = '';
         return SafeArea(
           child: FractionallySizedBox(
-            heightFactor: 0.75,
-            child: Column(
-              children: [
-                const SizedBox(height: 10),
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: onSurface.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'اختر القارئ',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: onSurface,
-                  ),
-                ),
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-                    children: [
-                      for (final r in kReciters) ...[
-                        _ReciterRow(
-                          reciter: r,
-                          selected: r.id == audio.reciterId,
-                          accent: accent,
-                          onTap: () {
-                            ref
-                                .read(quranAudioControllerProvider.notifier)
-                                .setReciter(r.id);
-                            Navigator.of(sheetContext).pop();
-                          },
+            heightFactor: 0.8,
+            child: StatefulBuilder(
+              builder: (sheetContext, setSheetState) {
+                final filtered = query.trim().isEmpty
+                    ? kReciters
+                    : kReciters
+                          .where((r) => r.nameAr.contains(query.trim()))
+                          .toList();
+                return Column(
+                  children: [
+                    const SizedBox(height: 10),
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: onSurface.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'اختر القارئ',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: onSurface,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                      child: TextField(
+                        autofocus: false,
+                        onChanged: (v) => setSheetState(() => query = v),
+                        decoration: InputDecoration(
+                          hintText: 'ابحث عن قارئ...',
+                          prefixIcon: const Icon(Icons.search, size: 20),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
-                        const SizedBox(height: 8),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
+                      ),
+                    ),
+                    Expanded(
+                      child: filtered.isEmpty
+                          ? Center(
+                              child: Text(
+                                'لا يوجد قارئ بهذا الاسم',
+                                style: TextStyle(
+                                  color: onSurface.withValues(alpha: 0.5),
+                                ),
+                              ),
+                            )
+                          : ListView(
+                              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                              children: [
+                                for (final r in filtered) ...[
+                                  _ReciterRow(
+                                    reciter: r,
+                                    selected: r.id == audio.reciterId,
+                                    accent: accent,
+                                    onTap: () {
+                                      ref
+                                          .read(quranAudioControllerProvider.notifier)
+                                          .setReciter(r.id);
+                                      Navigator.of(sheetContext).pop();
+                                    },
+                                  ),
+                                  const SizedBox(height: 8),
+                                ],
+                              ],
+                            ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         );
