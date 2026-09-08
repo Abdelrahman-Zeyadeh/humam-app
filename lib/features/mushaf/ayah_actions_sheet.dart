@@ -126,34 +126,79 @@ class _AyahActionsSheetState extends ConsumerState<AyahActionsSheet> {
           final isBookmarked = prefs.isBookmarked(ayah.id);
           final colorTags = prefs.colorTagsForAyah(ayah.id);
 
-          return Center(
-            child: Container(
-              width: 260,
-              margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-              decoration: BoxDecoration(
-                color: cardBg,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: isDark ? AppColors.lineDark : const Color(0xFFE8E8E8),
-                  width: 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
-                    blurRadius: 20,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: Material(
-                  color: Colors.transparent,
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // 1. تشغيل إلى نهاية الجزء
+          // شيت سفلي كامل العرض بدل صندوق عائم عرضه ٢٦٠ فقط مُوسَّط بمنتصف
+          // الشاشة — بطلب صريح "شكل القائمة بدائي وفيش تفاعل": الصندوق
+          // الضيّق كان يخالف نمط كل شيتات التطبيق الأخرى (سفلية كاملة
+          // العرض بمقبض سحب، راجع `_ColorTagPickerSheet`/`_BookmarkPickerSheet`
+          // بنفس الملف)، ومساحة لمس محدودة تحسّ التفاعل بطيئاً/جامداً.
+          // أضفنا أيضاً رأس معاينة (سورة/رقم الآية + مقطع من نصها) — كانت
+          // القائمة سابقاً بلا أي سياق يوضّح أي آية يتصرّف المستخدم بها.
+          return Container(
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Material(
+                color: Colors.transparent,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(height: 10),
+                      Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: onSurface.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      // رأس المعاينة — سورة/رقم الآية + مقطع من النص، يمنح
+                      // القائمة سياقاً واضحاً بدلاً من قائمة إجراءات مجرَّدة.
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: themeAccent(context).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                surah != null ? '${surah.nameAr} · ${ayah.ayah}' : '${ayah.ayah}',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: themeAccent(context),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                stripQuranicMarksForDisplay(ayah.textUthmani),
+                                textDirection: TextDirection.rtl,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontFamily: 'AmiriQuran',
+                                  fontSize: 15.5,
+                                  height: 1.6,
+                                  color: onSurface,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Divider(height: 1, color: dividerColor),
+                      // 1. تشغيل إلى نهاية الجزء
                         _MenuItemTile(
                           icon: Icons.play_arrow_rounded,
                           titleBold: 'تشغيل',
@@ -299,8 +344,7 @@ class _AyahActionsSheetState extends ConsumerState<AyahActionsSheet> {
                             _NoteSheet.show(context, ayah.id, noteAsync.value);
                           },
                         ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
               ),
@@ -353,14 +397,23 @@ class _MenuItemTile extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8.5),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Row(
           children: [
-            // أيقونة البند بحجم أنيق
-            Icon(
-              icon,
-              size: 20,
-              color: isActive ? accent : onSurface.withValues(alpha: 0.85),
+            // شارة أيقونة دائرية — بدل أيقونة مجرَّدة، بنفس لغة بقية شيتات
+            // المشروع (`_BookmarkPickerSheet`/`_ColorTagPickerSheet` بنفس
+            // الملف) — تمنح مساحة لمس أوضح وتفاعلاً بصرياً أقوى.
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: (isActive ? accent : onSurface).withValues(alpha: isActive ? 0.15 : 0.06),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 19,
+                color: isActive ? accent : onSurface.withValues(alpha: 0.85),
+              ),
             ),
             const SizedBox(width: 12),
             // النص العريض والمكمل على سطر واحد
