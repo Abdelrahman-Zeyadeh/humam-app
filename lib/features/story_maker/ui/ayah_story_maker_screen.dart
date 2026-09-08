@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -19,7 +20,11 @@ import '../models/story_theme.dart';
 import 'widgets/ayah_end_circle.dart';
 import 'widgets/story_panel_controls.dart';
 
-enum StoryRatio { story, square, banner }
+// مقاسان فقط (بدل ٣) — بطلب صريح "خليها حجمين لانها في مكرر": المقاس
+// الثالث (١٦:٩ "بانر") كان متكرراً فعلياً بلا فائدة تصميمية مختلفة عن
+// المربّع (١:١) لبطاقة نصية رأسية المحتوى أصلاً — يُترك فقط القصة الرأسية
+// (٩:١٦) الأنسب لستوري إنستغرام/واتساب، والمربّع (١:١) الأنسب لمنشور عادي.
+enum StoryRatio { story, square }
 
 class AyahStoryMakerScreen extends ConsumerStatefulWidget {
   final int initialAyahId;
@@ -217,6 +222,35 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
       }
     } finally {
       if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
+  Future<void> _copyText(List<Ayah> ayahs, Surah surah) async {
+    final versesText = ayahs.map((a) => '﴿${a.textUthmani}﴾').join(' ');
+    final fullText = '$versesText\n[${surah.nameAr} - ${_referenceSuffix(ayahs)}]\nعبر تطبيق هُمَام';
+    await Clipboard.setData(ClipboardData(text: fullText));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم نسخ النص القرآني بنجاح 📋✨'),
+          backgroundColor: Color(0xFF2E7D32),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _copyGenericText(StoryContent content) async {
+    final fullText = '${content.mainText}\n${content.subText}\n[${content.sourceReference}]\nعبر تطبيق هُمَام';
+    await Clipboard.setData(ClipboardData(text: fullText));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم نسخ النص بنجاح 📋✨'),
+          backgroundColor: Color(0xFF2E7D32),
+          duration: Duration(seconds: 2),
+        ),
+      );
     }
   }
 
@@ -539,10 +573,6 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
       case StoryRatio.square:
         width = 310.0;
         height = 310.0;
-        break;
-      case StoryRatio.banner:
-        width = 330.0;
-        height = 190.0;
         break;
     }
 
@@ -953,116 +983,171 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
             ),
             const SizedBox(height: 10),
 
-            // النمط (بطاقة فنية / مظهر المصحف) والمقاس — صفّان منفصلان
-            // بعرض كامل كل واحد (كانا يتشاركان صفاً واحداً بـ`Expanded` +
-            // زر مقاس بعرضه الذاتي، فيضغط زر النمط الطويل النص لعرض ضيّق
-            // جداً ويتكسّر شكله لدائرة متراكبة بشاشات عادية — شكوى صريحة
-            // "شكله عجقة").
-            PanelLabel('النمط'),
-            SizedBox(
-              width: double.infinity,
-              child: SegmentedButton<bool>(
-                segments: const [
-                  ButtonSegment(value: false, label: Text('بطاقة فنية 🎨')),
-                  ButtonSegment(value: true, label: Text('مظهر المصحف 📖')),
+            // محدد عدد الآيات المعروضة (Screenshot 4)
+            PanelLabel('نطاق الآيات'),
+            Row(
+              children: [
+                for (int count = 1; count <= 4; count++) ...[
+                  Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(left: count < 4 ? 6.0 : 0.0),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: () {
+                          setState(() {
+                            if (count == 1) {
+                              _selectedAyahIdTo = null;
+                            } else {
+                              // إذا كان السقف يتجاوز عدد آيات السورة، يتم تصحيحه
+                              final maxPossible = (_selectedAyahId + (count - 1)).clamp(_selectedAyahId, 6236);
+                              _selectedAyahIdTo = maxPossible;
+                            }
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: ((count == 1 && _selectedAyahIdTo == null) ||
+                                    (_selectedAyahIdTo != null && (_selectedAyahIdTo! - _selectedAyahId + 1) == count))
+                                ? accent
+                                : (isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.05)),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            count == 1 ? 'آية' : (count == 2 ? 'آيتان' : '$count آيات'),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: ((count == 1 && _selectedAyahIdTo == null) ||
+                                      (_selectedAyahIdTo != null && (_selectedAyahIdTo! - _selectedAyahId + 1) == count))
+                                  ? Colors.white
+                                  : (isDark ? Colors.white70 : Colors.black87),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
-                selected: {_isMushafMode},
-                onSelectionChanged: (set) => setState(() {
-                  _isMushafMode = set.first;
-                  if (_isMushafMode) _customImagePath = null;
-                }),
-                style: SegmentedButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            PanelLabel('المقاس'),
-            SizedBox(
-              width: double.infinity,
-              child: SegmentedButton<StoryRatio>(
-                segments: const [
-                  ButtonSegment(value: StoryRatio.story, label: Text('9:16')),
-                  ButtonSegment(value: StoryRatio.square, label: Text('1:1')),
-                  ButtonSegment(value: StoryRatio.banner, label: Text('16:9')),
-                ],
-                selected: {_selectedRatio},
-                onSelectionChanged: (set) => setState(() => _selectedRatio = set.first),
-                style: SegmentedButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                ),
-              ),
+              ],
             ),
             const SizedBox(height: 10),
 
-            // شريط اختيار الثيمات والصورة المخصصة (إذا لم يكن في وضع المصحف)
+            // النمط (بطاقة فنية / مظهر المصحف) والمقاس
+            Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment(value: false, label: Text('بطاقة 🎨', style: TextStyle(fontSize: 11.5))),
+                      ButtonSegment(value: true, label: Text('مصحف 📖', style: TextStyle(fontSize: 11.5))),
+                    ],
+                    selected: {_isMushafMode},
+                    onSelectionChanged: (set) => setState(() {
+                      _isMushafMode = set.first;
+                      if (_isMushafMode) _customImagePath = null;
+                    }),
+                    style: SegmentedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 4,
+                  child: SegmentedButton<StoryRatio>(
+                    segments: const [
+                      ButtonSegment(value: StoryRatio.story, label: Text('9:16', style: TextStyle(fontSize: 11.5))),
+                      ButtonSegment(value: StoryRatio.square, label: Text('1:1', style: TextStyle(fontSize: 11.5))),
+                    ],
+                    selected: {_selectedRatio},
+                    onSelectionChanged: (set) => setState(() => _selectedRatio = set.first),
+                    style: SegmentedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // شريط اختيار ألوان الثيمات الدائرية والصورة المخصصة (Screenshot 4)
             if (!_isMushafMode) ...[
-              PanelLabel('الخلفية'),
+              PanelLabel('ألوان وثيمات التصميم'),
               SizedBox(
-                height: 38,
+                height: 48,
                 child: ListView(
                   scrollDirection: Axis.horizontal,
                   children: [
                     // زر اختيار صورة من المعرض
-                    InkWell(
-                      onTap: _pickCustomImage,
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        margin: const EdgeInsets.only(left: 8),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: _customImagePath != null ? accent.withValues(alpha: 0.2) : (isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.05)),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: _customImagePath != null ? accent : Colors.grey.withValues(alpha: 0.3),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.photo_library_outlined, size: 16, color: _customImagePath != null ? accent : null),
-                            const SizedBox(width: 5),
-                            Text(
-                              _customImagePath != null ? 'تغيير صورتي' : 'صورة من المعرض',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.bold,
-                                color: _customImagePath != null ? accent : null,
-                              ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: InkWell(
+                        onTap: _pickCustomImage,
+                        borderRadius: BorderRadius.circular(24),
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: _customImagePath != null ? accent.withValues(alpha: 0.2) : (isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.05)),
+                            border: Border.all(
+                              color: _customImagePath != null ? accent : Colors.grey.withValues(alpha: 0.35),
+                              width: 2,
                             ),
-                          ],
+                          ),
+                          child: Icon(
+                            Icons.photo_library_outlined,
+                            size: 20,
+                            color: _customImagePath != null ? accent : (isDark ? Colors.white70 : Colors.black54),
+                          ),
                         ),
                       ),
                     ),
 
+                    // دوائر الثيمات الجمالية
                     for (final t in StoryTheme.presets) ...[
-                      InkWell(
-                        onTap: () => setState(() {
-                          _selectedTheme = t;
-                          _customImagePath = null;
-                        }),
-                        borderRadius: BorderRadius.circular(10),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          margin: const EdgeInsets.only(left: 6),
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(colors: t.backgroundColors),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: (_selectedTheme.id == t.id && _customImagePath == null) ? accent : Colors.transparent,
-                              width: 2,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: InkWell(
+                          onTap: () => setState(() {
+                            _selectedTheme = t;
+                            _customImagePath = null;
+                          }),
+                          borderRadius: BorderRadius.circular(24),
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: t.backgroundColors,
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              border: Border.all(
+                                color: (_selectedTheme.id == t.id && _customImagePath == null)
+                                    ? Colors.white
+                                    : Colors.white24,
+                                width: (_selectedTheme.id == t.id && _customImagePath == null) ? 3 : 1.2,
+                              ),
+                              boxShadow: (_selectedTheme.id == t.id && _customImagePath == null)
+                                  ? [
+                                      BoxShadow(
+                                        color: t.accentColor.withValues(alpha: 0.5),
+                                        blurRadius: 8,
+                                        spreadRadius: 1,
+                                      ),
+                                    ]
+                                  : null,
                             ),
-                          ),
-                          child: Text(
-                            t.name,
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: (_selectedTheme.id == t.id && _customImagePath == null) ? FontWeight.bold : FontWeight.w600,
-                              color: t.textColor,
-                            ),
+                            child: (_selectedTheme.id == t.id && _customImagePath == null)
+                                ? const Center(
+                                    child: Icon(Icons.check_rounded, color: Colors.white, size: 22),
+                                  )
+                                : null,
                           ),
                         ),
                       ),
@@ -1072,6 +1157,33 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
               ),
               const SizedBox(height: 10),
             ],
+
+            // حجم خط الآية — بطلب صريح "عشان النص يظهر كله مش جزء منه بس":
+            // نص البطاقة يُعرَض داخل `SingleChildScrollView` بارتفاع بطاقة
+            // ثابت (راجع `_buildCardPreview`)، فالآيات الطويلة بحجم الخط
+            // الافتراضي تحتاج تمريراً يدوياً لرؤيتها كاملة — والتصدير
+            // (`RepaintBoundary.toImage`) يلتقط الجزء الظاهر فقط بلحظة
+            // الضغط، فقد تخرج الصورة النهائية بنص مبتور بلا أي تنبيه.
+            // تصغير الخط هون يحل المشكلة فعلياً: النص كامل بلا تمرير.
+            Row(
+              children: [
+                const Icon(Icons.format_size_rounded, size: 16),
+                const SizedBox(width: 6),
+                const Text('حجم الخط:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                Expanded(
+                  child: Slider(
+                    value: _fontSize,
+                    min: 14,
+                    max: 30,
+                    divisions: 16,
+                    label: _fontSize.round().toString(),
+                    activeColor: accent,
+                    onChanged: (val) => setState(() => _fontSize = val),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
 
             // خيارات الصورة الخاصة إن وُجدت
             if (_customImagePath != null) ...[
@@ -1096,30 +1208,7 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
               const SizedBox(height: 6),
             ],
 
-            // حجم الخط — صف مستقل بعرض كامل (كان يتشارك الصف مع ٤ شرائح
-            // فلتر معاً، بلا التفاف، فيضغط على بعضه بشاشات ضيّقة)
-            PanelLabel('حجم الخط'),
-            Row(
-              children: [
-                const Icon(Icons.format_size, size: 16),
-                Expanded(
-                  child: Slider(
-                    value: _fontSize,
-                    min: 16.0,
-                    max: 32.0,
-                    divisions: 8,
-                    label: '${_fontSize.round()}',
-                    activeColor: accent,
-                    onChanged: (val) => setState(() => _fontSize = val),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-
-            // عناصر إضافية — شرائح قابلة للالتفاف (`Wrap` بدل `Row`) عشان
-            // ما تنضغط ببعضها بشاشات ضيّقة
-            PanelLabel('عناصر إضافية'),
+            // خيارات البسملة والتفسير بحجم مقتضب
             Wrap(
               spacing: 6,
               runSpacing: 6,
@@ -1157,33 +1246,64 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            Divider(height: 1, color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.08)),
-            const SizedBox(height: 10),
 
-            // أزرار التصدير والمشاركة والحفظ
+            // أزرار الحفظ المباشر والنسخ والمشاركة (مطابقة للصورة 4)
             Row(
               children: [
+                // زر الحفظ (Save)
                 Expanded(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: accent,
-                      side: BorderSide(color: accent, width: 1.5),
+                  flex: 3,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6D4C41),
+                      foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      elevation: 2,
                     ),
-                    icon: const Icon(Icons.download_rounded, size: 20),
-                    label: const Text('حفظ بالصور', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
+                    icon: _isExporting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.download_rounded, size: 20),
+                    label: Text(
+                      _isExporting ? 'جارٍ الحفظ...' : 'حفظ',
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                    ),
                     onPressed: _isExporting ? null : _saveToGallery,
                   ),
                 ),
                 const SizedBox(width: 8),
+
+                // زر النسخ (Copy)
                 Expanded(
-                  flex: 2,
-                  child: AppPrimaryButton(
-                    label: _isExporting ? 'جارٍ التصدير...' : 'مشاركة الستوري 🚀',
-                    icon: Icons.share_rounded,
-                    color: accent,
-                    loading: _isExporting,
+                  flex: 3,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: isDark ? Colors.white : const Color(0xFF4A3B2C),
+                      side: BorderSide(
+                        color: isDark ? Colors.white38 : const Color(0xFF8D6E63),
+                        width: 1.5,
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    icon: const Icon(Icons.copy_rounded, size: 18),
+                    label: const Text('نسخ', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    onPressed: () => _copyText(ayahs, surah),
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // زر مشاركة سريع
+                Material(
+                  color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(14),
+                  child: IconButton(
+                    tooltip: 'مشاركة الستوري',
+                    icon: Icon(Icons.share_rounded, color: accent),
                     onPressed: _isExporting ? null : () => _exportAndShare(ayahs, surah),
                   ),
                 ),
@@ -1277,10 +1397,6 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
       case StoryRatio.square:
         width = 310.0;
         height = 310.0;
-        break;
-      case StoryRatio.banner:
-        width = 330.0;
-        height = 190.0;
         break;
     }
 
@@ -1462,7 +1578,6 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
                 segments: const [
                   ButtonSegment(value: StoryRatio.story, label: Text('9:16')),
                   ButtonSegment(value: StoryRatio.square, label: Text('1:1')),
-                  ButtonSegment(value: StoryRatio.banner, label: Text('16:9')),
                 ],
                 selected: {_selectedRatio},
                 onSelectionChanged: (set) => setState(() => _selectedRatio = set.first),
@@ -1471,66 +1586,72 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
             ),
             const SizedBox(height: 10),
 
-            PanelLabel('الخلفية'),
+            PanelLabel('ألوان وثيمات التصميم'),
             SizedBox(
-              height: 38,
+              height: 48,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 children: [
-                  InkWell(
-                    onTap: _pickCustomImage,
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      margin: const EdgeInsets.only(left: 8),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: _customImagePath != null ? accent.withValues(alpha: 0.2) : (isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.05)),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: _customImagePath != null ? accent : Colors.grey.withValues(alpha: 0.3),
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.photo_library_outlined, size: 16, color: _customImagePath != null ? accent : null),
-                          const SizedBox(width: 5),
-                          Text(
-                            _customImagePath != null ? 'تغيير صورتي' : 'صورة من المعرض',
-                            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: _customImagePath != null ? accent : null),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: InkWell(
+                      onTap: _pickCustomImage,
+                      borderRadius: BorderRadius.circular(24),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _customImagePath != null ? accent.withValues(alpha: 0.2) : (isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.05)),
+                          border: Border.all(
+                            color: _customImagePath != null ? accent : Colors.grey.withValues(alpha: 0.35),
+                            width: 2,
                           ),
-                        ],
+                        ),
+                        child: Icon(
+                          Icons.photo_library_outlined,
+                          size: 20,
+                          color: _customImagePath != null ? accent : (isDark ? Colors.white70 : Colors.black54),
+                        ),
                       ),
                     ),
                   ),
                   for (final t in StoryTheme.presets) ...[
-                    InkWell(
-                      onTap: () => setState(() {
-                        _selectedTheme = t;
-                        _customImagePath = null;
-                      }),
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        margin: const EdgeInsets.only(left: 6),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(colors: t.backgroundColors),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: (_selectedTheme.id == t.id && _customImagePath == null) ? accent : Colors.transparent,
-                            width: 2,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: InkWell(
+                        onTap: () => setState(() {
+                          _selectedTheme = t;
+                          _customImagePath = null;
+                        }),
+                        borderRadius: BorderRadius.circular(24),
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: t.backgroundColors,
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            border: Border.all(
+                              color: (_selectedTheme.id == t.id && _customImagePath == null) ? Colors.white : Colors.white24,
+                              width: (_selectedTheme.id == t.id && _customImagePath == null) ? 3 : 1.2,
+                            ),
+                            boxShadow: (_selectedTheme.id == t.id && _customImagePath == null)
+                                ? [
+                                    BoxShadow(
+                                      color: t.accentColor.withValues(alpha: 0.5),
+                                      blurRadius: 8,
+                                      spreadRadius: 1,
+                                    ),
+                                  ]
+                                : null,
                           ),
-                        ),
-                        child: Text(
-                          t.name,
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: (_selectedTheme.id == t.id && _customImagePath == null) ? FontWeight.bold : FontWeight.w600,
-                            color: t.textColor,
-                          ),
+                          child: (_selectedTheme.id == t.id && _customImagePath == null)
+                              ? const Center(child: Icon(Icons.check_rounded, color: Colors.white, size: 22))
+                              : null,
                         ),
                       ),
                     ),
@@ -1539,6 +1660,26 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
               ),
             ),
             const SizedBox(height: 10),
+
+            // حجم الخط — راجع نفس التعليق بـ_buildCardPreview أعلاه.
+            Row(
+              children: [
+                const Icon(Icons.format_size_rounded, size: 16),
+                const SizedBox(width: 6),
+                const Text('حجم الخط:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                Expanded(
+                  child: Slider(
+                    value: _fontSize,
+                    min: 14,
+                    max: 30,
+                    divisions: 16,
+                    label: _fontSize.round().toString(),
+                    onChanged: (val) => setState(() => _fontSize = val),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
 
             if (_customImagePath != null) ...[
               Row(
@@ -1561,25 +1702,6 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
               ),
               const SizedBox(height: 6),
             ],
-
-            PanelLabel('حجم الخط'),
-            Row(
-              children: [
-                const Icon(Icons.format_size, size: 16),
-                Expanded(
-                  child: Slider(
-                    value: _fontSize,
-                    min: 16.0,
-                    max: 32.0,
-                    divisions: 8,
-                    label: '${_fontSize.round()}',
-                    activeColor: accent,
-                    onChanged: (val) => setState(() => _fontSize = val),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
 
             PanelLabel('عناصر إضافية'),
             Wrap(
@@ -1608,32 +1730,55 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            Divider(height: 1, color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.08)),
-            const SizedBox(height: 10),
 
             Row(
               children: [
                 Expanded(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: accent,
-                      side: BorderSide(color: accent, width: 1.5),
+                  flex: 3,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6D4C41),
+                      foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      elevation: 2,
                     ),
-                    icon: const Icon(Icons.download_rounded, size: 20),
-                    label: const Text('حفظ بالصور', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
+                    icon: _isExporting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.download_rounded, size: 20),
+                    label: Text(_isExporting ? 'جارٍ الحفظ...' : 'حفظ', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                     onPressed: _isExporting ? null : _saveToGallery,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  flex: 2,
-                  child: AppPrimaryButton(
-                    label: _isExporting ? 'جارٍ التصدير...' : 'مشاركة 🚀',
-                    icon: Icons.share_rounded,
-                    color: accent,
-                    loading: _isExporting,
+                  flex: 3,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: isDark ? Colors.white : const Color(0xFF4A3B2C),
+                      side: BorderSide(
+                        color: isDark ? Colors.white38 : const Color(0xFF8D6E63),
+                        width: 1.5,
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    icon: const Icon(Icons.copy_rounded, size: 18),
+                    label: const Text('نسخ', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    onPressed: () => _copyGenericText(content),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Material(
+                  color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(14),
+                  child: IconButton(
+                    tooltip: 'مشاركة',
+                    icon: Icon(Icons.share_rounded, color: accent),
                     onPressed: _isExporting ? null : () => _exportAndShareGeneric(content),
                   ),
                 ),
