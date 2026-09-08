@@ -133,6 +133,43 @@ class StreaksRow extends ConsumerWidget {
         .toList();
     if (filtered.isEmpty) return const SizedBox.shrink();
 
+    // مستخدم جديد كلياً (كل سلاسله صفر) — بطلب صريح "الرئيسية للمستخدم
+    // الجديد معجوقة خاصة بسلاسل الاستمرار": شبكة بعشر بطاقات "٠" فارغة
+    // فوراً بأول فتح للتطبيق لا تعني شيئاً وتحسّ مزدحمة بلا فائدة. رسالة
+    // ترحيبية واحدة بدلها بدل الشبكة كاملة.
+    final hasAnyProgress = filtered.any((it) => it.days > 0);
+    if (!hasAnyProgress) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionLabel(
+            icon: Icons.local_fire_department_outlined,
+            label: 'سلاسل الاستمرار',
+            trailing: trailing,
+          ),
+          AppCard(
+            child: Row(
+              children: [
+                const Icon(Icons.emoji_events_outlined, color: AppColors.goldDeep, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'ابدأ أول نشاط اليوم عشان تبلش سلاسل استمرارك تظهر هون',
+                    style: TextStyle(fontSize: 12.5, color: homeTextSoft(context), height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    // لمستخدم عنده تقدّم فعلي: نعرض فقط السلاسل الفعّالة (أيام > ٠) —
+    // تصفير المزدحم بأصفار سلاسل لم يبدأها بعد، حتى لو مفعَّلة بتخصيص
+    // الداشبورد.
+    final withProgress = filtered.where((it) => it.days > 0).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -149,7 +186,7 @@ class StreaksRow extends ConsumerWidget {
           crossAxisSpacing: 8,
           childAspectRatio: 1.15,
           children: [
-            for (final item in filtered)
+            for (final item in withProgress)
               _StreakChip(
                 icon: item.icon,
                 label: item.label,

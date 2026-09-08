@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/data/user/dashboard_prefs.dart';
 import '../../../core/data/user/user_prefs.dart';
 import '../../../core/theme/app_accent_colors.dart';
 import '../../../core/theme/app_colors.dart';
@@ -10,6 +11,8 @@ import '../../onboarding/onboarding_target_keys.dart';
 import '../../profile/profile_stats_screen.dart';
 import '../../search/unified_search_screen.dart';
 import '../dashboard_customize_sheet.dart';
+
+enum _HeaderMenuAction { toggleMinimal, customize }
 
 /// شريط الترحيب أعلى الشاشة الرئيسية — تحية بحسب الوقت، اسم المستخدم،
 /// حالة المزامنة السحابية، والتاريخ الهجري. استُخرج من `home_screen.dart`
@@ -27,6 +30,7 @@ class HomeHeader extends ConsumerWidget {
     );
     final name = ref.watch(userPrefsProvider).userName.trim();
     final syncState = ref.watch(cloudSyncControllerProvider);
+    final isMinimal = ref.watch(dashboardMinimalModeProvider);
     final h = DateTime.now().hour;
     final greeting = h < 4
         ? 'طاب ليلك وقيامك 🌙'
@@ -84,27 +88,70 @@ class HomeHeader extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    // زر "تخصيص الواجهة" — كان زرّاً بأسفل الرئيسية بعد سكرول
-                    // طويل رغم إنه إجراء يُستخدم بشكل دوري؛ نقلناه هون
-                    // ضمن أزرار الهيدر الثابتة (أقرب وأدوم ظهورًا).
-                    InkWell(
+                    // "تخصيص الواجهة" + "الوضع البسيط" مُجمَّعان بقائمة
+                    // منسدلة واحدة بدل دائرتين منفصلتين — بطلب صريح "زبط
+                    // الهيدر العلوي لأنه معجوق": ٤ أزرار متلاصقة (بدّل
+                    // الوضع/تخصيص/بحث/حسابي) بجانب نص الترحيب كانت تحسّ
+                    // الهيدر مزدحماً، خصوصاً بالشاشات الضيّقة. الإجراءان
+                    // الأقل استخداماً يومياً جُمِّعا هون؛ البحث والحساب
+                    // (الأكثر استخداماً) بقيا أزرارهما المباشرة.
+                    PopupMenuButton<_HeaderMenuAction>(
                       key: dashboardCustomizeButtonKey,
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: () => showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        builder: (_) => const DashboardCustomizeSheet(),
-                      ),
+                      tooltip: 'المزيد',
+                      position: PopupMenuPosition.under,
+                      onSelected: (action) {
+                        switch (action) {
+                          case _HeaderMenuAction.toggleMinimal:
+                            ref.read(dashboardMinimalModeProvider.notifier).toggle();
+                            break;
+                          case _HeaderMenuAction.customize:
+                            showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              builder: (_) => const DashboardCustomizeSheet(),
+                            );
+                            break;
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        PopupMenuItem(
+                          value: _HeaderMenuAction.toggleMinimal,
+                          child: Row(
+                            children: [
+                              Icon(isMinimal ? Icons.view_agenda_rounded : Icons.tune_rounded, size: 18),
+                              const SizedBox(width: 10),
+                              Text(isMinimal ? 'العودة للواجهة الكاملة' : 'الوضع البسيط'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: _HeaderMenuAction.customize,
+                          child: Row(
+                            children: [
+                              Icon(Icons.dashboard_customize_outlined, size: 18),
+                              SizedBox(width: 10),
+                              Text('تخصيص الواجهة'),
+                            ],
+                          ),
+                        ),
+                      ],
                       child: Container(
                         padding: const EdgeInsets.all(8),
                         margin: const EdgeInsets.only(left: 8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.14),
+                          color: isMinimal
+                              ? Colors.white.withValues(alpha: 0.28)
+                              : Colors.white.withValues(alpha: 0.14),
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                          border: Border.all(
+                            color: isMinimal
+                                ? AppColors.goldSoft
+                                : Colors.white.withValues(alpha: 0.2),
+                            width: isMinimal ? 1.5 : 1,
+                          ),
                         ),
                         child: const Icon(
-                          Icons.dashboard_customize_outlined,
+                          Icons.more_vert_rounded,
                           color: Colors.white,
                           size: 18,
                         ),
