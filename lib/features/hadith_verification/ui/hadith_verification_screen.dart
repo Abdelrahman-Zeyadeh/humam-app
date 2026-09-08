@@ -12,6 +12,7 @@ import '../models/dorar_hadith_result.dart';
 import '../services/dorar_search_cache.dart';
 import '../services/dorar_search_service.dart';
 import '../services/dorar_webview_fetcher.dart';
+import 'widgets/dorar_result_card.dart';
 
 enum _SearchStatus { idle, loading, loaded, error }
 
@@ -37,6 +38,11 @@ class _HadithVerificationScreenState
   List<DorarHadithResult> _results = [];
   String? _errorMessage;
   String _lastQuery = '';
+
+  // حالة صفحة النتائج الإضافية ("تحميل المزيد") — راجع `_loadMore`.
+  int _currentPage = 1;
+  bool _hasMorePages = true;
+  bool _loadingMore = false;
 
   @override
   void initState() {
@@ -67,6 +73,8 @@ class _HadithVerificationScreenState
     setState(() {
       _status = _SearchStatus.loading;
       _errorMessage = null;
+      _currentPage = 1;
+      _hasMorePages = true;
     });
 
     try {
@@ -96,6 +104,15 @@ class _HadithVerificationScreenState
         _results = results;
         _status = _SearchStatus.loaded;
       });
+    } on DorarBlockedException {
+      // مختلف عمداً عن الرسالة العامة أسفله — "لا نتائج" ليست نفس معنى
+      // "الموقع حجب الطلب مؤقتاً" (راجع توثيق [DorarBlockedException]).
+      if (!mounted || _lastQuery != q) return;
+      setState(() {
+        _status = _SearchStatus.error;
+        _errorMessage =
+            'موسوعة الدرر السنية فرضت حماية مؤقتة على الطلبات الآن. انتظر قليلاً ثم أعد المحاولة.';
+      });
     } catch (e) {
       if (!mounted || _lastQuery != q) return;
       setState(() {
@@ -103,6 +120,52 @@ class _HadithVerificationScreenState
         _errorMessage =
             'تعذر الاتصال بموسوعة الدرر السنية. تأكد من اتصال الإنترنت وحاول مجدداً.';
       });
+    }
+  }
+
+  /// يجلب صفحة نتائج إضافية (`_currentPage + 1`) ويلحقها بالنتائج
+  /// المعروضة — بلا كاش (الكاش الحالي يخزّن الصفحة الأولى فقط لكل
+  /// استعلام، راجع `DorarSearchCache`؛ تعميمه لكل الصفحات خارج نطاق هذا
+  /// الإصلاح). فشل جلب صفحة إضافية لا يمسح النتائج المعروضة أصلاً — مجرد
+  /// تنبيه عابر (`SnackBar`).
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMorePages || _status != _SearchStatus.loaded) return;
+    setState(() => _loadingMore = true);
+    try {
+      final nextPage = _currentPage + 1;
+      final cache = ref.read(dorarSearchCacheProvider);
+      // كاش لكل صفحة على حدة الآن (راجع `DorarSearchCache._key`) — رجوع
+      // المستخدم لنفس البحث و"تحميل المزيد" مجدداً يعيد النتيجة المحفوظة
+      // فوراً بدل WebView جديد.
+      final cached = cache.get(_lastQuery, page: nextPage);
+      final List<DorarHadithResult> more;
+      if (cached != null) {
+        more = cached;
+      } else {
+        final html = await _fetcherController.fetchHtml(
+          dorarSearchUrl(_lastQuery, page: nextPage),
+        );
+        final service = ref.read(dorarSearchServiceProvider);
+        more = service.parseSearchResults(html);
+        unawaited(cache.set(_lastQuery, more, page: nextPage));
+      }
+      if (!mounted) return;
+      setState(() {
+        _loadingMore = false;
+        if (more.isEmpty) {
+          _hasMorePages = false;
+          return;
+        }
+        _currentPage = nextPage;
+        final existingIds = _results.map((r) => r.id).toSet();
+        _results = [..._results, ...more.where((r) => !existingIds.contains(r.id))];
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingMore = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذّر تحميل المزيد من النتائج')),
+      );
     }
   }
 
@@ -317,36 +380,112 @@ class _HadithVerificationScreenState
   }
 
   Widget _buildIdleState(Color accent, bool isDark) {
-    return Center(
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.fact_check_outlined,
-              size: 56,
-              color: accent.withValues(alpha: 0.5),
+    final cache = ref.watch(dorarSearchCacheProvider);
+    final history = cache.getRecentQueries();
+
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // لو فيه سجل بحث سابق
+          if (history.isNotEmpty) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.history_rounded, size: 18, color: accent),
+                    const SizedBox(width: 6),
+                    Text(
+                      'عمليات البحث الأخيرة',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : AppColors.ink,
+                      ),
+                    ),
+                  ],
+                ),
+                TextButton(
+                  onPressed: () async {
+                    await cache.clearHistory();
+                    setState(() {});
+                  },
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: Colors.redAccent.shade100,
+                  ),
+                  child: const Text('مسح السجل', style: TextStyle(fontSize: 11.5)),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            Text(
-              'اكتب نص الحديث بالأعلى للتحقق من صحته',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14.5,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white70 : AppColors.ink,
-              ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: history.map((q) {
+                return InputChip(
+                  label: Text(
+                    q,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white70 : AppColors.ink,
+                    ),
+                  ),
+                  avatar: Icon(Icons.search_rounded, size: 14, color: accent),
+                  backgroundColor: isDark
+                      ? const Color(0xFF1E2836)
+                      : accent.withValues(alpha: 0.08),
+                  side: BorderSide(
+                    color: isDark ? AppColors.lineDark : AppColors.line,
+                  ),
+                  onDeleted: () async {
+                    await cache.removeFromHistory(q);
+                    setState(() {});
+                  },
+                  onPressed: () {
+                    _searchCtrl.text = q;
+                    _runSearch(q);
+                  },
+                );
+              }).toList(),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'النتائج (الدرجة، الراوي، المصدر) تُجلب مباشرة من موسوعة الدرر السنية',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-            ),
+            const SizedBox(height: 32),
+            Divider(color: isDark ? AppColors.lineDark : AppColors.line, height: 1),
+            const SizedBox(height: 32),
           ],
-        ),
+
+          Center(
+            child: Column(
+              children: [
+                Icon(
+                  Icons.fact_check_outlined,
+                  size: 56,
+                  color: accent.withValues(alpha: 0.5),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'اكتب نص الحديث بالأعلى للتحقق من صحته',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white70 : AppColors.ink,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'النتائج (الدرجة، الراوي، المصدر) تُجلب مباشرة من موسوعة الدرر السنية وتُحفظ بالكاش لسرعة الوصول',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -485,288 +624,56 @@ class _HadithVerificationScreenState
           parent: BouncingScrollPhysics(),
         ),
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-        itemCount: _results.length,
+        // عنصر إضافي بالنهاية: زر "تحميل المزيد"/مؤشّر تحميل/رسالة نهاية
+        // النتائج (راجع `_loadMore`) — لا نعرضه لو صفحة واحدة فقط كافية.
+        itemCount: _results.length + (_hasMorePages ? 1 : 0),
         separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (context, index) => _ExpandableResultCard(
-          result: _results[index],
-          accent: accent,
-          isDark: isDark,
-          onOpenFullPage: () => _openFullPage(_results[index]),
-          onShare: () => _shareResult(_results[index]),
+        itemBuilder: (context, index) {
+          if (index >= _results.length) {
+            return _buildLoadMoreFooter(accent);
+          }
+          return DorarResultCard(
+            result: _results[index],
+            accent: accent,
+            isDark: isDark,
+            onOpenFullPage: () => _openFullPage(_results[index]),
+            onShare: () => _shareResult(_results[index]),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildLoadMoreFooter(Color accent) {
+    if (_loadingMore) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: SizedBox(
+            width: 26,
+            height: 26,
+            child: CircularProgressIndicator(strokeWidth: 2.5, color: accent),
+          ),
+        ),
+      );
+    }
+    return Center(
+      child: OutlinedButton.icon(
+        onPressed: _loadMore,
+        icon: const Icon(Icons.expand_more_rounded, size: 18),
+        label: const Text(
+          'تحميل المزيد من النتائج',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+        ),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: accent,
+          side: BorderSide(color: accent.withValues(alpha: 0.5)),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
     );
   }
 }
 
-/// بطاقة نتيجة واحدة **قابلة للطي** — النص (المتن) والدرجة يظهران أولاً
-/// فقط، وبقية التفاصيل (الراوي/المحدث/المصدر/التخريج/التصنيفات/أزرار
-/// الإجراءات) تظهر فقط بعد الضغط على البطاقة، بطلب صريح ("النص أولاً...
-/// اذا كبست بتوسع"، مطابقة لتجربة تطبيقات تحقّق حديث مشابهة). **بلا أي
-/// طلب شبكة إضافي عند التوسيع** — كل الحقول مُستخرَجة أصلاً دفعة وحدة من
-/// نفس صفحة نتائج البحث (`DorarSearchService.parseSearchResults`)، فطلب
-/// جلب منفصل لكل بطاقة عبر الـWebView الهش أصلاً (راجع توثيق
-/// `DorarWebViewFetcher`) كان سيُبطئ التوسيع ويُضاعف نقاط فشل الشبكة بلا
-/// أي معلومة جديدة فعلياً — "التوسيع" هون كشف لبيانات محلية جاهزة، لا
-/// إعادة جلب.
-class _ExpandableResultCard extends StatefulWidget {
-  const _ExpandableResultCard({
-    required this.result,
-    required this.accent,
-    required this.isDark,
-    required this.onOpenFullPage,
-    required this.onShare,
-  });
-
-  final DorarHadithResult result;
-  final Color accent;
-  final bool isDark;
-  final VoidCallback onOpenFullPage;
-  final VoidCallback onShare;
-
-  @override
-  State<_ExpandableResultCard> createState() => _ExpandableResultCardState();
-}
-
-class _ExpandableResultCardState extends State<_ExpandableResultCard> {
-  bool _expanded = false;
-
-  Color _gradeColor(String? grade) {
-    if (grade == null) return Colors.grey;
-    if (grade.contains('صحيح')) return Colors.green.shade600;
-    if (grade.contains('حسن')) return AppColors.goldDeep;
-    if (grade.contains('ضعيف') ||
-        grade.contains('منكر') ||
-        grade.contains('باطل') ||
-        grade.contains('موضوع') ||
-        grade.contains('لا يصح') ||
-        grade.contains('لا أصل له')) {
-      return Colors.redAccent.shade200;
-    }
-    return Colors.blueGrey;
-  }
-
-  IconData _gradeIcon(String? grade) {
-    if (grade == null) return Icons.help_outline_rounded;
-    if (grade.contains('صحيح')) return Icons.check_circle_rounded;
-    if (grade.contains('حسن')) return Icons.thumb_up_rounded;
-    if (grade.contains('ضعيف') ||
-        grade.contains('منكر') ||
-        grade.contains('باطل') ||
-        grade.contains('موضوع') ||
-        grade.contains('لا يصح') ||
-        grade.contains('لا أصل له')) {
-      return Icons.cancel_rounded;
-    }
-    return Icons.info_rounded;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final result = widget.result;
-    final isDark = widget.isDark;
-    final gradeColor = _gradeColor(result.grade);
-    final hasMoreDetails =
-        result.narrator != null ||
-        result.muhaddith != null ||
-        result.source != null ||
-        result.takhrij != null ||
-        result.categories.isNotEmpty;
-
-    return AppCard(
-      padding: const EdgeInsets.all(14),
-      onTap: () => setState(() => _expanded = !_expanded),
-      child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (result.grade != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: gradeColor.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: gradeColor.withValues(alpha: 0.4)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(_gradeIcon(result.grade), size: 14, color: gradeColor),
-                      const SizedBox(width: 5),
-                      Text(
-                        result.grade!,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: gradeColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              const SizedBox(height: 10),
-              Text(
-                result.matn,
-                maxLines: _expanded ? null : 4,
-                overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 14.5,
-                  height: 1.7,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white : AppColors.ink,
-                ),
-              ),
-              AnimatedSize(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeInOut,
-                alignment: Alignment.topCenter,
-                child: !_expanded
-                    ? const SizedBox.shrink()
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 14,
-                            runSpacing: 6,
-                            children: [
-                              if (result.narrator != null)
-                                _detailChip(
-                                  Icons.person_rounded,
-                                  result.narrator!,
-                                  isDark,
-                                ),
-                              if (result.muhaddith != null)
-                                _detailChip(
-                                  Icons.school_rounded,
-                                  result.muhaddith!,
-                                  isDark,
-                                ),
-                              if (result.source != null)
-                                _detailChip(
-                                  Icons.menu_book_rounded,
-                                  result.pageOrNumber != null
-                                      ? '${result.source} (${result.pageOrNumber})'
-                                      : result.source!,
-                                  isDark,
-                                ),
-                            ],
-                          ),
-                          if (result.takhrij != null) ...[
-                            const SizedBox(height: 8),
-                            Text(
-                              'التخريج: ${result.takhrij}',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
-                                color: isDark ? Colors.white60 : AppColors.inkSoft,
-                              ),
-                            ),
-                          ],
-                          if (result.categories.isNotEmpty) ...[
-                            const SizedBox(height: 10),
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 6,
-                              children: result.categories.take(4).map((c) {
-                                return Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isDark
-                                        ? Colors.white10
-                                        : Colors.black.withValues(alpha: 0.05),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    c,
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w600,
-                                      color: isDark ? Colors.white70 : Colors.black87,
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ],
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: widget.onOpenFullPage,
-                                  icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                                  label: const Text(
-                                    'الصفحة الكاملة',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12.5,
-                                    ),
-                                  ),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: widget.accent,
-                                    side: BorderSide(color: widget.accent.withValues(alpha: 0.5)),
-                                    padding: const EdgeInsets.symmetric(vertical: 10),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              IconButton.filledTonal(
-                                onPressed: widget.onShare,
-                                icon: const Icon(Icons.share_rounded, size: 18),
-                                tooltip: 'مشاركة الحديث',
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-              ),
-              // إشارة قابلية الطي/الفتح — تظهر فقط لو فيه فعلاً تفاصيل
-              // إضافية تستحق التوسيع (بعض النتائج بلا أي حقل إضافي أصلاً).
-              if (hasMoreDetails) ...[
-                const SizedBox(height: 6),
-                Center(
-                  child: AnimatedRotation(
-                    duration: const Duration(milliseconds: 220),
-                    turns: _expanded ? 0.5 : 0,
-                    child: Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      size: 20,
-                      color: (isDark ? Colors.white54 : AppColors.inkSoft),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-    );
-  }
-
-  Widget _detailChip(IconData icon, String value, bool isDark) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          icon,
-          size: 13,
-          color: isDark ? Colors.white54 : AppColors.inkSoft,
-        ),
-        const SizedBox(width: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 11.5,
-            fontWeight: FontWeight.w700,
-            color: isDark ? Colors.white70 : AppColors.ink,
-          ),
-        ),
-      ],
-    );
-  }
-}
 

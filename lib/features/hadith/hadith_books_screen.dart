@@ -60,7 +60,7 @@ class HadithBooksScreen extends ConsumerWidget {
       // بهالتعديل — كان يُحسب بلا أي استخدام لاحقاً بالملف).
       appBar: GradientAppBar(
         title: 'موسوعة الحديث النبوي',
-        colors: const [AppColors.purple, AppColors.navy],
+        colors: const [AppColors.blue, AppColors.navy],
         actions: [
           IconButton(
             icon: const Icon(Icons.verified_outlined),

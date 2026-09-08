@@ -8,6 +8,16 @@ final dorarSearchServiceProvider = Provider<DorarSearchService>((ref) {
   return DorarSearchService();
 });
 
+/// الصفحة حُمِّلت فعلياً (`WebView` انتهى تحميلها بنجاح) لكنها لم تكن صفحة
+/// نتائج بحث حقيقية — عادة صفحة تحدي حماية (Cloudflare "Just a moment...")
+/// حجبت الطلب مؤقتاً. **مختلف صراحةً عن "لا نتائج"**: الفرق جوهري للمستخدم
+/// (حديث غير موجود فعلاً ≠ الخدمة محجوبة الآن) وكانا يُعرَضان بنفس الرسالة
+/// "لم يتم العثور على نتائج" المضلِّلة قبل هذا التمييز. راجع
+/// `DorarSearchService._looksBlocked` لعلامات الكشف.
+class DorarBlockedException implements Exception {
+  const DorarBlockedException();
+}
+
 /// رابط صفحة نتائج بحث دُرر السنية — دالة موحّدة يستخدمها كل من الجالب
 /// الفعلي (`DorarWebViewFetcher`) وهذا الملف، لضمان تطابقهما دائماً.
 String dorarSearchUrl(String query, {int page = 1}) {
@@ -36,12 +46,34 @@ class DorarSearchService {
     final document = html_parser.parse(html);
     final blocks = document.querySelectorAll('div.border-bottom.py-4');
 
+    // لا نتائج إطلاقاً بالصفحة — قبل اعتبارها "لا نتائج فعلية" (بحث صحيح
+    // لحديث غير موجود)، نتحقق أولاً إنها مو صفحة حجب/تحدي حماية حُمِّلت
+    // بنجاح ظاهرياً (راجع توثيق [DorarBlockedException]).
+    if (blocks.isEmpty && _looksBlocked(html)) {
+      throw const DorarBlockedException();
+    }
+
     final results = <DorarHadithResult>[];
     for (final block in blocks) {
       final parsed = _parseResultBlock(block);
       if (parsed != null) results.add(parsed);
     }
     return results;
+  }
+
+  /// علامات نصية معروفة لصفحات تحدي Cloudflare ("Just a moment...")
+  /// وصفحات حجب مشابهة — لا اعتماد على بنية HTML كاملة (هشّة أصلاً وقد
+  /// تتغيّر) بل نص ظاهر مستقر عبر إصدارات Cloudflare المختلفة.
+  static bool _looksBlocked(String html) {
+    final lower = html.toLowerCase();
+    const markers = [
+      'just a moment',
+      'cf-chl',
+      'cf_chl_opt',
+      'attention required',
+      'checking your browser',
+    ];
+    return markers.any(lower.contains);
   }
 
   DorarHadithResult? _parseResultBlock(Element block) {

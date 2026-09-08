@@ -13,10 +13,12 @@ class DailyHadithCard extends StatelessWidget {
     super.key,
     required this.hadith,
     required this.onCopy,
+    this.onDesignCard,
   });
 
   final DailyHadithItem hadith;
   final VoidCallback onCopy;
+  final VoidCallback? onDesignCard;
 
   @override
   Widget build(BuildContext context) {
@@ -104,6 +106,12 @@ class DailyHadithCard extends StatelessWidget {
                   ),
                 ),
               ),
+              if (onDesignCard != null)
+                IconButton(
+                  icon: const Icon(Icons.palette_outlined, size: 19),
+                  tooltip: 'تصميم بطاقة ستوري',
+                  onPressed: onDesignCard,
+                ),
               IconButton(
                 icon: const Icon(Icons.copy_outlined, size: 18),
                 tooltip: 'نسخ الحديث',
