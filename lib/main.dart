@@ -13,6 +13,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/data/hadith/hadith_providers.dart';
+import 'core/deep_links/deep_link_service.dart';
 import 'core/platform/dnd_service.dart';
 import 'core/data/user/hifz_prefs.dart';
 import 'core/data/user/khatma_prefs.dart';
@@ -34,6 +35,10 @@ import 'features/notifications/smart_reminder_sync.dart';
 import 'features/notifications/weekly_summary_text.dart';
 import 'features/prayer/prayer_location_controller.dart';
 import 'features/splash/splash_screen.dart';
+
+/// مفتاح ملاح جذري — يسمح لـ`DeepLinkService` بالتنقّل (فتح حوار الانضمام
+/// لمجموعة عبر رابط دعوة) بلا `BuildContext` محلي جاهز عند وصول الرابط.
+final rootNavigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -120,6 +125,13 @@ void main() async {
   // فلسفة `AudioService.init`/إشعارات الأذان أعلاه.
   if (!kIsWeb && Platform.isAndroid) {
     unawaited(_initFirebaseInBackground());
+  }
+
+  // رابط دعوة مباشر لمجموعات الصحبة (`humam://join/<code>`) — بالخلفية
+  // بنفس فلسفة بقية التهيئات أعلاه، مقصورة على أندرويد/iOS (`app_links`
+  // بلا دعم ويندوز فعلي). راجع `deep_link_service.dart`.
+  if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+    unawaited(DeepLinkService.instance.init(rootNavigatorKey));
   }
 
   runApp(
@@ -476,6 +488,7 @@ class HumamApp extends ConsumerWidget {
       ref.read(userPrefsProvider).accentColorId,
     );
     return MaterialApp(
+      navigatorKey: rootNavigatorKey,
       title: 'هُمَام',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(accent: accent),

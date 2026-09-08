@@ -11,9 +11,14 @@ import '../group_details_screen.dart';
 import 'avatar_picker.dart';
 
 /// حوار "الانضمام برمز المجموعة" — يُفتح من زر الانضمام بأعلى مركز
-/// المجموعات.
-Future<void> showJoinGroupDialog(BuildContext context, WidgetRef ref) async {
-  final codeCtrl = TextEditingController();
+/// المجموعات، أو تلقائياً برمز مُعبَّأ مسبقاً عند فتح رابط دعوة مباشر
+/// (`initialCode`، راجع `deep_link_service.dart`).
+Future<void> showJoinGroupDialog(
+  BuildContext context,
+  WidgetRef ref, {
+  String? initialCode,
+}) async {
+  final codeCtrl = TextEditingController(text: initialCode ?? '');
   var isLoading = false;
   var selectedAvatarIndex = await GroupsService.instance.getMyAvatarIndex();
   if (!context.mounted) return;

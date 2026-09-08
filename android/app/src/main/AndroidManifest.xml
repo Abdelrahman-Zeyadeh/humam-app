@@ -76,6 +76,17 @@
                 <category android:name="android.intent.category.DEFAULT"/>
                 <data android:scheme="humam"/>
             </intent-filter>
+            <!-- رابط دعوة مباشر لمجموعات الصحبة: humam://join/<code> — نفس
+                 الـscheme الذي يستخدمه ويدجت الشاشة الرئيسية أعلاه لكن بفعل
+                 VIEW/BROWSABLE منفصل (لا LAUNCH الخاص بالويدجت)، فتُفتح
+                 التطبيق مباشرة من رابط مُشارَك بواتساب/الرسائل. راجع
+                 core/deep_links/deep_link_service.dart. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="humam" android:host="join"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
