@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../onboarding/onboarding_target_keys.dart';
 import '../quran_audio_bar.dart';
 import '../mushaf_screen.dart' show kMushafPageCount;
+import '../mushaf_settings.dart';
 
 /// أشرطة/شرائط المصحف العائمة والدائمة — استُخرجت من `mushaf_screen.dart`
 /// أثناء تفكيك الملف بلا أي تغيير سلوكي: كل هذي الودجتات كانت أصلاً
@@ -180,6 +181,25 @@ class TopChromeBar extends StatelessWidget {
                 tooltip: 'بحث',
                 onPressed: onSearch,
               ),
+              // وضع الحفظ الذاتي وإخفاء الآيات
+              Consumer(
+                builder: (context, ref, _) {
+                  final isHifzMode = ref.watch(memorizationModeProvider);
+                  final accent = themeAccent(context);
+                  return IconButton(
+                    visualDensity: VisualDensity.compact,
+                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                    padding: const EdgeInsets.all(6),
+                    iconSize: 20,
+                    icon: Icon(
+                      isHifzMode ? Icons.visibility_off_rounded : Icons.visibility_outlined,
+                      color: isHifzMode ? accent : fg,
+                    ),
+                    tooltip: isHifzMode ? 'إيقاف وضع اختبار الحفظ' : 'بدء وضع اختبار الحفظ والتسميع',
+                    onPressed: () => ref.read(memorizationModeProvider.notifier).toggle(),
+                  );
+                },
+              ),
               // قراءة مع التفسير — تمرير طولي متواصل، كل آية وتحتها تفسيرها
               IconButton(
                 key: mushafTafsirReadingButtonKey,
@@ -338,13 +358,13 @@ class _PageIdentityBarState extends ConsumerState<PageIdentityBar> {
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+          padding: const EdgeInsets.fromLTRB(16, 2, 16, 3),
           child: Container(
-            height: 46,
+            height: 36,
             decoration: BoxDecoration(
               color: accent.withValues(alpha: isDark ? 0.08 : 0.05),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: accent.withValues(alpha: 0.28)),
+              borderRadius: BorderRadius.circular(9),
+              border: Border.all(color: accent.withValues(alpha: 0.25)),
             ),
             child: Row(
               children: [

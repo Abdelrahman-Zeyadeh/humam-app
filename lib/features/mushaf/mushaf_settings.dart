@@ -41,6 +41,35 @@ final themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(
   ThemeModeNotifier.new,
 );
 
+const _kAmoledDarkModeKey = 'app_amoled_dark_mode';
+
+class AmoledDarkModeNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    final prefs = ref.watch(sharedPreferencesProvider);
+    return prefs.getBool(_kAmoledDarkModeKey) ?? false;
+  }
+
+  Future<void> toggle() async {
+    final next = !state;
+    state = next;
+    final prefs = ref.read(sharedPreferencesProvider);
+    await prefs.setBool(_kAmoledDarkModeKey, next);
+  }
+
+  Future<void> set(bool enabled) async {
+    state = enabled;
+    final prefs = ref.read(sharedPreferencesProvider);
+    await prefs.setBool(_kAmoledDarkModeKey, enabled);
+  }
+}
+
+final amoledDarkModeProvider =
+    NotifierProvider<AmoledDarkModeNotifier, bool>(
+      AmoledDarkModeNotifier.new,
+    );
+
+
 const _kMushafFontEditionKey = 'mushaf_font_edition';
 
 /// نوع خط صفحة المصحف / الطبعة:

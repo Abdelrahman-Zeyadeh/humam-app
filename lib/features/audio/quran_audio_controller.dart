@@ -20,6 +20,7 @@ enum RepeatOption {
   times2,
   times3,
   times5,
+  times10,
   infinite;
 
   /// عدد مرّات تكرار الطابور الأساسي كاملاً (`null` = تكرار مستمر عبر
@@ -29,6 +30,7 @@ enum RepeatOption {
     RepeatOption.times2 => 2,
     RepeatOption.times3 => 3,
     RepeatOption.times5 => 5,
+    RepeatOption.times10 => 10,
     RepeatOption.infinite => null,
   };
 
@@ -37,6 +39,7 @@ enum RepeatOption {
     RepeatOption.times2 => 'تكرار ×٢',
     RepeatOption.times3 => 'تكرار ×٣',
     RepeatOption.times5 => 'تكرار ×٥',
+    RepeatOption.times10 => 'تكرار حفظ ×١٠',
     RepeatOption.infinite => 'تكرار مستمر',
   };
 
