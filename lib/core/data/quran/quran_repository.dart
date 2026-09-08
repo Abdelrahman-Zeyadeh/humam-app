@@ -130,6 +130,14 @@ class QuranRepository {
         ..orderBy([(a) => OrderingTerm.asc(a.ayah)]))
       .get();
 
+  /// كل آيات جزء واحد (١-٣٠) مرتّبة بترتيب المصحف (`id` = ترتيب عام صحيح
+  /// عبر كل السور) — يُستخدَم لنطاق اختبار الحفظ بالجزء كاملاً
+  /// (`HifzQuizScreen`) بدل الاقتصار على سورة واحدة أو نطاق يدوي.
+  Future<List<Ayah>> ayahsForJuz(int juz) => (_db.select(_db.ayahs)
+        ..where((a) => a.juz.equals(juz))
+        ..orderBy([(a) => OrderingTerm.asc(a.id)]))
+      .get();
+
   /// نطاق آيات متتالٍ بمعرّفات صفوف من fromId إلى toId شاملَين — يُستخدَم
   /// لميزة "من — إلى" باستوديو بطاقات الآيات (`AyahStoryMakerScreen`).
   Future<List<Ayah>> ayahsInIdRange(int fromId, int toId) => (_db.select(_db.ayahs)
@@ -344,5 +352,34 @@ class QuranRepository {
       final ayah = _db.ayahs.map(row.data);
       return SimilarAyahResult(ayah: ayah, surahNameAr: row.read<String>('surah_name_ar'));
     }).toList();
+  }
+
+  /// آيات "الأصل" (`mutashabihat.ayah_id`) اللي نصها **أو** نص أي واحدة من
+  /// متشابهاتها يطابق [query] — بحث عام بكل القرآن بلا تحديد سورة مسبقاً،
+  /// بطلب صريح "بحث بالمتشابهة اللي بدك اياها بدون ما تحدد السورة... حالياً
+  /// البحث مقتصر على السورة المحدَّدة فقط" (`mutashabihat_screen.dart`).
+  /// استعلام SQL واحد على جدول `mutashabihat` مباشرة (`JOIN` مزدوج لنص
+  /// الأصل والمتشابهة معاً) بدل تكرار [similarAyahsFor] على كل آيات
+  /// القرآن الـ٦٢٣٦ (كان سيكون بطيئاً جداً لكل ضغطة مفتاح بحث).
+  Future<List<Ayah>> searchMutashabihatOrigins(String query) async {
+    final rows = await _db
+        .customSelect(
+          '''
+          SELECT DISTINCT origin.*
+          FROM mutashabihat
+          JOIN ayahs AS origin ON origin.id = mutashabihat.ayah_id
+          JOIN ayahs AS sim ON sim.id = mutashabihat.similar_ayah_id
+          WHERE origin.text_uthmani LIKE ? OR sim.text_uthmani LIKE ?
+          ORDER BY origin.id
+          ''',
+          variables: [
+            Variable.withString('%$query%'),
+            Variable.withString('%$query%'),
+          ],
+          readsFrom: {_db.mutashabihat, _db.ayahs},
+        )
+        .get();
+
+    return rows.map((row) => _db.ayahs.map(row.data)).toList();
   }
 }
