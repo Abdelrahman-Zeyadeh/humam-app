@@ -262,3 +262,25 @@ final dashboardCardsPrefsProvider =
     NotifierProvider<DashboardCardsPrefsNotifier, Set<String>>(
       DashboardCardsPrefsNotifier.new,
     );
+
+const _kDashboardMinimalModeKey = 'dashboard_minimal_mode_v1';
+
+class DashboardMinimalModeNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    final prefs = ref.watch(sharedPreferencesProvider);
+    return prefs.getBool(_kDashboardMinimalModeKey) ?? false;
+  }
+
+  Future<void> toggle() async {
+    final next = !state;
+    state = next;
+    final prefs = ref.read(sharedPreferencesProvider);
+    await prefs.setBool(_kDashboardMinimalModeKey, next);
+  }
+}
+
+final dashboardMinimalModeProvider =
+    NotifierProvider<DashboardMinimalModeNotifier, bool>(
+      DashboardMinimalModeNotifier.new,
+    );

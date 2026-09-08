@@ -66,7 +66,16 @@ abstract final class AppTheme {
     );
   }
 
-  static ThemeData dark({AppAccentColor accent = kDefaultAppAccentColor}) {
+  static ThemeData dark({
+    AppAccentColor accent = kDefaultAppAccentColor,
+    bool isAmoled = false,
+  }) {
+    final bgColor = isAmoled ? Colors.black : accent.primaryDark;
+    final surfaceColor = isAmoled ? const Color(0xFF101010) : AppColors.surfaceDark;
+    final cardBorder = isAmoled
+        ? const BorderSide(color: Color(0xFF222222))
+        : const BorderSide(color: AppColors.lineDark);
+
     final base = ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
@@ -75,18 +84,18 @@ abstract final class AppTheme {
         onPrimary: accent.onColor,
         secondary: accent.color,
         onSecondary: accent.onColor,
-        surface: AppColors.surfaceDark,
+        surface: surfaceColor,
         onSurface: AppColors.inkOnDark,
         error: const Color(0xFFCF6679),
         onError: Colors.black,
       ),
-      scaffoldBackgroundColor: accent.primaryDark,
+      scaffoldBackgroundColor: bgColor,
       fontFamily: _kCairoFamily,
     );
 
     return base.copyWith(
       appBarTheme: base.appBarTheme.copyWith(
-        backgroundColor: accent.primaryDark,
+        backgroundColor: bgColor,
         foregroundColor: AppColors.inkOnDark,
         elevation: 0,
         centerTitle: true,
@@ -98,7 +107,7 @@ abstract final class AppTheme {
         ),
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        backgroundColor: AppColors.surfaceDark,
+        backgroundColor: surfaceColor,
         selectedItemColor: accent.color,
         unselectedItemColor: AppColors.inkSoftOnDark,
         selectedLabelStyle: const TextStyle(
@@ -114,13 +123,16 @@ abstract final class AppTheme {
         type: BottomNavigationBarType.fixed,
         elevation: 6,
       ),
-      dividerTheme: const DividerThemeData(color: AppColors.lineDark, space: 1),
+      dividerTheme: DividerThemeData(
+        color: isAmoled ? const Color(0xFF1F1F1F) : AppColors.lineDark,
+        space: 1,
+      ),
       cardTheme: base.cardTheme.copyWith(
-        color: AppColors.surfaceDark,
+        color: surfaceColor,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
-          side: const BorderSide(color: AppColors.lineDark),
+          side: cardBorder,
         ),
       ),
     );

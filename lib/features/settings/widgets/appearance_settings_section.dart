@@ -50,6 +50,23 @@ class AppearanceSettingsSection extends ConsumerWidget {
                   onSelectionChanged: (s) =>
                       ref.read(themeModeProvider.notifier).set(s.first),
                 ),
+                if (themeMode != ThemeMode.light) ...[
+                  const SizedBox(height: 12),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text(
+                      'الوضع الليلي الصافي (AMOLED Black)',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: const Text(
+                      'خلفية سوداء نقية بالكامل لتوفير البطارية وإراحة العين تماماً',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    value: ref.watch(amoledDarkModeProvider),
+                    onChanged: (val) =>
+                        ref.read(amoledDarkModeProvider.notifier).set(val),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 const SubHeader('لون تمييز التطبيق'),
                 const _AppAccentSection(),

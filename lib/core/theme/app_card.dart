@@ -121,7 +121,22 @@ class GradientAppBar extends StatelessWidget implements PreferredSizeWidget {
     return AppBar(
       title:
           titleWidget ??
-          Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+          // **باج حقيقي مُصلَح هون**: عناوين طويلة (مثلاً "مجموعات الصحبة
+          // والتنافس الإيماني") كانت تُقتَص بعلامة "..." لأن `Text` بلا
+          // أي تصغير تلقائي بعرض شريط العنوان المحدود — خصوصاً وسط
+          // `centerTitle: false` (افتراضي هون) يلي بيحاذي العنوان يمين
+          // الشاشة فيقلّل المساحة المتاحة أكتر. `FittedBox` بيصغّر الخط
+          // تلقائياً بس لو النص أطول من المساحة، بلا أي تغيير للعناوين
+          // القصيرة العادية.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: centerTitle ? Alignment.center : AlignmentDirectional.centerStart,
+            child: Text(
+              title,
+              maxLines: 1,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+            ),
+          ),
       centerTitle: centerTitle,
       backgroundColor: Colors.transparent,
       elevation: 0,

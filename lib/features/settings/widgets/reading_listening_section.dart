@@ -236,18 +236,50 @@ class _DndWhileReadingTile extends ConsumerWidget {
             final proceed = await showDialog<bool>(
               context: context,
               builder: (dialogContext) => AlertDialog(
-                title: const Text('إذن إضافي مطلوب'),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+                contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                title: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.teal.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.do_not_disturb_on_rounded,
+                        color: AppColors.teal,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'وضع الخشوع أثناء القراءة',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 content: const Text(
-                  'هالميزة تحتاج تصريح "الوصول لسياسة الإشعارات" من إعدادات النظام — سيفتح لك التطبيق شاشة الإعدادات المطلوبة، فعّل هُمَام منها ثم ارجع.',
+                  'لكتم إشعارات الهاتف مؤقتاً طوال وجودك داخل المصحف الشريف وإعادتها فور خروجك تلقائياً، يحتاج أندرويد إذناً خاصاً يسمى "الوصول لسياسة الإشعارات".\n\nسننقلك الآن للإعدادات، اختر تطبيق "هُمَام" وفعّل المفتاح.',
+                  style: TextStyle(fontSize: 13, height: 1.6),
                 ),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.of(dialogContext).pop(false),
-                    child: const Text('إلغاء'),
+                    child: const Text('لاحقاً'),
                   ),
-                  FilledButton(
+                  FilledButton.icon(
                     onPressed: () => Navigator.of(dialogContext).pop(true),
-                    child: const Text('فتح الإعدادات'),
+                    icon: const Icon(Icons.settings_outlined, size: 16),
+                    label: const Text('الانتقال للإعدادات'),
                   ),
                 ],
               ),

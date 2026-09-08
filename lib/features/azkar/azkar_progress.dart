@@ -21,7 +21,11 @@ class AzkarProgressNotifier extends Notifier<Map<AzkarProgressKey, int>> {
     final key = (period, order);
     final current = state[key] ?? total;
     if (current <= 0) return;
-    HapticFeedback.lightImpact();
+    if (current == 1) {
+      HapticFeedback.mediumImpact();
+    } else {
+      HapticFeedback.lightImpact();
+    }
     state = {...state, key: current - 1};
   }
 
