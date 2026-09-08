@@ -11,6 +11,7 @@ import '../fasting/ui/fasting_assistant_screen.dart';
 import '../groups/ui/groups_hub_screen.dart';
 import '../hadith/hadith_hub_screen.dart';
 import '../hifz/hifz_screen.dart';
+import '../hifz/mutashabihat_screen.dart';
 import '../hijri/hijri_calendar_screen.dart';
 import '../home/weekly_report_screen.dart';
 import '../khatma/khatma_screen.dart';
@@ -18,14 +19,17 @@ import '../mushaf/bookmarks_screen.dart';
 import '../mushaf/notes_screen.dart';
 import '../names_of_allah/names_of_allah_screen.dart';
 import '../prayer/qibla_screen.dart';
+import '../duroos/duroos_screen.dart';
 import '../profile/achievements_screen.dart';
 import '../profile/profile_stats_screen.dart';
 import '../qiyam/qiyam_screen.dart';
+import '../radio/quran_radio_screen.dart';
 import '../radio/radio_and_duroos_screen.dart';
 import '../tajweed/ui/tajweed_screen.dart';
 import 'reminders_screen.dart';
 import '../onboarding/onboarding_target_keys.dart';
 import '../settings/settings_screen.dart';
+import '../wallpapers/wallpapers_screen.dart';
 import '../wrapped/ui/faith_wrapped_screen.dart';
 
 /// أداة داخل مركز الأدوات
@@ -342,19 +346,44 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
       ).push(MaterialPageRoute(builder: (_) => const TajweedScreen())),
     ),
     _ToolItem(
-      // id جديد مقصود (لا 'radio' ولا 'duroos') — الاثنان دُمجا بشاشة واحدة
-      // بتبويبين (`RadioAndDuroosScreen`، بطلب صريح لتقليل زحمة هالقائمة).
-      // إحصاء "الأكثر استخدامًا" لأي ضغطة قديمة على المعرّفين السابقين
-      // تُتجاهَل بأمان تلقائياً (`byId[id] case final tool?` بأسفل هالملف
-      // يرشّح أي id غير موجود بالقائمة الحالية — نفس آلية حذفيات سابقة).
-      id: 'radio_duroos',
-      title: 'الإذاعة والدروس الصوتية',
-      icon: Icons.radio_outlined,
+      id: 'radio',
+      title: 'الإذاعات والبث المباشر',
+      icon: Icons.podcasts_rounded,
       category: 'المكتبة والعلوم',
-      color: _toolShade(_kToolCategories[2].color, 5, 6),
+      color: _toolShade(_kToolCategories[2].color, 5, 7),
       onTap: (ctx, _) => Navigator.of(
         ctx,
-      ).push(MaterialPageRoute(builder: (_) => const RadioAndDuroosScreen())),
+      ).push(MaterialPageRoute(builder: (_) => const QuranRadioScreen(isStandalone: true))),
+    ),
+    _ToolItem(
+      id: 'duroos',
+      title: 'الدروس والمحاضرات العلمية',
+      icon: Icons.school_outlined,
+      category: 'المكتبة والعلوم',
+      color: _toolShade(_kToolCategories[2].color, 6, 8),
+      onTap: (ctx, _) => Navigator.of(
+        ctx,
+      ).push(MaterialPageRoute(builder: (_) => const DuroosScreen(isStandalone: true))),
+    ),
+    _ToolItem(
+      id: 'wallpapers',
+      title: 'خلفيات هُمَام',
+      icon: Icons.wallpaper_rounded,
+      category: 'المكتبة والعلوم',
+      color: _toolShade(_kToolCategories[2].color, 7, 9),
+      onTap: (ctx, _) => Navigator.of(
+        ctx,
+      ).push(MaterialPageRoute(builder: (_) => const WallpapersScreen())),
+    ),
+    _ToolItem(
+      id: 'mutashabihat',
+      title: 'متشابهات القرآن الكريم',
+      icon: Icons.compare_arrows_rounded,
+      category: 'المكتبة والعلوم',
+      color: _toolShade(_kToolCategories[2].color, 8, 9),
+      onTap: (ctx, _) => Navigator.of(
+        ctx,
+      ).push(MaterialPageRoute(builder: (_) => const MutashabihatScreen())),
     ),
 
     // فئة "خدمات وتخصيص" (كانت آخر فئة) صارت فاضية بالكامل وأُزيلت —
@@ -645,17 +674,26 @@ class _PinnedMostUsedSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ids = ref.watch(mostUsedToolIdsProvider).value ?? const <String>[];
-    if (ids.isEmpty) return const SizedBox.shrink();
+    final userPinned = ref.watch(pinnedToolsProvider);
+    final mostUsed = ref.watch(mostUsedToolIdsProvider).value ?? const <String>[];
+
+    // لو المستخدم خصص أدوات مثبتة نعرضها، وإلا نعرض الأكثر استخداماً تلقائياً
+    final activeIds = userPinned.isNotEmpty
+        ? userPinned
+        : mostUsed;
+
+    if (activeIds.isEmpty) return const SizedBox.shrink();
 
     final byId = {for (final t in allTools) t.id: t};
     final pinned = [
-      for (final id in ids)
+      for (final id in activeIds)
         if (byId[id] case final tool?) tool,
     ];
     if (pinned.isEmpty) return const SizedBox.shrink();
 
     final onSurface = Theme.of(context).colorScheme.onSurface;
+    final isCustomPinned = userPinned.isNotEmpty;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
       child: Column(
@@ -663,16 +701,36 @@ class _PinnedMostUsedSection extends ConsumerWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.star_rounded, size: 16, color: AppColors.goldDeep),
+              Icon(
+                isCustomPinned ? Icons.push_pin_rounded : Icons.star_rounded,
+                size: 16,
+                color: AppColors.goldDeep,
+              ),
               const SizedBox(width: 6),
               Text(
-                'الأكثر استخدامًا',
+                isCustomPinned ? 'أدواتي المثبتة' : 'الأكثر استخدامًا',
                 style: TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w700,
                   color: onSurface.withValues(alpha: 0.85),
                 ),
               ),
+              const Spacer(),
+              if (isCustomPinned)
+                GestureDetector(
+                  onTap: () {
+                    for (final id in [...userPinned]) {
+                      ref.read(pinnedToolsProvider.notifier).togglePin(id);
+                    }
+                  },
+                  child: Text(
+                    'إعادة ضبط',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      color: onSurface.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 10),
@@ -826,8 +884,7 @@ class _ProfileHeaderCard extends ConsumerWidget {
   }
 }
 
-/// عنصر صف الأداة الواحد (اليمين: الأيقونة والعنوان | الشمال: سهم التنقل)
-class _ToolListTile extends StatelessWidget {
+class _ToolListTile extends ConsumerWidget {
   const _ToolListTile({
     required this.tool,
     required this.isDark,
@@ -839,19 +896,30 @@ class _ToolListTile extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
+    final isPinned = ref.watch(pinnedToolsProvider).contains(tool.id);
 
     return InkWell(
       onTap: onTap,
+      onLongPress: () {
+        ref.read(pinnedToolsProvider.notifier).togglePin(tool.id);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            duration: const Duration(seconds: 2),
+            content: Text(
+              isPinned
+                  ? 'تمت إزالة "${tool.title}" من أدواتك المثبتة'
+                  : 'تم تثبيت "${tool.title}" في أعلى شاشة أدواتي 📌',
+            ),
+          ),
+        );
+      },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
         child: Row(
           children: [
-            // أيقونة الأداة داخل خلفية دائرية ملوّنة (على اليمين في RTL) —
-            // بدل أيقونة عارية على الخلفية مباشرة، ليتماشى شكلها مع نمط
-            // "الأكثر استخداماً" الدائري أعلى القائمة ويصير أكثر تعبيراً
-            // بصرياً (وزن/تمييز لكل أداة بلونها الخاص).
+            // أيقونة الأداة داخل خلفية دائرية ملوّنة (على اليمين في RTL)
             IconBadge(icon: tool.icon, color: tool.color, large: true, tintAlpha: 0.14),
             const SizedBox(width: 12),
             // عنوان الأداة (+ شارة "مميزة" للأدوات الرئيسية كالختمة/الحفظ)
@@ -893,6 +961,14 @@ class _ToolListTile extends StatelessWidget {
                 ],
               ),
             ),
+            if (isPinned) ...[
+              const Icon(
+                Icons.push_pin_rounded,
+                size: 16,
+                color: AppColors.goldDeep,
+              ),
+              const SizedBox(width: 8),
+            ],
             // سهم الانتقال (على الشمال في RTL)
             Icon(
               Icons.chevron_left_rounded,

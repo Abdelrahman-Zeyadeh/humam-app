@@ -199,7 +199,10 @@ class _RadioAndDuroosScreenState extends ConsumerState<RadioAndDuroosScreen>
       // الراديو ولا يفقد حالة البحث/التصنيف المختار بتبويب الإذاعة.
       body: TabBarView(
         controller: _tabController,
-        children: const [QuranRadioScreen(), DuroosScreen()],
+        children: const [
+          QuranRadioScreen(isStandalone: false),
+          DuroosScreen(isStandalone: false),
+        ],
       ),
     );
   }
