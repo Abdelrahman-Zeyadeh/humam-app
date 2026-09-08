@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/data/user/location_prefs.dart';
 import '../../../core/data/user/user_prefs.dart';
@@ -304,6 +305,7 @@ class _PrayerChecklistScreenState extends ConsumerState<PrayerChecklistScreen>
                     label: item.label,
                     icon: item.icon,
                     promptAzkar: true,
+                    prayerShortKey: item.moment.name,
                     locked: !hasMomentArrivedToday(
                       lat: loc.lat,
                       lon: loc.lon,
@@ -353,9 +355,40 @@ class _PrayerChecklistScreenState extends ConsumerState<PrayerChecklistScreen>
   }
 }
 
+/// مفتاح تاريخ بصيغة `YYYY-MM-DD` — **مطابق حرفياً** لـ
+/// `PrayerAnalyticsScreen._formatDateKey` (لا يمكن استخدام
+/// `UserRepository.dateKeyFor` هون رغم تشابه الفكرة — الصيغتان مختلفتان،
+/// وشاشة الإحصائيات تقرأ هذه الصيغة تحديداً من `prayer_perf_<فرض>_<تاريخ>`).
+String _perfDateKey(DateTime dt) {
+  final y = dt.year.toString().padLeft(4, '0');
+  final m = dt.month.toString().padLeft(2, '0');
+  final d = dt.day.toString().padLeft(2, '0');
+  return '$y-$m-$d';
+}
+
+/// يحفظ اختيار "جماعة/منفرد/قضاء" بـSharedPreferences — **الإصلاح الفعلي**
+/// لتتبّع صلاة الجماعة بالمسجد: كان الاختيار يُخزَّن بـ
+/// [PrayerPerformanceNotifier] فقط (حالة Riverpod بالذاكرة، تُمسَح بإغلاق
+/// التطبيق) بينما `PrayerAnalyticsScreen` تقرأ من مفاتيح
+/// `prayer_perf_<فرض>_<تاريخ>` بـSharedPreferences التي لم تكن تُكتَب
+/// إطلاقاً — فشاشة الإحصائيات الكاملة (مواظبة الجماعة/المنفرد/القضاء) كانت
+/// تعرض صفراً دائماً بلا استثناء رغم وجود واجهتها كاملة. `[prayerShortKey]`
+/// هو `PrayerMoment.name` (`fajr`/`dhuhr`/...)، مطابق لما تقرأه شاشة
+/// الإحصائيات تحديداً — لا `UserCategories` (بادئة `prayer_` إضافية).
+Future<void> _savePrayerPerformance(String prayerShortKey, String choice) async {
+  try {
+    final sp = await SharedPreferences.getInstance();
+    await sp.setString(
+      'prayer_perf_${prayerShortKey}_${_perfDateKey(DateTime.now())}',
+      choice,
+    );
+  } catch (_) {}
+}
+
 /// حالة اختيار "جماعة/منفرد/قضاء" لكل فرض اليوم — تُعرض كشارة بعد التسجيل.
-/// حالة داخل الجلسة الحالية فقط (لا تخزين دائم بعد) — راجع
-/// `_PrayerPerformanceSheet` لواجهة الاختيار نفسها.
+/// حالة داخل الجلسة الحالية فقط للعرض الفوري (لا تنتظر إعادة قراءة
+/// SharedPreferences)، لكن [_savePrayerPerformance] أعلاه يحفظها فعلياً
+/// أيضاً — راجع `_PrayerPerformanceSheet` لواجهة الاختيار نفسها.
 class PrayerPerformanceNotifier extends Notifier<Map<String, String>> {
   @override
   Map<String, String> build() => {};
@@ -378,6 +411,7 @@ class _PrayerCheckRow extends ConsumerWidget {
     this.tag,
     this.promptAzkar = false,
     this.locked = false,
+    this.prayerShortKey,
   });
   final String category;
   final String label;
@@ -385,6 +419,9 @@ class _PrayerCheckRow extends ConsumerWidget {
   final String? tag;
   final bool locked;
   final bool promptAzkar;
+  /// `PrayerMoment.name` — فقط للفرائض الخمس (راجع `_savePrayerPerformance`)،
+  /// `null` للسنن الرواتب (لا خيار جماعة/منفرد/قضاء لها أصلاً).
+  final String? prayerShortKey;
 
   Widget _buildPerfBadge(BuildContext context, WidgetRef ref) {
     final choice = ref.watch(prayerPerformanceMapProvider)[category];
@@ -410,6 +447,9 @@ class _PrayerCheckRow extends ConsumerWidget {
                 ref
                     .read(prayerPerformanceMapProvider.notifier)
                     .setChoice(category, newChoice);
+                if (prayerShortKey != null) {
+                  await _savePrayerPerformance(prayerShortKey!, newChoice);
+                }
               }
             }
           : null,
@@ -565,6 +605,9 @@ class _PrayerCheckRow extends ConsumerWidget {
                         ref
                             .read(prayerPerformanceMapProvider.notifier)
                             .setChoice(category, choice);
+                        if (prayerShortKey != null) {
+                          await _savePrayerPerformance(prayerShortKey!, choice);
+                        }
                       }
                       await userPrefs.bumpCategoryStreakIfNewDay(category);
                       ref.read(categoryStreakVersionProvider.notifier).bump();
