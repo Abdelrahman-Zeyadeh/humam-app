@@ -99,3 +99,9 @@ test/**/failures/
 .idea/
 .widget_preview/
 tools/ 
+.metadata
+devtools_options.yaml
+.firebaserc
+firebase.json
+firestore.indexes.json
+firestore.rules
