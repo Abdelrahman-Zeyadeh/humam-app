@@ -98,3 +98,4 @@ test/**/failures/
 .claude/
 .idea/
 .widget_preview/
+tools/ 
