@@ -15,10 +15,10 @@ import 'tasbih_screen.dart';
 
 Color _strong(BuildContext c) => Theme.of(c).brightness == Brightness.dark
     ? AppColors.inkOnDark
-    : AppColors.navy;
+    : const Color(0xFF135B4C);
 Color _soft(BuildContext c) => Theme.of(c).brightness == Brightness.dark
     ? AppColors.inkSoftOnDark
-    : AppColors.inkSoft;
+    : const Color(0xFF8C6D3F);
 
 /// الصفحة الأساسية لتبويب "الأذكار": بحث + شريط وصول سريع (الصباح
 /// والمساء بالعدّاد المخصَّص `AzkarScreen`، أذكار النوم، المفضّلة) + مكتبة
@@ -73,7 +73,7 @@ class _AzkarLibraryScreenState extends ConsumerState<AzkarLibraryScreen> {
                 gradient: LinearGradient(
                   begin: Alignment.topRight,
                   end: Alignment.bottomLeft,
-                  colors: [AppColors.blue, AppColors.navy],
+                  colors: [Color(0xFF135B4C), Color(0xFF0D3B31)],
                 ),
               ),
               child: Column(
@@ -400,8 +400,11 @@ class _QuickChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
-      color: selected ? themeAccent(context) : AppColors.navy,
+      color: selected
+          ? const Color(0xFFC5A059)
+          : (isDark ? const Color(0xFF1E2632) : const Color(0xFF135B4C)),
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
@@ -413,14 +416,16 @@ class _QuickChip extends StatelessWidget {
             children: [
               Icon(
                 icon,
-                color: selected ? AppColors.navyDeep : AppColors.goldSoft,
+                color: selected
+                    ? Colors.white
+                    : const Color(0xFFD4AF67),
                 size: 17,
               ),
               const SizedBox(width: 8),
               Text(
                 label,
-                style: TextStyle(
-                  color: selected ? AppColors.navyDeep : Colors.white,
+                style: const TextStyle(
+                  color: Colors.white,
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
                 ),

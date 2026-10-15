@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../audio/ui/global_mini_audio_player_bar.dart';
 import '../auth/cloud_sync_service.dart';
 import '../azkar/azkar_library_screen.dart';
 import '../azkar/post_prayer_azkar_screen.dart';
@@ -180,48 +181,54 @@ class _RootShellState extends ConsumerState<RootShell> with WidgetsBindingObserv
             ),
         ],
       ),
-      bottomNavigationBar: AnimatedSlide(
-        duration: _kNavAnim,
-        offset: showNav ? Offset.zero : const Offset(0, 1.5),
-        curve: Curves.easeInOut,
-        child: AnimatedOpacity(
-          duration: _kNavAnim,
-          opacity: showNav ? 1.0 : 0.0,
-          child: SafeArea(
-            top: false,
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1B232E) : Colors.white,
-                borderRadius: BorderRadius.circular(32),
-                border: Border.all(
-                  color: (isDark ? AppColors.lineDark : AppColors.line).withValues(alpha: 0.8),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.08),
-                    blurRadius: 18,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  for (var i = 0; i < _tabs.length; i++)
-                    _FloatingDockItem(
-                      tab: _tabs[i],
-                      isSelected: i == activeIndex,
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        ref.read(rootTabIndexProvider.notifier).select(i);
-                      },
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const GlobalMiniAudioPlayerBar(),
+            AnimatedSlide(
+              duration: _kNavAnim,
+              offset: showNav ? Offset.zero : const Offset(0, 1.5),
+              curve: Curves.easeInOut,
+              child: AnimatedOpacity(
+                duration: _kNavAnim,
+                opacity: showNav ? 1.0 : 0.0,
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1B232E) : Colors.white,
+                    borderRadius: BorderRadius.circular(32),
+                    border: Border.all(
+                      color: (isDark ? AppColors.lineDark : AppColors.line).withValues(alpha: 0.8),
                     ),
-                ],
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.08),
+                        blurRadius: 18,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      for (var i = 0; i < _tabs.length; i++)
+                        _FloatingDockItem(
+                          tab: _tabs[i],
+                          isSelected: i == activeIndex,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            ref.read(rootTabIndexProvider.notifier).select(i);
+                          },
+                        ),
+                    ],
+                  ),
+                ),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -245,9 +252,13 @@ class _FloatingDockItem extends StatelessWidget {
     final accent = themeAccent(context);
     final unselectedColor = isDark ? Colors.white60 : const Color(0xFF6B6760);
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
+    return Semantics(
+      label: tab.label,
+      selected: isSelected,
+      button: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOutCubic,
@@ -284,38 +295,7 @@ class _FloatingDockItem extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// سكافولد موحّد للشاشات المؤقتة (placeholder) — يُستبدل كل واحد منها
-/// بميزته الحقيقية في مرحلته المحددة بخطة العمل.
-class ComingSoonScaffold extends StatelessWidget {
-  const ComingSoonScaffold({
-    super.key,
-    required this.title,
-    required this.icon,
-  });
-  final String title;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 48, color: AppColors.inkSoft),
-            const SizedBox(height: 12),
-            Text(
-              'قيد التطوير — مرحلة قادمة',
-              style: TextStyle(color: AppColors.inkSoft, fontSize: 13),
-            ),
-          ],
-        ),
-      ),
+    ),
     );
   }
 }

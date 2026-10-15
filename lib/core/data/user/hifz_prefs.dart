@@ -38,6 +38,17 @@ class HifzPrefs {
 
   /// راجع توثيق `UserRepository.hifzReviewedToday`.
   Future<bool> reviewedToday() => _repo.hifzReviewedToday();
+
+  /// خريطة إتقان الحفظ لكافة الآيات المسجلة
+  Future<Map<int, String>> allMasteryMap() => _repo.allHifzMasteryMap();
+
+  /// تعيين حالة إتقان آية محددة ('mastered' | 'needsReview' | 'unmemorized')
+  Future<void> setAyahMasteryStatus(int ayahId, String status) =>
+      _repo.setAyahMasteryStatus(ayahId, status);
+
+  /// تعيين حالة إتقان مجموعة آيات دفعة واحدة (لسورة كاملة أو نطاق)
+  Future<void> setMultipleAyahsMasteryStatus(List<int> ayahIds, String status) =>
+      _repo.setMultipleAyahsMasteryStatus(ayahIds, status);
 }
 
 final hifzPrefsProvider = Provider<HifzPrefs>((ref) {

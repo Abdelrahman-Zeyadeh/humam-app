@@ -72,11 +72,21 @@ tools/mushaf/
 tools/v4_tajweed_fonts_for_release/
 
 # قواعد بيانات التفسير الوسيطة (٥٨٢ ميجا، ١٤ ملف) — مصدر محلي وحيد لبناء
-# إصدار GitHub Release "Tafsir-v1" المُستضاف فعلياً (راجع
+# إصدار GitHub Release "Tafsir-v1" المُست hosted فعلياً (راجع
 # remote_assets_config.dart)، لا حاجة/فائدة لتتبّعها بـgit — كانت مسحوبة
 # بالغلط لتاريخ الفرع (نُظِّف التاريخ بـgit filter-branch، أحد ملفاتها
 # تجاوز حد GitHub الأقصى للملف الواحد ١٠٠ ميجا فرفض الدفع بالكامل).
 tools/tafsir_editions/*.db
+
+# شظايا الكتب التسع (~٩٠ ميجا) — مخرجات وسيطة لـ
+# tools/split_hadith_shards.py، تُعاد توليدها من assets/hadith/hadith.db
+# بأمر واحد، والمصدر النهائي يُرفع لإصدارات GitHub (remote_assets_config).
+# نفس فلسفة tools/raw وtafsir_editions: تتبّعها بالريبو يكبّر الحجم بلا فائدة.
+tools/hadith_shards/*.db
+
+# لقطات Golden test الفاشلة (master/test/isolatedDiff/maskedDiff) — تُولَّد
+# آلياً عند فشل المقارنة، المطلوب تعقبه فقط هو goldens/*.png الأساسية.
+test/**/failures/
 
 # نسخة JDK محلية بجذر المشروع (~٣٧٠ ميجا) — أداة تطوير محلية، لا علاقة
 # لها بمصدر التطبيق؛ انسحبت بالغلط لتاريخ git مرتين (هون وبـandroid/app/

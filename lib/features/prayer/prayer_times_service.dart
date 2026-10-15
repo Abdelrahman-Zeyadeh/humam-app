@@ -131,17 +131,23 @@ PrayerMomentTime? nextPrayer(List<PrayerMomentTime> dayTimes, DateTime now) {
   return null;
 }
 
-/// وقت دخول [moment] اليوم — `null` لو الموقع غير مضبوط (لا حساب ممكن).
+/// إحداثيات افتراضية بديلة (عمان / مكة المكرمة) عند عدم تحديد الموقع بعد،
+/// لضمان عدم فتح الصلوات والسنن قبل دخول وقتها حتى لو لم يفعل المستخدم GPS بعد.
+const double kDefaultFallbackLat = 31.9539;
+const double kDefaultFallbackLon = 35.9106;
+
+/// وقت دخول [moment] اليوم — يستخدم إحداثيات افتراضية احتياطية لو الموقع غير مضبوط.
 DateTime? prayerMomentTimeToday({
   required double? lat,
   required double? lon,
   required String methodKey,
   required PrayerMoment moment,
 }) {
-  if (lat == null || lon == null) return null;
+  final effectiveLat = lat ?? kDefaultFallbackLat;
+  final effectiveLon = lon ?? kDefaultFallbackLon;
   final times = computeDayTimes(
-    lat: lat,
-    lon: lon,
+    lat: effectiveLat,
+    lon: effectiveLon,
     date: DateTime.now(),
     methodKey: methodKey,
   );
@@ -150,14 +156,13 @@ DateTime? prayerMomentTimeToday({
 
 /// هل حان وقت [moment] اليوم بعد؟ — بطلب صاحب المشروع: "كل اشي بوقته
 /// واللي ما اجا وقته عليه قفل" (الصلوات والسنن الرواتب وأذكار الصباح/
-/// المساء والقيام لا تُفتح للتسجيل إلا بعد دخول وقتها). **`true` افتراضياً
-/// لو الموقع غير مضبوط** — عمداً لا نقفل ميزات كاملة عن مستخدم بلا موقع
-/// محدَّد، أفضل من حجبها بالكامل.
+/// المساء والقيام لا تُفتح للتسجيل إلا بعد دخول وقتها).
 bool hasMomentArrivedToday({
   required double? lat,
   required double? lon,
   required String methodKey,
   required PrayerMoment moment,
+  bool isDuha = false,
 }) {
   final t = prayerMomentTimeToday(
     lat: lat,
@@ -165,8 +170,9 @@ bool hasMomentArrivedToday({
     methodKey: methodKey,
     moment: moment,
   );
-  if (t == null) return true;
-  return !DateTime.now().isBefore(t);
+  if (t == null) return false;
+  final effectiveTime = isDuha ? t.add(const Duration(minutes: 15)) : t;
+  return !DateTime.now().isBefore(effectiveTime);
 }
 
 /// هل الوقت الحالي ضمن نافذة قيام الليل (من دخول العشاء حتى دخول الفجر،
@@ -174,18 +180,18 @@ bool hasMomentArrivedToday({
 /// الى الفجر": كانت شاشة القيام تفتح التسجيل بدخول العشاء ولا تُغلقه
 /// إطلاقاً بعدها (يبقى متاحاً كل اليوم التالي)، فتوسّعنا [hasMomentArrivedToday]
 /// بموقّت زمن واحد لا يكفي لنافذة تعبر منتصف الليل (عشاء الليلة → فجر
-/// الغد). **`true` افتراضياً لو الموقع غير مضبوط** — نفس منطق
-/// [hasMomentArrivedToday]، لا نحجب الميزة كاملة عن مستخدم بلا موقع.
+/// الغد).
 bool isWithinQiyamWindow({
   required double? lat,
   required double? lon,
   required String methodKey,
 }) {
-  if (lat == null || lon == null) return true;
+  final effectiveLat = lat ?? kDefaultFallbackLat;
+  final effectiveLon = lon ?? kDefaultFallbackLon;
   final now = DateTime.now();
   final todayTimes = computeDayTimes(
-    lat: lat,
-    lon: lon,
+    lat: effectiveLat,
+    lon: effectiveLon,
     date: now,
     methodKey: methodKey,
   );

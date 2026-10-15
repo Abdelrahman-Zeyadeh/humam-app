@@ -7,6 +7,7 @@ import '../../core/data/quran/quran_providers.dart';
 import '../../core/data/quran/quran_repository.dart';
 import '../../core/text/arabic_normalizer.dart';
 import '../../core/theme/app_colors.dart';
+import 'mushaf_settings.dart' show mushafJumpRequestProvider;
 
 enum _SearchFilter { all, surahs, ayahs }
 
@@ -241,7 +242,13 @@ class _MushafSearchScreenState extends ConsumerState<MushafSearchScreen> {
                           result: r,
                           query: _currentQuery,
                           accent: accent,
-                          onTap: () => Navigator.of(context).pop(r.ayah.page),
+                          onTap: () {
+                            ref.read(mushafJumpRequestProvider.notifier).request(
+                                  page: r.ayah.page,
+                                  ayahId: r.ayah.id,
+                                );
+                            Navigator.of(context).pop();
+                          },
                         ),
                         const SizedBox(height: 10),
                       ],

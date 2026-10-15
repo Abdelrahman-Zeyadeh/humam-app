@@ -28,12 +28,13 @@ abstract final class AppTheme {
         backgroundColor: accent.surfaceLight,
         foregroundColor: accent.primaryLight,
         elevation: 0,
+        scrolledUnderElevation: 0,
         centerTitle: true,
         iconTheme: IconThemeData(color: accent.primaryLight),
         titleTextStyle: TextStyle(
           fontFamily: _kCairoFamily,
           fontSize: 18,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w800,
           color: accent.primaryLight,
         ),
       ),
@@ -52,15 +53,15 @@ abstract final class AppTheme {
           fontWeight: FontWeight.w500,
         ),
         type: BottomNavigationBarType.fixed,
-        elevation: 6,
+        elevation: 4,
       ),
-      dividerTheme: const DividerThemeData(color: AppColors.line, space: 1),
+      dividerTheme: const DividerThemeData(color: Color(0xFFEBE4D6), space: 1),
       cardTheme: base.cardTheme.copyWith(
         color: Colors.white,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
-          side: const BorderSide(color: AppColors.line),
+          side: const BorderSide(color: Color(0xFFEBE4D6)),
         ),
       ),
     );

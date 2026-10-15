@@ -95,11 +95,9 @@ class HifzReminderRow extends ConsumerWidget {
 
   Future<void> _toggle(BuildContext context, WidgetRef ref, bool value) async {
     final hifzPrefs = ref.read(hifzPrefsProvider);
-    if (value && hifzPrefs.reminderHour == null) {
-      await _pickTime(context, ref);
-      return;
-    }
-    await hifzPrefs.setReminder(enabled: value);
+    final hour = hifzPrefs.reminderHour ?? 16;
+    final minute = hifzPrefs.reminderMinute;
+    await hifzPrefs.setReminder(enabled: value, hour: hour, minute: minute);
     ref.read(hifzVersionProvider.notifier).bump();
     if (!context.mounted) return;
     await _applyState(context, ref);

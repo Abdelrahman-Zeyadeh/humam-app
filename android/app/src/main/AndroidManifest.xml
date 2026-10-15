@@ -37,6 +37,10 @@
          `MainActivity.kt` وDartـها `lib/core/platform/dnd_service.dart`.
          غير مُختبر بجهاز فعلي بعد. -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY"/>
+    <!-- أذونات خاصية الذكر والتسبيح العائم فوق التطبيقات -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
     <application
         android:label="@string/app_name"
         android:name="${applicationName}"
@@ -190,6 +194,16 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/ayah_dhikr_widget_info"/>
         </receiver>
+        <!-- خدمة عداد الذكر والتسبيح العائم فوق التطبيقات -->
+        <service
+            android:name=".FloatingDhikrService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Floating interactive dhikr counter over other apps requested by user" />
+        </service>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

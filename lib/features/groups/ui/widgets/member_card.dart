@@ -15,17 +15,20 @@ class MemberCard extends StatelessWidget {
     required this.isMe,
     required this.isDark,
     required this.onNudge,
+    this.onReport,
+    this.onBlock,
+    this.isBlocked = false,
   });
 
   final GroupMember member;
   final int rank;
-  /// عدد أعضاء المجموعة كلها — يُستخدم فقط لإخفاء شارة الترتيب ("الأول 🥇")
-  /// لو كان المستخدم العضو الوحيد بالمجموعة (ملاحظة فعلية: شارة "الأول"
-  /// لعضو منفرد لا معنى تنافسياً لها). تظهر الشارة بمجرد انضمام عضو ثانٍ.
   final int totalMembers;
   final bool isMe;
   final bool isDark;
   final VoidCallback onNudge;
+  final VoidCallback? onReport;
+  final VoidCallback? onBlock;
+  final bool isBlocked;
 
   @override
   Widget build(BuildContext context) {
@@ -151,6 +154,26 @@ class MemberCard extends StatelessWidget {
                                 ),
                               ),
                             ),
+                          ] else if (isBlocked) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text(
+                                'محظور',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ),
                           ],
                         ],
                       ),
@@ -246,31 +269,94 @@ class MemberCard extends StatelessWidget {
                   done: member.progress.morningAzkar || member.progress.eveningAzkar,
                 ),
                 if (!isMe)
-                  InkWell(
-                    onTap: onNudge,
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: accent.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: accent.withValues(alpha: 0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.favorite_rounded, size: 14, color: accent),
-                          const SizedBox(width: 4),
-                          Text(
-                            'تشجيع',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.bold,
-                              color: accent,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isBlocked)
+                        InkWell(
+                          onTap: onBlock,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
+                            ),
+                            child: const Text(
+                              'إلغاء الحظر',
+                              style: TextStyle(fontSize: 11, color: Colors.grey),
                             ),
                           ),
-                        ],
-                      ),
-                    ),
+                        )
+                      else ...[
+                        InkWell(
+                          onTap: onNudge,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: accent.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: accent.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.favorite_rounded, size: 14, color: accent),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'تشجيع',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: accent,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        PopupMenuButton<String>(
+                          icon: Icon(
+                            Icons.more_vert,
+                            size: 18,
+                            color: isDark ? Colors.white54 : Colors.black45,
+                          ),
+                          padding: EdgeInsets.zero,
+                          tooltip: 'خيارات العضو',
+                          onSelected: (val) {
+                            if (val == 'report') onReport?.call();
+                            if (val == 'block') onBlock?.call();
+                          },
+                          itemBuilder: (ctx) => [
+                            const PopupMenuItem(
+                              value: 'report',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.flag_outlined, size: 18, color: Colors.amber),
+                                  SizedBox(width: 8),
+                                  Text('إبلاغ عن محتوى أو سلوك', style: TextStyle(fontSize: 12.5)),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'block',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.block, size: 18, color: Colors.redAccent),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'حظر هذا العضو',
+                                    style: TextStyle(fontSize: 12.5, color: Colors.redAccent),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
                   ),
               ],
             ),

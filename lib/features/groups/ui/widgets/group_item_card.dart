@@ -1,17 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../providers/groups_providers.dart';
 import '../group_details_screen.dart';
 
-/// بطاقة مجموعة واحدة بقائمة "مجموعاتي الإيمانية" — تفتح تفاصيل المجموعة
-/// عند الضغط.
+/// بطاقة مجموعة واحدة بقائمة "مجموعاتي الإيمانية" — تصميم عصري فخم
+/// يبرز اسم المجموعة، شارة الأعضاء، ورمز الانضمام القابل للنسخ بنقرة واحدة،
+/// وزر الانتقال للوحة التنافس.
 class GroupItemCard extends ConsumerWidget {
   const GroupItemCard({super.key, required this.groupId, required this.isDark});
 
   final String groupId;
   final bool isDark;
+
+  void _copyGroupCode(BuildContext context, String code) {
+    HapticFeedback.selectionClick();
+    Clipboard.setData(ClipboardData(text: code));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('تم نسخ رمز الانضمام "$code" بنجاح 📋'),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -26,8 +41,8 @@ class GroupItemCard extends ConsumerWidget {
         return Container(
           margin: const EdgeInsets.only(bottom: 14),
           decoration: BoxDecoration(
-            color: isDark ? AppColors.surfaceDark : Colors.white,
-            borderRadius: BorderRadius.circular(20),
+            color: isDark ? const Color(0xFF131F2E) : Colors.white,
+            borderRadius: BorderRadius.circular(22),
             border: Border.all(
               color: isDark ? AppColors.lineDark : AppColors.line,
               width: 1.2,
@@ -35,7 +50,7 @@ class GroupItemCard extends ConsumerWidget {
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
-                blurRadius: 10,
+                blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
             ],
@@ -43,7 +58,7 @@ class GroupItemCard extends ConsumerWidget {
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(22),
               onTap: () {
                 Navigator.push(
                   context,
@@ -62,12 +77,13 @@ class GroupItemCard extends ConsumerWidget {
                   children: [
                     Row(
                       children: [
+                        // أيقونة المجموعة / الحرف الأول بتدرج جميل
                         Container(
-                          width: 48,
-                          height: 48,
+                          width: 50,
+                          height: 50,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            shape: BoxShape.circle,
+                            borderRadius: BorderRadius.circular(16),
                             gradient: LinearGradient(
                               colors: [
                                 accent.withValues(alpha: 0.25),
@@ -84,8 +100,8 @@ class GroupItemCard extends ConsumerWidget {
                           child: Text(
                             group.name.isNotEmpty ? group.name[0] : 'م',
                             style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
                               color: accent,
                             ),
                           ),
@@ -97,9 +113,10 @@ class GroupItemCard extends ConsumerWidget {
                             children: [
                               Text(
                                 group.name,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w800,
+                                  color: isDark ? Colors.white : AppColors.ink,
                                 ),
                               ),
                               if (group.description.isNotEmpty) ...[
@@ -110,9 +127,7 @@ class GroupItemCard extends ConsumerWidget {
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: isDark
-                                        ? Colors.white60
-                                        : Colors.black54,
+                                    color: isDark ? Colors.white60 : Colors.black54,
                                   ),
                                 ),
                               ],
@@ -126,14 +141,14 @@ class GroupItemCard extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
+
+                    // شريط الشارات والمعلومات
                     Row(
                       children: [
+                        // شارة عدد الأعضاء
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
                           decoration: BoxDecoration(
                             color: accent.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(8),
@@ -142,7 +157,7 @@ class GroupItemCard extends ConsumerWidget {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                Icons.people_alt_outlined,
+                                Icons.people_alt_rounded,
                                 size: 14,
                                 color: accent,
                               ),
@@ -159,44 +174,70 @@ class GroupItemCard extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? Colors.white10
-                                : Colors.black.withValues(alpha: 0.05),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.tag_rounded,
-                                size: 14,
-                                color: Colors.grey,
+
+                        // شارة رمز المجموعة القابلة للنسخ بنقرة واحدة
+                        InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () => _copyGroupCode(context, group.code),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4.5),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.08)
+                                  : Colors.black.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isDark ? Colors.white12 : Colors.black12,
                               ),
-                              const SizedBox(width: 4),
-                              Text(
-                                group.code,
-                                style: const TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.copy_rounded,
+                                  size: 12,
+                                  color: Colors.grey,
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 4),
+                                Text(
+                                  group.code,
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                         const Spacer(),
-                        Text(
-                          'عرض التنافس 👈',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? Colors.white54 : Colors.black45,
+
+                        // زر التنافس
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.gold.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'لوحة التنافس',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.goldDeep,
+                                ),
+                              ),
+                              SizedBox(width: 4),
+                              Icon(
+                                Icons.trending_up_rounded,
+                                size: 14,
+                                color: AppColors.goldDeep,
+                              ),
+                            ],
                           ),
                         ),
                       ],

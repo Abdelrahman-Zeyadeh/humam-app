@@ -1,4 +1,4 @@
-import 'dart:async' show unawaited;
+﻿import 'dart:async' show unawaited;
 
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
@@ -15,6 +15,8 @@ import '../../core/data/user/user_repository.dart'
 import '../../core/hijri/hijri_occasions.dart' show isRamadan;
 import '../prayer/adhan_voices.dart';
 import '../prayer/prayer_times_service.dart';
+
+part 'adhan_notification_handlers.dart';
 
 const _kNotifIdBase = 9000;
 const _kMaxScheduledPerCall = 20; // يومان × ٥ صلوات + هامش
@@ -58,6 +60,10 @@ const _kDailyNameOfAllahNotifIdBase = 11100;
 /// `_initAdhanNotificationsInBackground`)، لا فقط عند تبديل المستخدم للإعداد
 /// يدوياً.
 const _kReminderRotationDays = 30;
+
+const _kIqamahChannelId = 'iqamah_reminder_ch';
+const _kIqamahChannelName = 'تنبيه وقت الإقامة';
+const _kIqamahIdBase = 9350;
 
 const _kCheckinChannelId = 'prayer_checkin_ch';
 const _kCheckinChannelName = 'متابعة "هل صليت؟"';
@@ -135,7 +141,7 @@ const _kCustomHabitNotifIdBase = 9800;
 const _kHourlyDhikrChannelId = 'hourly_dhikr_ch';
 const _kHourlyDhikrChannelName = 'أذكار وأدعية كل ساعة';
 const _kHourlyDhikrNotifIdBase = 10000;
-const _kMaxHourlySlots = 48; // يومان × ٢٤ ساعة
+const _kMaxHourlySlots = 144; // متسع كافٍ لعدة فترات مجدولة مسبقاً
 
 /// معرّفات إشعار "التكرار العام" (راجع [AdhanNotificationService.
 /// scheduleRepeatingReminder]) — بلوك ١٠٠ معرّف لكل فئة، بعيد تماماً عن
@@ -302,210 +308,6 @@ const List<({String title, String body})> kHourlyDhikrPool = [
   ),
 ];
 
-/// معالج رد فعل زرّي إشعار متابعة "هل صليت؟" — **دالة top-level مستقلة**
-/// (لا داخل الصنف) بموسم `@pragma('vm:entry-point')` لأنها **قد تُستدعى
-/// بمعزل (isolate) خلفي منفصل كلياً** لو ضغط المستخدم الزرّ والتطبيق مغلَق
-/// تماماً (قيد فعلي بمكتبة `flutter_local_notifications`، راجع "⚠️ قيود
-/// معروفة، غير مُختبرة بجهاز فعلي" أعلى الملف — هذا القيد لم يُختبر بإغلاق
-/// فعلي كامل للتطبيق بعد). لا وصول لحاوية Riverpod هون، فالكتابة تفتح
-/// اتصال `UserDatabase` مستقل قصير العمر بدل المرور بـ`UserRepository`
-/// المحمَّل مسبقاً بالتطبيق الرئيسي.
-@pragma('vm:entry-point')
-void onPrayerCheckinNotificationResponse(NotificationResponse response) {
-  final actionId = response.actionId;
-  final payload = response.payload;
-  if (payload == null) return;
-
-  // نفس الدالة الوحيدة مسجَّلة لكل أنواع إشعارات هذا الملف (متابعة "هل
-  // صليت؟" وتنبيه أذكار بعد الصلاة معاً) — التمييز ببادئة الحمولة (payload)
-  // بدل دالتين منفصلتين، لأن `flutter_local_notifications` يسمح بمعالج
-  // واحد فقط مسجَّل بـ`initialize()`.
-  if (payload.startsWith(_kPostPrayerAzkarPayloadPrefix)) {
-    final openReading =
-        actionId == _kPostPrayerAzkarReadAction ||
-        actionId == null ||
-        actionId.isEmpty;
-    unawaited(
-      _handlePostPrayerAzkarResponse(
-        openReading: openReading,
-        notificationId: response.id,
-      ),
-    );
-    return;
-  }
-
-  // إذا ضغط المستخدم على زر "صليت" أو ضغط على جسم الإشعار مباشرة (actionId == null)
-  final isYes =
-      (actionId == _kCheckinYesAction || actionId == null || actionId.isEmpty);
-  unawaited(
-    _handlePrayerCheckinResponse(
-      payload,
-      prayed: isYes,
-      notificationId: response.id,
-    ),
-  );
-}
-
-/// معالج رد فعل تنبيه "أذكار بعد الصلاة" — نفس قيد ردّ المتابعة أعلاه (قد
-/// يُستدعى بمعزل خلفي كلياً). "اقرأ الآن" (أو ضغط جسم الإشعار مباشرة) يفتح
-/// شاشة الأذكار بعد الصلاة فوراً لو التطبيق حيّ ([postPrayerAzkarOpenCallback]
-/// مسجَّلة من `RootShell`)، وإلا يُحفَظ علم [kPendingOpenPostPrayerAzkarKey]
-/// يُستهلَك عند الإقلاع القادم. "×" يغلق الإشعار بلا فتح ولا تسجيل أي شيء.
-Future<void> _handlePostPrayerAzkarResponse({
-  required bool openReading,
-  int? notificationId,
-}) async {
-  if (notificationId != null) {
-    try {
-      await FlutterLocalNotificationsPlugin().cancel(id: notificationId);
-    } catch (_) {}
-  }
-  if (!openReading) return;
-
-  final callback = postPrayerAzkarOpenCallback;
-  if (callback != null) {
-    callback();
-    return;
-  }
-  try {
-    final sp = await SharedPreferences.getInstance();
-    await sp.setBool(kPendingOpenPostPrayerAzkarKey, true);
-  } catch (_) {}
-}
-
-Future<void> _handlePrayerCheckinResponse(
-  String payload, {
-  required bool prayed,
-  int? notificationId,
-}) async {
-  final parts = payload.split('|');
-  if (parts.length != 3) return;
-  final dateKey = parts[0];
-  final rawCategory = parts[1];
-  final category = rawCategory.startsWith('prayer_')
-      ? rawCategory
-      : 'prayer_$rawCategory'; // يطابق UserCategories.fajr/dhuhr/asr/maghrib/isha
-  final slotIndex = int.tryParse(parts[2]);
-  if (slotIndex == null) return;
-
-  final plugin = FlutterLocalNotificationsPlugin();
-  try {
-    await plugin.initialize(
-      settings: const InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-        iOS: DarwinInitializationSettings(
-          requestAlertPermission: false,
-          requestBadgePermission: false,
-          requestSoundPermission: false,
-        ),
-      ),
-      onDidReceiveNotificationResponse: onPrayerCheckinNotificationResponse,
-      onDidReceiveBackgroundNotificationResponse:
-          onPrayerCheckinNotificationResponse,
-    );
-  } catch (e) {
-    debugPrint('تعذّر تهيئة الإشعارات بمعزل خلفي: $e');
-  }
-
-  // إخفاء وحذف الإشعار فوراً من شريط الإشعارات عند الضغط
-  if (notificationId != null) {
-    try {
-      await plugin.cancel(id: notificationId);
-    } catch (_) {}
-  }
-  if (slotIndex == 99) {
-    try {
-      await plugin.cancel(id: 9998);
-    } catch (_) {}
-  }
-
-  // "صليت" فقط يكتب شيئاً — "لسا" يلغي التكرار بلا تسجيل
-  //
-  // **ملاحظة**: كان هون سابقاً إشعار فوري ثابت "أذكار ما بعد الصلاة" يُطلَق
-  // مباشرة عند الضغط على "صليت" تحديداً. حُذف بالكامل — الميزة الآن مستقلة
-  // كلياً (`postPrayerAzkarEnabled`/`_schedulePostPrayerAzkarOne`، مجدولة
-  // مسبقاً بمدة قابلة للتخصيص من دخول وقت الصلاة نفسه)، بغضّ النظر عن ردّ
-  // "هل صليت؟" من عدمه — راجع توثيق `UserRepository.postPrayerAzkarEnabled`.
-  if (prayed) {
-    final db = UserDatabase();
-    try {
-      await _bumpCategoryStreakIfNewDay(db, category, dateKey);
-      if (UserRepository.currentInstance != null) {
-        await UserRepository.currentInstance!.reloadCategoryStreaks();
-      }
-    } catch (e) {
-      debugPrint('تعذّر تسجيل "صليت" من الإشعار: $e');
-    } finally {
-      await db.close();
-    }
-  }
-
-  // ألغِ بقية إشعارات هذه الصلاة/اليوم
-  if (slotIndex != 99) {
-    for (var i = 0; i < _kCheckinMaxRepeatsPerSlot; i++) {
-      try {
-        await plugin.cancel(id: _kCheckinIdBase + slotIndex * 10 + i);
-      } catch (_) {}
-    }
-  }
-}
-
-/// نسخة طبق الأصل من منطق `UserRepository.bumpCategoryStreakIfNewDay` —
-/// **معاد كتابتها هون عمداً** لا مستدعاة مباشرة، لأن هذا الرد قد يصل بمعزل
-/// خلفي منفصل كلياً بلا وصول لمثيل `UserRepository` المحمَّل مسبقاً بالتطبيق
-/// الرئيسي (راجع توثيق [onPrayerCheckinNotificationResponse]). `dateKey`
-/// يصل جاهزاً من وقت جدولة الإشعار نفسه (لا `DateTime.now()` هون) — قد
-/// يُضغَط الزرّ بعد منتصف الليل لصلاة كان وقتها أمس.
-Future<void> _bumpCategoryStreakIfNewDay(
-  UserDatabase db,
-  String category,
-  String dateKey,
-) async {
-  final alreadyLogged =
-      await (db.select(db.categoryDailyLog)..where(
-            (t) => t.category.equals(category) & t.dateKey.equals(dateKey),
-          ))
-          .getSingleOrNull();
-  if (alreadyLogged != null) return;
-
-  final row = await (db.select(
-    db.categoryStreaks,
-  )..where((t) => t.category.equals(category))).getSingleOrNull();
-  final yesterday = _yesterdayOf(dateKey);
-  final continued = row?.streakLastDay == yesterday;
-  final newCount = continued ? (row?.streakDays ?? 0) + 1 : 1;
-
-  await db
-      .into(db.categoryStreaks)
-      .insertOnConflictUpdate(
-        CategoryStreaksCompanion(
-          category: Value(category),
-          streakDays: Value(newCount),
-          streakLastDay: Value(dateKey),
-        ),
-      );
-  await db
-      .into(db.categoryDailyLog)
-      .insertOnConflictUpdate(
-        CategoryDailyLogCompanion(
-          category: Value(category),
-          dateKey: Value(dateKey),
-        ),
-      );
-}
-
-/// نفس تنسيق `UserRepository._dateKey` حرفياً (بلا حشو أصفار) — يحسب مفتاح
-/// اليوم السابق من نص `dateKey` مباشرة بدل `DateTime.now()`.
-String _yesterdayOf(String dateKey) {
-  final parts = dateKey.split('-');
-  final d = DateTime(
-    int.parse(parts[0]),
-    int.parse(parts[1]),
-    int.parse(parts[2]),
-  );
-  final y = d.subtract(const Duration(days: 1));
-  return '${y.year}-${y.month}-${y.day}';
-}
 
 class _ActivityReminderMeta {
   const _ActivityReminderMeta({
@@ -701,6 +503,15 @@ class AdhanNotificationService {
 
     await _recreateChannel(
       const AndroidNotificationChannel(
+        _kIqamahChannelId,
+        _kIqamahChannelName,
+        description: 'تنبيه عند حلول موعد إقامة الصلاة في المسجد',
+        importance: Importance.high,
+      ),
+    );
+
+    await _recreateChannel(
+      const AndroidNotificationChannel(
         _kImsakChannelId,
         _kImsakChannelName,
         description: 'تذكير قرب الإمساك خلال شهر رمضان فقط، تلقائياً بلا إعداد',
@@ -777,6 +588,36 @@ class AdhanNotificationService {
     }
   }
 
+  /// التحقق من منح إذن الإشعارات
+  Future<bool> areNotificationsEnabled() async {
+    try {
+      final android = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      if (android != null) {
+        return await android.areNotificationsEnabled() ?? false;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('فحص إذن الإشعارات فشل: $e');
+      return false;
+    }
+  }
+
+  /// التحقق من صلاحية جدولة المنبهات الدقيقة (أندرويد 12+)
+  Future<bool> canScheduleExactNotifications() async {
+    try {
+      final android = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      if (android != null) {
+        return await android.canScheduleExactNotifications() ?? false;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('فحص إذن المنبهات الدقيقة فشل: $e');
+      return false;
+    }
+  }
+
   /// يلغي كل إشعارات الأذان المجدولة حالياً — يُستخدم مباشرة عند تعطيل
   /// الإشعارات كلياً، وداخلياً أول كل [rescheduleUpcoming].
   Future<void> cancelAll() async {
@@ -834,32 +675,42 @@ class AdhanNotificationService {
     bool isEnabled = true,
     int startHour = 8,
     int endHour = 23,
+    int? intervalMinutes,
     int intervalHours = 1,
   }) async {
     if (!_initialized) await initialize();
     await cancelAllHourlyDhikr();
     if (!isEnabled) return;
-    final step = intervalHours < 1 ? 1 : intervalHours;
+    final stepMin = (intervalMinutes != null && intervalMinutes > 0)
+        ? intervalMinutes
+        : (intervalHours < 1 ? 60 : intervalHours * 60);
+    final step = stepMin < 15 ? 15 : stepMin;
 
     final now = DateTime.now();
     var slotIndex = 0;
 
     for (var dayOffset = 0; dayOffset <= 1; dayOffset++) {
       final baseDate = now.add(Duration(days: dayOffset));
-      for (var hour = startHour; hour <= endHour; hour += step) {
+      var currentMinuteOfDay = startHour * 60;
+      final endMinuteOfDay = endHour * 60 + 59;
+
+      while (currentMinuteOfDay <= endMinuteOfDay) {
+        final hour = currentMinuteOfDay ~/ 60;
+        final minute = currentMinuteOfDay % 60;
         final targetTime = DateTime(
           baseDate.year,
           baseDate.month,
           baseDate.day,
           hour,
-          0,
+          minute,
         );
+        currentMinuteOfDay += step;
         if (targetTime.isBefore(now.add(const Duration(minutes: 2)))) continue;
         if (slotIndex >= _kMaxHourlySlots) break;
 
         final notifId = _kHourlyDhikrNotifIdBase + slotIndex;
         final item =
-            kHourlyDhikrPool[(targetTime.day * 24 + hour) %
+            kHourlyDhikrPool[(targetTime.day * 24 + hour + minute) %
                 kHourlyDhikrPool.length];
 
         try {
@@ -873,7 +724,7 @@ class AdhanNotificationService {
               android: AndroidNotificationDetails(
                 _kHourlyDhikrChannelId,
                 _kHourlyDhikrChannelName,
-                channelDescription: 'إشعار لطيف كل ساعة بذكر ودعاء مأثور',
+                channelDescription: 'إشعار لطيف دوري بذكر ودعاء مأثور',
                 importance: Importance.defaultImportance,
                 priority: Priority.defaultPriority,
                 styleInformation: BigTextStyleInformation(''),
@@ -888,7 +739,7 @@ class AdhanNotificationService {
           );
           slotIndex++;
         } catch (e) {
-          debugPrint('خطأ في جدولة تذكير الساعة ($hour:00): $e');
+          debugPrint('خطأ في جدولة تذكير الذكر الدوري ($hour:$minute): $e');
         }
       }
     }
@@ -1031,6 +882,8 @@ class AdhanNotificationService {
     int postPrayerAzkarDelayMinutes = 5,
     bool rawatibEnabled = false,
     int Function(PrayerMoment)? getIqamahMinutesFor,
+    bool Function(PrayerMoment)? isIqamahEnabledFor,
+    int Function(PrayerMoment)? getPreAdhanMinutesFor,
   }) async {
     if (!_initialized) await initialize();
     await cancelAll();
@@ -1038,6 +891,7 @@ class AdhanNotificationService {
     await cancelAllPostPrayerAzkarReminders();
     await cancelAllRawatibReminders();
     await cancelAllImsakReminders();
+    await cancelAllIqamahReminders();
 
     final now = DateTime.now();
 
@@ -1104,19 +958,36 @@ class AdhanNotificationService {
       }
 
       // 2. تذكير قبل الأذان (الاستعداد والوضوء)
-      if (preAdhanMinutes > 0 && isEnabled(p.moment) && mode != 'off') {
-        final preTime = p.time.subtract(Duration(minutes: preAdhanMinutes));
+      final effectivePreMins =
+          getPreAdhanMinutesFor?.call(p.moment) ?? preAdhanMinutes;
+      if (effectivePreMins > 0 && isEnabled(p.moment) && mode != 'off') {
+        final preTime = p.time.subtract(Duration(minutes: effectivePreMins));
         if (preTime.isAfter(now)) {
           await _schedulePreAdhanOne(
             id + 200,
             p.moment,
             preTime,
-            preAdhanMinutes,
+            effectivePreMins,
           );
         }
       }
 
-      // 3. سلسلة متابعة "هل صليت؟": إذا كانت متابعة الصلاة مفعلة، ونافذة الصلاة ما تزال نشطة في المستقبل
+      // 3. تذكير وقت الإقامة: إذا كان مفعلاً للصلاة
+      final iqamahActive = isIqamahEnabledFor?.call(p.moment) ?? false;
+      final iqamahMins = getIqamahMinutesFor?.call(p.moment) ?? 15;
+      final iqamahTime = p.time.add(Duration(minutes: iqamahMins));
+      if (iqamahActive && isEnabled(p.moment) && mode != 'off') {
+        if (iqamahTime.isAfter(now)) {
+          await _scheduleIqamahOne(
+            _kIqamahIdBase + i,
+            p.moment,
+            iqamahTime,
+            iqamahMins,
+          );
+        }
+      }
+
+      // 4. سلسلة متابعة "هل صليت؟": إذا كانت متابعة الصلاة مفعلة، ونافذة الصلاة ما تزال نشطة في المستقبل
       if (checkinEnabled && p.boundary.isAfter(now) && i < _kCheckinMaxSlots) {
         await _scheduleCheckinSeries(
           slotIndex: i,
@@ -1127,13 +998,11 @@ class AdhanNotificationService {
         );
       }
 
-      // 4. تنبيه "أذكار بعد الصلاة": يبدأ حسابه بعد الإقامة (أو وقت الأذان + مدة الإقامة)
+      // 5. تنبيه "أذكار بعد الصلاة": يبدأ حسابه بعد الإقامة (أو وقت الأذان + مدة الإقامة)
       // بطلب المستخدم صراحة ("بعد الاقامة مش الاذان").
       if (postPrayerAzkarEnabled &&
           isEnabled(p.moment) &&
           i < _kPostPrayerAzkarMaxSlots) {
-        final iqamahMins = getIqamahMinutesFor?.call(p.moment) ?? 15;
-        final iqamahTime = p.time.add(Duration(minutes: iqamahMins));
         await _schedulePostPrayerAzkarOne(
           slotIndex: i,
           prayer: p.moment,
@@ -1143,11 +1012,10 @@ class AdhanNotificationService {
         );
       }
 
-      // 5. تذكير السنن الرواتب: لصلوات الظهر/المغرب/العشاء فقط (سنن مؤكَّدة
+      // 6. تذكير السنن الرواتب: لصلوات الظهر/المغرب/العشاء فقط (سنن مؤكَّدة
       // بعد الفرض)، بعد ١٠ دقائق ثابتة من دخول الوقت — راجع توثيق
       // [_schedulePostPrayerAzkarOne] لنفس آلية الجدولة والتحقق من الحدود.
       if (rawatibEnabled &&
-          isEnabled(p.moment) &&
           i < _kRawatibMaxSlots &&
           _kRawatibTexts.containsKey(p.moment)) {
         await _scheduleRawatibOne(
@@ -1237,25 +1105,24 @@ class AdhanNotificationService {
     }
   }
 
-  /// الصلوات ذات السنن الرواتب المؤكَّدة بعد الفرض (الفجر لها سنة **قبل**
-  /// الفرض فقط، والعصر بلا سنة راتبة مؤكَّدة — فلا تُدرَجان هنا عمداً).
+  /// الصلوات ذات السنن الرواتب المؤكَّدة
   static const _kRawatibTexts = {
-    PrayerMoment.dhuhr: 'لا تنسَ ركعتين بعد الظهر (من السنن الرواتب المؤكَّدة)',
+    PrayerMoment.fajr: 'ركعتا الفجر خير من الدنيا وما فيها — لا تنسَ سنة الفجر الراتبة',
+    PrayerMoment.dhuhr: 'لا تنسَ ركعات السنة الراتبة (قبل الظهر وبعده)',
     PrayerMoment.maghrib: 'لا تنسَ ركعتين بعد المغرب (من السنن الرواتب المؤكَّدة)',
-    PrayerMoment.isha: 'لا تنسَ ركعتين بعد العشاء (من السنن الرواتب المؤكَّدة)',
+    PrayerMoment.isha: 'لا تنسَ ركعتين بعد العشاء والوتر (من السنن الرواتب المؤكَّدة)',
   };
 
-  /// يجدوِل تذكير "السنن الرواتب" الواحد لصلاة واحدة — بعد ١٠ دقائق ثابتة
-  /// من دخول الوقت (كافية عادةً لإتمام الفرض والإقامة قبل الراتبة)، بنفس
-  /// آلية التحقق من الحدود بـ[_schedulePostPrayerAzkarOne] تماماً لكن بلا
-  /// أزرار إجراء (لا شاشة مخصَّصة تُفتَح، تذكير بسيط فقط).
+  /// يجدوِل تذكير "السنن الرواتب" الواحد لصلاة واحدة
   Future<void> _scheduleRawatibOne({
     required int slotIndex,
     required PrayerMoment prayer,
     required DateTime prayerTime,
     required DateTime boundary,
   }) async {
-    final fireTime = prayerTime.add(const Duration(minutes: 10));
+    final fireTime = prayer == PrayerMoment.fajr
+        ? prayerTime.add(const Duration(minutes: 5))
+        : prayerTime.add(const Duration(minutes: 15));
     final now = DateTime.now();
     if (!fireTime.isBefore(boundary)) return;
     if (!fireTime.isAfter(now)) return;
@@ -1267,9 +1134,9 @@ class AdhanNotificationService {
       android: AndroidNotificationDetails(
         _kRawatibChannelId,
         _kRawatibChannelName,
-        channelDescription: 'تذكير بأداء السنن الرواتب بعد الفرض',
-        importance: Importance.defaultImportance,
-        priority: Priority.defaultPriority,
+        channelDescription: 'تذكير بأداء السنن الرواتب',
+        importance: Importance.high,
+        priority: Priority.high,
       ),
       iOS: DarwinNotificationDetails(),
     );
@@ -2142,6 +2009,44 @@ class AdhanNotificationService {
       );
     } catch (e) {
       debugPrint('جدولة تذكير قبل الأذان: $e');
+    }
+  }
+
+  Future<void> cancelAllIqamahReminders() async {
+    for (var i = 0; i < 20; i++) {
+      await _plugin.cancel(id: _kIqamahIdBase + i);
+    }
+  }
+
+  Future<void> _scheduleIqamahOne(
+    int id,
+    PrayerMoment moment,
+    DateTime iqamahTime,
+    int minutesAfter,
+  ) async {
+    final scheduled = tz.TZDateTime.from(iqamahTime, tz.local);
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        _kIqamahChannelId,
+        _kIqamahChannelName,
+        channelDescription: 'تنبيه عند حلول موعد إقامة الصلاة',
+        importance: Importance.high,
+        priority: Priority.high,
+      ),
+      iOS: DarwinNotificationDetails(),
+    );
+
+    try {
+      await _plugin.zonedSchedule(
+        id: id,
+        title: 'حان موعد إقامة صلاة ${moment.nameAr}',
+        body: 'أقيمت الصلاة — استووا واعتدلوا، وتوجّه إلى صلاتك بخشوع 🕌',
+        scheduledDate: scheduled,
+        notificationDetails: details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      );
+    } catch (e) {
+      debugPrint('جدولة إشعار الإقامة: $e');
     }
   }
 

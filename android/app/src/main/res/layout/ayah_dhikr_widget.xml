@@ -4,6 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
+    android:layoutDirection="rtl"
     android:background="@drawable/humam_widget_background"
     android:paddingStart="12dp"
     android:paddingEnd="12dp"
@@ -23,7 +24,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="السبت 09 ربيع الأول 1448"
-            android:textColor="#C5A059"
+            android:textColor="#F5D78E"
             android:textSize="11sp"
             android:textStyle="bold"
             android:gravity="start" />
@@ -32,26 +33,30 @@
             android:id="@+id/widget_app_brand"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="هُمَام"
-            android:textColor="#80FFFFFF"
-            android:textSize="11sp"
-            android:textStyle="bold" />
+            android:text="✦ قبس هُمَام"
+            android:textColor="#F5D78E"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:background="@drawable/humam_widget_pill_gold" />
     </LinearLayout>
 
-    <!-- فاصل رفيع -->
-    <ImageView
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:layout_marginTop="5dp"
-        android:layout_marginBottom="6dp"
-        android:background="#1FFFFFFF" />
-
-    <!-- 2. آية الفترة -->
+    <!-- 2. آية الفترة داخل بطاقة ناعمة -->
     <LinearLayout
         android:id="@+id/widget_ayah_section"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="6dp"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:background="@drawable/humam_widget_inner_card"
         android:orientation="vertical"
         android:gravity="center">
 
@@ -72,19 +77,11 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="سورة الرعد · آية 28"
-            android:textColor="#C5A059"
+            android:textColor="#F5D78E"
             android:textSize="10sp"
             android:gravity="center"
-            android:layout_marginTop="2dp" />
+            android:layout_marginTop="3dp" />
     </LinearLayout>
-
-    <!-- فاصل رفيع -->
-    <ImageView
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:layout_marginTop="4dp"
-        android:layout_marginBottom="4dp"
-        android:background="#1FFFFFFF" />
 
     <!-- 3. ذكر الفترة -->
     <LinearLayout
@@ -93,15 +90,15 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="4dp"
-        android:paddingEnd="4dp">
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp">
 
         <TextView
             android:id="@+id/widget_dhikr_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="📿 ذكر الفترة:"
-            android:textColor="#E7D2A0"
+            android:textColor="#F5D78E"
             android:textSize="10sp"
             android:textStyle="bold" />
 

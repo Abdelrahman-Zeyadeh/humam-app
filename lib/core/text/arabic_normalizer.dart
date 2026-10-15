@@ -32,6 +32,8 @@ String stripQuranicMarksForDisplay(String input) {
   var text = input.replaceAll(_quranicAnnotationMarksOnly, '');
   // إزالة أي مدات عثمانية طافية (U+0653) قد تكسر تشبيك الهمزات في الخطوط القياسية
   text = text.replaceAll('\u0653', '');
+  // إزالة علامات السكت والوقف والرموز القرآنية الإضافية (سكت، صلة، قلى، صفر مستدير/مستطيل، ميم صغيرة)
+  text = text.replaceAll(RegExp(r'[\u06DF\u06E0\u06E2\u06EA-\u06ED\u0615-\u061A]'), '');
   // إزالة أي مسافات عارضة بين تنوين الفتح حصراً (\u064B/\u08F0) وحرف الألف/الياء التابع لنفس الكلمة
   text = text.replaceAllMapped(
     RegExp(r'([\u064B\u08F0])\s+([اى][ۖ-ۭ]?)(?=\s|$|[\u2000-\u200F])'),

@@ -16,6 +16,7 @@ class AyahEndCircle extends ConsumerWidget {
   final int ayahNumber;
   final int pageNumber;
   final double size;
+  final Color? color;
 
   const AyahEndCircle({
     super.key,
@@ -23,10 +24,12 @@ class AyahEndCircle extends ConsumerWidget {
     required this.ayahNumber,
     required this.pageNumber,
     this.size = 26,
+    this.color,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final effectiveColor = color ?? const Color(0xFF1E1912);
     final fontAsync = ref.watch(pageFontFamilyProvider(pageNumber));
     final glyphAsync = ref.watch(_ayahGlyphProvider(ayahId));
 
@@ -39,7 +42,7 @@ class AyahEndCircle extends ConsumerWidget {
           style: TextStyle(
             fontFamily: fontAsync.value,
             fontSize: size * 1.05,
-            color: const Color(0xFF1E1912),
+            color: effectiveColor,
             height: 1.0,
           ),
         ),
@@ -50,7 +53,7 @@ class AyahEndCircle extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 2.5),
       child: CustomPaint(
         size: Size(size, size * 1.15),
-        painter: _AyahEndCirclePainter(color: const Color(0xFF1E1912)),
+        painter: _AyahEndCirclePainter(color: effectiveColor),
         child: SizedBox(
           width: size,
           height: size * 1.15,
@@ -61,7 +64,7 @@ class AyahEndCircle extends ConsumerWidget {
                 fontFamily: 'AmiriQuran',
                 fontSize: size * 0.40,
                 fontWeight: FontWeight.bold,
-                color: const Color(0xFF1E1912),
+                color: effectiveColor,
                 height: 1.0,
               ),
             ),

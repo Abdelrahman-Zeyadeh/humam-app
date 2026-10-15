@@ -5,7 +5,6 @@ import '../../../core/data/user/location_prefs.dart';
 import '../../../core/data/user/user_prefs.dart';
 import '../../notifications/adhan_notification_prefs.dart';
 import '../../notifications/adhan_notification_service.dart';
-import '../prayer_times_service.dart';
 
 /// إعداد متابعة "هل صليت؟" — تفعيل مستقل عن إشعار الأذان العادي (بطلب
 /// صاحب المشروع: "اشعار بعد كل صلاة... مع تذكير وسؤال صليت؟... وتكرير
@@ -79,49 +78,6 @@ class PrayerCheckinCard extends ConsumerWidget {
                     const SizedBox(width: 6),
                   ],
                 ],
-              ),
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                icon: const Icon(Icons.send_outlined, size: 16),
-                label: const Text('إرسال إشعار متابعة تجريبي الآن'),
-                style: OutlinedButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                ),
-                onPressed: () async {
-                  try {
-                    await AdhanNotificationService.instance
-                        .requestPermissions();
-                    PrayerMoment? currentMoment;
-                    if (prefs.hasLocation) {
-                      final now = DateTime.now();
-                      final dayTimes = computeDayTimes(
-                        lat: prefs.lat!,
-                        lon: prefs.lon!,
-                        date: now,
-                        methodKey: prefs.calculationMethod,
-                      ).where((t) => t.moment.isPrayer).toList();
-                      for (final t in dayTimes) {
-                        if (!t.time.isAfter(now)) {
-                          currentMoment = t.moment;
-                        }
-                      }
-                      currentMoment ??= dayTimes.first.moment;
-                    }
-                    await AdhanNotificationService.instance
-                        .sendTestCheckinNotification(moment: currentMoment);
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('راقب شريط الإشعارات خلال ٣ ثوانٍ...'),
-                      ),
-                    );
-                  } catch (e) {
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('تعذّر إرسال الإشعار: $e')),
-                    );
-                  }
-                },
               ),
             ],
           ],

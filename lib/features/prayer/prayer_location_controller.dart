@@ -117,6 +117,10 @@ class LocationController extends Notifier<AsyncValue<void>> {
         checkinFirstDelayMinutes: userPrefs.prayerCheckinFirstDelayMinutes,
         postPrayerAzkarEnabled: userPrefs.postPrayerAzkarEnabled,
         postPrayerAzkarDelayMinutes: userPrefs.postPrayerAzkarDelayMinutes,
+        rawatibEnabled: userPrefs.rawatibEnabled,
+        getIqamahMinutesFor: (m) => userPrefs.iqamahMinutesFor(m.name),
+        isIqamahEnabledFor: (m) => userPrefs.iqamahNotificationEnabledFor(m.name),
+        getPreAdhanMinutesFor: (m) => userPrefs.preAdhanMinutesFor(m.name),
       );
     } catch (_) {
       // راجع تعليق الدالة — لا نُفشل تحديث الموقع بسبب الإشعارات.
@@ -156,6 +160,9 @@ Future<void> rescheduleAdhanNotifications(
     checkinFirstDelayMinutes: userPrefs.prayerCheckinFirstDelayMinutes,
     postPrayerAzkarEnabled: userPrefs.postPrayerAzkarEnabled,
     postPrayerAzkarDelayMinutes: userPrefs.postPrayerAzkarDelayMinutes,
+    rawatibEnabled: userPrefs.rawatibEnabled,
     getIqamahMinutesFor: (m) => userPrefs.iqamahMinutesFor(m.name),
+    isIqamahEnabledFor: (m) => userPrefs.iqamahNotificationEnabledFor(m.name),
+    getPreAdhanMinutesFor: (m) => userPrefs.preAdhanMinutesFor(m.name),
   );
 }

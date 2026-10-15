@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/data/user/user_prefs.dart';
+import '../../../core/data/user/user_repository.dart' show UserCategories;
 import '../../../core/text/time_format.dart';
 import '../../notifications/adhan_notification_service.dart';
 import 'reminder_repeat_interval.dart';
@@ -95,12 +96,19 @@ class ActivityReminderRow extends ConsumerWidget {
 
   Future<void> _toggle(BuildContext context, WidgetRef ref, bool value) async {
     final userPrefs = ref.read(userPrefsProvider);
-    if (value && userPrefs.reminderHourFor(category) == null) {
-      // ما في وقت مختار بعد — نفتح المنتقي مباشرة، يفعّل ضمنياً عند الاختيار.
-      await _pickTime(context, ref);
-      return;
-    }
-    await userPrefs.setActivityReminder(category, enabled: value);
+    final defaultHour = category == UserCategories.morningAzkar
+        ? 6
+        : (category == UserCategories.eveningAzkar
+            ? 18
+            : (category == UserCategories.dailyWird ? 8 : 9));
+    final hour = userPrefs.reminderHourFor(category) ?? defaultHour;
+    final minute = userPrefs.reminderMinuteFor(category);
+    await userPrefs.setActivityReminder(
+      category,
+      enabled: value,
+      hour: hour,
+      minute: minute,
+    );
     ref.read(categoryStreakVersionProvider.notifier).bump();
     if (!context.mounted) return;
     await _applyState(context, ref);

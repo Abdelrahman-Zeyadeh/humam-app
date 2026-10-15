@@ -4,22 +4,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_card.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../models/faith_group.dart';
+import '../../services/social_safety_service.dart';
 import 'nudge_dialog.dart';
 
 /// تبويب "حائط التواصي": قائمة رسائل التشجيع المتبادلة بالمجموعة.
-class NudgesTab extends StatelessWidget {
+class NudgesTab extends ConsumerWidget {
   const NudgesTab({super.key, required this.nudgesAsync, required this.isDark});
 
   final AsyncValue<List<GroupNudge>> nudgesAsync;
   final bool isDark;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final accent = themeAccent(context);
+    final blockedUsers = ref.watch(blockedUsersProvider);
 
     return nudgesAsync.when(
       data: (nudges) {
-        if (nudges.isEmpty) {
+        final visibleNudges = nudges
+            .where((n) => !blockedUsers.contains(n.fromUserId))
+            .toList();
+
+        if (visibleNudges.isEmpty) {
           return EmptyState(
             icon: Icons.favorite_outline_rounded,
             message: 'لا توجد رسائل تشجيع بعد',
@@ -31,9 +37,9 @@ class NudgesTab extends StatelessWidget {
 
         return ListView.builder(
           padding: const EdgeInsets.all(16),
-          itemCount: nudges.length,
+          itemCount: visibleNudges.length,
           itemBuilder: (ctx, i) {
-            final n = nudges[i];
+            final n = visibleNudges[i];
             return Container(
               margin: const EdgeInsets.only(bottom: 10),
               decoration: BoxDecoration(
@@ -82,7 +88,12 @@ class NudgesTab extends StatelessWidget {
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('خطأ: $e')),
+      error: (_, __) => const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: Text('تعذّر تحميل رسائل التواصي. يرجى التحقق من اتصال الإنترنت.'),
+        ),
+      ),
     );
   }
 }

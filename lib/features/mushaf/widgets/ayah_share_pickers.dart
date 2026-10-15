@@ -243,3 +243,123 @@ void showAyahShareSearchPicker(
     ),
   );
 }
+
+/// نافذة اختيار رقم صفحة المصحف للمشاركة كصفحة كاملة (١ - ٦٠٤)
+void showAyahSharePagePicker(
+  BuildContext context, {
+  required int currentPage,
+  required ValueChanged<int> onPageSelected,
+}) {
+  final controller = TextEditingController(text: '$currentPage');
+  showDialog(
+    context: context,
+    builder: (ctx) {
+      int tempPage = currentPage;
+      return StatefulBuilder(
+        builder: (ctx, setDlgState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            contentPadding: EdgeInsets.zero,
+            titlePadding: EdgeInsets.zero,
+            title: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: const BoxDecoration(
+                color: AyahShareColors.primaryGreen,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('اختر صفحة المصحف', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white, size: 20),
+                    onPressed: () => Navigator.pop(ctx),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
+              ),
+            ),
+            content: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton.filledTonal(
+                        icon: const Icon(Icons.remove),
+                        onPressed: tempPage > 1
+                            ? () {
+                                setDlgState(() {
+                                  tempPage--;
+                                  controller.text = '$tempPage';
+                                });
+                              }
+                            : null,
+                      ),
+                      const SizedBox(width: 14),
+                      SizedBox(
+                        width: 90,
+                        child: TextField(
+                          controller: controller,
+                          keyboardType: TextInputType.number,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                          decoration: InputDecoration(
+                            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onChanged: (val) {
+                            final parsed = int.tryParse(val);
+                            if (parsed != null && parsed >= 1 && parsed <= 604) {
+                              setDlgState(() => tempPage = parsed);
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      IconButton.filledTonal(
+                        icon: const Icon(Icons.add),
+                        onPressed: tempPage < 604
+                            ? () {
+                                setDlgState(() {
+                                  tempPage++;
+                                  controller.text = '$tempPage';
+                                });
+                              }
+                            : null,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  const Text('من صفحة 1 إلى 604', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AyahShareColors.primaryGreen,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () {
+                        final p = int.tryParse(controller.text) ?? tempPage;
+                        if (p >= 1 && p <= 604) {
+                          onPageSelected(p);
+                        }
+                        Navigator.pop(ctx);
+                      },
+                      child: const Text('تأكيد اختيار الصفحة', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
+}

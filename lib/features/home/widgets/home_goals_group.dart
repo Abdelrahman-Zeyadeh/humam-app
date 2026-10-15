@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/data/user/user_repository.dart' show KhatmaPlan, HifzPlan;
+import '../../../core/data/user/user_repository.dart' show KhatmaPlan, HifzPlan, UserCategories;
+import '../../../core/data/user/khatma_prefs.dart';
+import '../../../core/data/user/user_prefs.dart';
 import '../../../core/theme/app_card.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../hifz/hifz_screen.dart';
@@ -137,12 +139,12 @@ class _GoalDonut extends StatelessWidget {
   }
 }
 
-class _KhatmaGoalRow extends StatelessWidget {
+class _KhatmaGoalRow extends ConsumerWidget {
   const _KhatmaGoalRow({required this.plan});
   final KhatmaPlan plan;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final progress = (plan.expectedPageByNow / 604).clamp(0.0, 1.0);
     final wirdPages = wirdPagesForToday(plan);
     return Padding(
@@ -167,7 +169,7 @@ class _KhatmaGoalRow extends StatelessWidget {
                 Text(
                   wirdPages > 0
                       ? 'ورد اليوم: $wirdPages صفحة'
-                      : 'أتممت وردك بالكامل اليوم',
+                      : 'أتممت وردك بالكامل اليوم ✨',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 11, color: homeTextSoft(context)),
@@ -177,12 +179,35 @@ class _KhatmaGoalRow extends StatelessWidget {
           ),
           if (wirdPages > 0) ...[
             const SizedBox(width: 6),
+            // زر "تمّ" السريع — للمستخدم الذي قرأ ورده خارج التطبيق
+            OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                side: const BorderSide(color: AppColors.blue, width: 1.2),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () async {
+                final newPage = (plan.currentPage + wirdPages).clamp(1, 604);
+                await ref.read(khatmaPrefsProvider).updateCurrentPage(plan.id, newPage);
+                await ref.read(userPrefsProvider).bumpCategoryStreakIfNewDay(UserCategories.dailyWird);
+                ref.read(categoryStreakVersionProvider.notifier).bump();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('مبارك! تمّ تسجيل ورد اليوم حتى صفحة $newPage 📖✨'),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
+              },
+              child: Text('تمّ ✓', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.blue)),
+            ),
+            const SizedBox(width: 4),
             FilledButton.tonal(
               style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
@@ -192,10 +217,7 @@ class _KhatmaGoalRow extends StatelessWidget {
                     initialPage: plan.currentPage,
                     khatmaPracticeMode: true,
                     khatmaPlanId: plan.id,
-                    wirdTargetPage: (plan.currentPage + wirdPages - 1).clamp(
-                      1,
-                      604,
-                    ),
+                    wirdTargetPage: (plan.currentPage + wirdPages - 1).clamp(1, 604),
                   ),
                 ),
               ),
@@ -208,28 +230,28 @@ class _KhatmaGoalRow extends StatelessWidget {
   }
 }
 
-class _HifzGoalRow extends StatelessWidget {
+class _HifzGoalRow extends ConsumerWidget {
   const _HifzGoalRow({required this.plan});
   final HifzPlan plan;
 
   @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => Navigator.of(
-        context,
-      ).push(MaterialPageRoute(builder: (_) => const HifzScreen())),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-        child: Row(
-          children: [
-            _GoalDonut(
-              size: 44,
-              progress: plan.progress,
-              color: AppColors.purple,
-              fontSize: 9.5,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      child: Row(
+        children: [
+          _GoalDonut(
+            size: 44,
+            progress: plan.progress,
+            color: AppColors.purple,
+            fontSize: 9.5,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: InkWell(
+              onTap: () => Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const HifzScreen())),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -251,9 +273,33 @@ class _HifzGoalRow extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(Icons.chevron_left, color: homeTextSoft(context), size: 18),
-          ],
-        ),
+          ),
+          const SizedBox(width: 6),
+          // زر "تمّ" السريع للحفظ — إذا راجع ورده خارج التطبيق
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              side: const BorderSide(color: AppColors.purple, width: 1.2),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              await ref.read(userPrefsProvider).bumpCategoryStreakIfNewDay(UserCategories.hifz);
+              ref.read(categoryStreakVersionProvider.notifier).bump();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('بارك الله فيك! تمّ تسجيل ورد الحفظ والمراجعة لليوم 🧠✨'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+            child: const Text('تمّ ✓', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.purple)),
+          ),
+          Icon(Icons.chevron_left, color: homeTextSoft(context), size: 18),
+        ],
       ),
     );
   }

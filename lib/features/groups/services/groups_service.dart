@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/faith_group.dart';
+import 'social_safety_service.dart';
 
 class GroupsService {
   static final GroupsService instance = GroupsService._();
@@ -257,6 +258,12 @@ class GroupsService {
     final user = _auth?.currentUser;
     if (user == null) return;
 
+    final validation = ProgressValidator.validateDailyProgress(progress);
+    if (!validation.isValid) {
+      debugPrint('syncMyProgress rejected invalid progress: ${validation.error}');
+      return;
+    }
+
     try {
       final memberRef = _firestore
           .collection('groups')
@@ -381,6 +388,15 @@ class GroupsService {
   }) async {
     final user = _auth?.currentUser;
     if (user == null || addValue <= 0) return;
+
+    final validation = ProgressValidator.validateChallengeContribution(
+      unit: '',
+      addValue: addValue,
+    );
+    if (!validation.isValid) {
+      debugPrint('contributeToChallenge rejected: ${validation.error}');
+      return;
+    }
 
     try {
       final progressRef = _firestore

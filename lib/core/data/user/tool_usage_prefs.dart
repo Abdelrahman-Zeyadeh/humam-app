@@ -43,6 +43,7 @@ final mostUsedToolIdsProvider = FutureProvider<List<String>>((ref) {
 });
 
 const _kPinnedToolsPrefKey = 'user_pinned_tools_v1';
+const _kRecentlyUsedToolsPrefKey = 'user_recently_used_tools_v1';
 
 class PinnedToolsNotifier extends Notifier<List<String>> {
   @override
@@ -56,22 +57,49 @@ class PinnedToolsNotifier extends Notifier<List<String>> {
     if (current.contains(toolId)) {
       current.remove(toolId);
     } else {
-      if (current.length < 4) {
-        current.add(toolId);
-      } else {
-        // الحد الأقصى ٤ أدوات مثبتة
-        current.removeAt(0);
-        current.add(toolId);
-      }
+      current.add(toolId);
     }
     state = current;
     final prefs = ref.read(sharedPreferencesProvider);
     await prefs.setStringList(_kPinnedToolsPrefKey, current);
   }
+
+  bool isPinned(String toolId) => state.contains(toolId);
 }
 
 final pinnedToolsProvider =
     NotifierProvider<PinnedToolsNotifier, List<String>>(
       PinnedToolsNotifier.new,
+    );
+
+/// الأدوات المستخدمة مؤخراً (آخر ٣-٥ أدوات دون تكرار)
+class RecentlyUsedToolsNotifier extends Notifier<List<String>> {
+  @override
+  List<String> build() {
+    final prefs = ref.watch(sharedPreferencesProvider);
+    return prefs.getStringList(_kRecentlyUsedToolsPrefKey) ?? const [];
+  }
+
+  Future<void> recordUse(String toolId) async {
+    final current = state.where((id) => id != toolId).toList();
+    current.insert(0, toolId);
+    if (current.length > 5) {
+      current.removeRange(5, current.length);
+    }
+    state = current;
+    final prefs = ref.read(sharedPreferencesProvider);
+    await prefs.setStringList(_kRecentlyUsedToolsPrefKey, current);
+  }
+
+  Future<void> clear() async {
+    state = const [];
+    final prefs = ref.read(sharedPreferencesProvider);
+    await prefs.remove(_kRecentlyUsedToolsPrefKey);
+  }
+}
+
+final recentlyUsedToolsProvider =
+    NotifierProvider<RecentlyUsedToolsNotifier, List<String>>(
+      RecentlyUsedToolsNotifier.new,
     );
 

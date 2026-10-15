@@ -8,7 +8,6 @@ import '../../../../core/theme/app_colors.dart';
 import '../../providers/groups_providers.dart';
 import '../../services/groups_service.dart';
 import '../group_details_screen.dart';
-import 'avatar_picker.dart';
 
 /// حوار "الانضمام برمز المجموعة" — يُفتح من زر الانضمام بأعلى مركز
 /// المجموعات، أو تلقائياً برمز مُعبَّأ مسبقاً عند فتح رابط دعوة مباشر
@@ -58,25 +57,6 @@ Future<void> showJoinGroupDialog(
                   hintText: 'HM1234',
                   border: OutlineInputBorder(),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: Text(
-                  'اختر أفاتارك بالمجموعة',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(
-                      ctx,
-                    ).colorScheme.onSurface.withValues(alpha: 0.7),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              AvatarPicker(
-                selectedIndex: selectedAvatarIndex,
-                onSelected: (i) => setDlgState(() => selectedAvatarIndex = i),
               ),
             ],
           ),

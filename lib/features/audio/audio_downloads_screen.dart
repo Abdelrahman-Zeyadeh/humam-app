@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import 'audio_download_service.dart';
 import 'quran_audio_controller.dart';
 import 'reciters.dart';
+import 'ui/reciter_avatar.dart';
 
 final _allSurahsProvider = FutureProvider<List<Surah>>((ref) {
   return ref.watch(quranRepositoryProvider).allSurahs();
@@ -56,7 +57,18 @@ class AudioDownloadsScreen extends ConsumerWidget {
                     ),
                     items: [
                       for (final r in kReciters)
-                        DropdownMenuItem(value: r.id, child: Text(r.nameAr)),
+                        DropdownMenuItem(
+                          value: r.id,
+                          child: Row(
+                            children: [
+                              ReciterAvatar(reciter: r, radius: 12),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(r.nameAr, overflow: TextOverflow.ellipsis),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                     onChanged: (id) {
                       if (id != null) controller.switchReciter(id);

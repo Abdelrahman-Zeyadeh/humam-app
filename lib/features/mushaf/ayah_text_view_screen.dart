@@ -279,27 +279,41 @@ class _AyahTextViewScreenState extends ConsumerState<AyahTextViewScreen> {
                   border: Border(top: BorderSide(color: isDark ? AppColors.lineDark : AppColors.line)),
                 ),
                 child: SafeArea(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      TextButton.icon(
-                        icon: const Icon(Icons.arrow_back_ios, size: 16),
-                        label: const Text('الآية السابقة'),
-                        onPressed: isFirst ? null : () => _goTo(_ayahId - 1),
-                      ),
-                      Text(
-                        'آية ${ayah.ayah} / سورة ${ayah.surah}',
-                        style: TextStyle(fontWeight: FontWeight.w700, color: onSurface.withValues(alpha: 0.7)),
-                      ),
-                      Directionality(
-                        textDirection: TextDirection.ltr,
-                        child: TextButton.icon(
-                          icon: const Icon(Icons.arrow_back_ios, size: 16),
-                          label: const Text('الآية التالية'),
-                          onPressed: isLast ? null : () => _goTo(_ayahId + 1),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          icon: const Icon(Icons.arrow_back_ios, size: 14),
+                          label: const Text('الآية السابقة'),
+                          onPressed: isFirst ? null : () => _goTo(_ayahId - 1),
                         ),
-                      ),
-                    ],
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Text(
+                            'آية ${ayah.ayah} / سورة ${ayah.surah}',
+                            style: TextStyle(fontWeight: FontWeight.w700, color: onSurface.withValues(alpha: 0.7)),
+                          ),
+                        ),
+                        Directionality(
+                          textDirection: TextDirection.ltr,
+                          child: TextButton.icon(
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            icon: const Icon(Icons.arrow_back_ios, size: 14),
+                            label: const Text('الآية التالية'),
+                            onPressed: isLast ? null : () => _goTo(_ayahId + 1),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -686,27 +700,41 @@ class _TranslationView extends ConsumerWidget {
                   border: Border(top: BorderSide(color: isDark ? AppColors.lineDark : AppColors.line)),
                 ),
                 child: SafeArea(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      TextButton.icon(
-                        icon: const Icon(Icons.arrow_back_ios, size: 16),
-                        label: const Text('الآية السابقة'),
-                        onPressed: isFirst ? null : () => onGoTo(ayahId - 1),
-                      ),
-                      Text(
-                        'آية ${ayah.ayah} / سورة ${ayah.surah}',
-                        style: TextStyle(fontWeight: FontWeight.w700, color: onSurface.withValues(alpha: 0.7)),
-                      ),
-                      Directionality(
-                        textDirection: TextDirection.ltr,
-                        child: TextButton.icon(
-                          icon: const Icon(Icons.arrow_back_ios, size: 16),
-                          label: const Text('الآية التالية'),
-                          onPressed: isLast ? null : () => onGoTo(ayahId + 1),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          icon: const Icon(Icons.arrow_back_ios, size: 14),
+                          label: const Text('الآية السابقة'),
+                          onPressed: isFirst ? null : () => onGoTo(ayahId - 1),
                         ),
-                      ),
-                    ],
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Text(
+                            'آية ${ayah.ayah} / سورة ${ayah.surah}',
+                            style: TextStyle(fontWeight: FontWeight.w700, color: onSurface.withValues(alpha: 0.7)),
+                          ),
+                        ),
+                        Directionality(
+                          textDirection: TextDirection.ltr,
+                          child: TextButton.icon(
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            icon: const Icon(Icons.arrow_back_ios, size: 14),
+                            label: const Text('الآية التالية'),
+                            onPressed: isLast ? null : () => onGoTo(ayahId + 1),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

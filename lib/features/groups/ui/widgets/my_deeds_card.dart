@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../models/faith_group.dart';
 
-/// بطاقة "إنجازك في أعمال اليوم والليلة" بأعلى مركز المجموعات — تُحدَّث
-/// تلقائياً بجميع مجموعات المستخدم.
+/// بطاقة "إنجازك في أعمال اليوم والليلة" بأعلى مركز المجموعات — بتصميم عصري ملهم
+/// وشريط تقدم دائري متوهج وشارات توضح إنجاز الفرائض والسنن والأذكار وورد القرآن.
 class MyDeedsCard extends StatelessWidget {
   const MyDeedsCard({super.key, required this.deeds, required this.isDark});
 
@@ -14,18 +14,30 @@ class MyDeedsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final score = deeds.scorePercentage;
+    final accent = themeAccent(context);
+
+    final String statusText = score >= 80
+        ? 'ما شاء الله، همة إيمانية عالية! 🌟'
+        : score >= 40
+            ? 'خطوة مباركة، واصل إتمام طاعاتك 🌱'
+            : 'سارع في الخيرات وابدأ أوراد يومك 🌿';
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: isDark ? AppColors.lineDark : AppColors.line),
+        color: isDark ? const Color(0xFF131F2E) : Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: score >= 80
+              ? const Color(0xFF2E7D32).withValues(alpha: 0.35)
+              : (isDark ? AppColors.lineDark : AppColors.line),
+          width: 1.3,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
@@ -38,49 +50,95 @@ class MyDeedsCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      '🌟 إنجازك في أعمال اليوم والليلة',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.gold.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'اليوم والليلة',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.goldDeep,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '🌟 إنجازك الإيماني اليومي',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: isDark ? Colors.white : AppColors.ink,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Text(
-                      'يتم تحديث إنجازك تلقائياً في جميع مجموعاتك',
+                      statusText,
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDark ? Colors.white60 : Colors.black54,
+                        fontWeight: FontWeight.w600,
+                        color: score >= 80
+                            ? const Color(0xFF2E7D32)
+                            : (isDark ? Colors.white70 : Colors.black54),
                       ),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: 12),
+              // عداد الإنجاز الدائري المتوهج
               Stack(
                 alignment: Alignment.center,
                 children: [
                   SizedBox(
-                    width: 50,
-                    height: 50,
+                    width: 56,
+                    height: 56,
                     child: CircularProgressIndicator(
                       value: score / 100.0,
-                      strokeWidth: 5,
+                      strokeWidth: 5.5,
                       backgroundColor: isDark
                           ? Colors.white12
                           : Colors.black.withValues(alpha: 0.06),
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        score >= 80 ? const Color(0xFF2E7D32) : AppColors.goldDeep,
+                        score >= 80 ? const Color(0xFF2E7D32) : accent,
                       ),
                     ),
                   ),
-                  Text(
-                    '$score%',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '$score%',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ],
           ),
           const SizedBox(height: 16),
-          const Divider(height: 1),
-          const SizedBox(height: 12),
+          Divider(
+            height: 1,
+            color: isDark ? Colors.white10 : Colors.black12,
+          ),
+          const SizedBox(height: 14),
+
+          // شارات تفصيل أعمال اليوم
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -103,7 +161,7 @@ class MyDeedsCard extends StatelessWidget {
               ),
               _DeedStatus(
                 icon: Icons.menu_book_outlined,
-                label: deeds.quranPages > 0 ? 'ورد القرآن' : 'الورد',
+                label: deeds.quranPages > 0 ? '${deeds.quranPages} ص ورد' : 'الورد',
                 done: deeds.quranPages > 0,
               ),
             ],
@@ -127,36 +185,64 @@ class _DeedStatus extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = themeAccent(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Column(
       children: [
-        Container(
-          width: 38,
-          height: 38,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: done
-                ? accent.withValues(alpha: 0.15)
-                : Colors.grey.withValues(alpha: 0.1),
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: done ? accent.withValues(alpha: 0.5) : Colors.transparent,
-              width: 1.5,
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: done
+                    ? const Color(0xFF2E7D32).withValues(alpha: 0.12)
+                    : (isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.04)),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: done
+                      ? const Color(0xFF2E7D32).withValues(alpha: 0.45)
+                      : Colors.transparent,
+                  width: 1.5,
+                ),
+              ),
+              child: Icon(
+                icon,
+                size: 20,
+                color: done ? const Color(0xFF2E7D32) : (isDark ? Colors.white38 : Colors.black38),
+              ),
             ),
-          ),
-          child: Icon(icon, size: 18, color: done ? accent : Colors.grey),
+            if (done)
+              Positioned(
+                top: -2,
+                right: -2,
+                child: Container(
+                  width: 14,
+                  height: 14,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF2E7D32),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check,
+                    size: 10,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 6),
         Text(
           label,
           style: TextStyle(
-            fontSize: 11.5,
-            fontWeight: done ? FontWeight.bold : FontWeight.normal,
+            fontSize: 11,
+            fontWeight: done ? FontWeight.bold : FontWeight.w500,
             color: done
-                ? (Theme.of(context).brightness == Brightness.dark
-                      ? Colors.white
-                      : Colors.black87)
-                : Colors.grey,
+                ? (isDark ? Colors.white : AppColors.ink)
+                : (isDark ? Colors.white38 : Colors.black38),
           ),
         ),
       ],

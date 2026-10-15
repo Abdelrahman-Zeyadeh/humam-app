@@ -18,11 +18,10 @@ class AzkarLibraryCategoryScreen extends ConsumerWidget {
     final onSurface = Theme.of(context).colorScheme.onSurface;
 
     return Scaffold(
-      // هيدر بتدرّج كحلي مطابق لباقي شاشات الأذكار — بقي `AppBar` عادياً
-      // بلا لمس هيكل الجسم، فقط زُيِّن بصرياً (`flexibleSpace`).
+      // هيدر بتدرّج أخضر زمردي فاخر موحّد مع هوية التطبيق
       appBar: GradientAppBar(
         title: category.title,
-        colors: const [AppColors.blue, AppColors.navy],
+        colors: const [Color(0xFF135B4C), Color(0xFF0D3B31)],
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

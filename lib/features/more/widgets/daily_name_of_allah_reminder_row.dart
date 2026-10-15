@@ -94,11 +94,14 @@ class DailyNameOfAllahReminderRow extends ConsumerWidget {
 
   Future<void> _toggle(BuildContext context, WidgetRef ref, bool value) async {
     final userPrefs = ref.read(userPrefsProvider);
-    if (value && userPrefs.reminderHourFor(_category) == null) {
-      await _pickTime(context, ref);
-      return;
-    }
-    await userPrefs.setActivityReminder(_category, enabled: value);
+    final hour = userPrefs.reminderHourFor(_category) ?? 9;
+    final minute = userPrefs.reminderMinuteFor(_category);
+    await userPrefs.setActivityReminder(
+      _category,
+      enabled: value,
+      hour: hour,
+      minute: minute,
+    );
     ref.read(categoryStreakVersionProvider.notifier).bump();
     if (!context.mounted) return;
     await _applyState(context, ref);

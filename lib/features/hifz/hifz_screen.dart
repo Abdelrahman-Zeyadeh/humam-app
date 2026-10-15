@@ -15,6 +15,8 @@ import '../mushaf/mushaf_screen.dart';
 import '../mushaf/mushaf_settings.dart' show hifzPickerProvider;
 import '../notifications/adhan_notification_service.dart';
 import '../notifications/reminder_messages.dart' show hifzReminderMessages;
+import 'hifz_heatmap_screen.dart';
+import 'hifz_mushaf_screen.dart';
 import 'hifz_quiz_screen.dart';
 import 'hifz_range_picker_sheet.dart';
 import 'hifz_review_screen.dart';
@@ -118,6 +120,13 @@ class HifzScreen extends ConsumerWidget {
         title: 'قسم الحفظ',
         colors: const [AppColors.blue, AppColors.navy],
         actions: [
+          IconButton(
+            icon: const Icon(Icons.grid_on_rounded),
+            tooltip: 'خريطة إتقان الحفظ',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const HifzHeatmapScreen()),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.compare_arrows_rounded),
             tooltip: 'متشابهات القرآن',
@@ -224,6 +233,52 @@ class HifzScreen extends ConsumerWidget {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+
+          // بطاقة خريطة إتقان الحفظ
+          Card(
+            color: const Color(0xFF2E7D32).withValues(alpha: 0.08),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: const Color(0xFF2E7D32).withValues(alpha: 0.3)),
+            ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const HifzHeatmapScreen()),
+              ),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: Color(0xFF2E7D32),
+                      radius: 18,
+                      child: Icon(Icons.grid_on_rounded, color: Colors.white, size: 20),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'خريطة إتقان الحفظ 🗺️',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'خريطة تفاعلية للسور والأجزاء وتتبع مستوى الإتقان',
+                            style: TextStyle(fontSize: 11, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
+                  ],
+                ),
+              ),
+            ),
+          ),
           const SizedBox(height: 16),
 
           if (plans.isEmpty)
@@ -294,10 +349,10 @@ class HifzScreen extends ConsumerWidget {
     if (!context.mounted) return;
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => MushafScreen(
+        builder: (_) => HifzMushafScreen(
           initialPage: page,
-          hifzPracticeMode: true,
-          hifzPlanId: plan.id,
+          initialMode: HifzMushafMode.review,
+          planId: plan.id,
         ),
       ),
     );
@@ -623,19 +678,25 @@ class _DueReviewRow extends ConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.only(top: 8),
-      child: OutlinedButton.icon(
-        icon: const Icon(Icons.psychology_outlined, size: 18),
-        label: Text(
-          due > 0
-              ? 'مراجعة وتثبيت اليوم ($due آية مستحقة)'
-              : 'مراجعة وتثبيت الحفظ',
+      child: SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          icon: const Icon(Icons.psychology_outlined, size: 18),
+          label: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              due > 0
+                  ? 'مراجعة وتثبيت اليوم ($due آية مستحقة)'
+                  : 'مراجعة وتثبيت الحفظ',
+            ),
+          ),
+          onPressed: () async {
+            await Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => HifzReviewScreen(planId: planId)),
+            );
+            ref.invalidate(_dueReviewCountProvider(planId));
+          },
         ),
-        onPressed: () async {
-          await Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => HifzReviewScreen(planId: planId)),
-          );
-          ref.invalidate(_dueReviewCountProvider(planId));
-        },
       ),
     );
   }

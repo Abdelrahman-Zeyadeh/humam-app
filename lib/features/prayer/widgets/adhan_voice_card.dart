@@ -412,41 +412,7 @@ class _AdhanVoiceCardState extends ConsumerState<AdhanVoiceCard> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
                 ],
-                Expanded(
-                  child: FilledButton.tonalIcon(
-                    onPressed: () async {
-                      final messenger = ScaffoldMessenger.of(context);
-                      try {
-                        await AdhanNotificationService.instance
-                            .requestPermissions();
-                        await AdhanNotificationService.instance
-                            .sendTestNotification(voiceId: selectedId);
-                        messenger.showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'تم إرسال إشعار تجريبي — سيصلك خلال ٣ ثوانٍ 🔔',
-                            ),
-                            duration: Duration(seconds: 3),
-                          ),
-                        );
-                      } catch (e) {
-                        messenger.showSnackBar(
-                          SnackBar(content: Text('تعذّر إرسال الإشعار: $e')),
-                        );
-                      }
-                    },
-                    icon: const Icon(
-                      Icons.notifications_active_outlined,
-                      size: 16,
-                    ),
-                    label: const Text(
-                      'فحص الإشعار',
-                      style: TextStyle(fontSize: 11.5),
-                    ),
-                  ),
-                ),
               ],
             ),
           ],

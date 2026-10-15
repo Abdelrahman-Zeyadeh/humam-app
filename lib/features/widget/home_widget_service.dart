@@ -43,6 +43,12 @@ Future<void> updateHumamHomeWidget({
   int? timeIshaMs,
   int? timeTomorrowFajrMs,
   String? activeMoment,
+  int? iqamahFajrMin,
+  int? iqamahDhuhrMin,
+  int? iqamahAsrMin,
+  int? iqamahMaghribMin,
+  int? iqamahIshaMin,
+  bool? isInIqamah,
   String? ayahPoolJson,
   String? dhikrPoolJson,
   String? accentId,
@@ -79,6 +85,12 @@ Future<void> updateHumamHomeWidget({
     if (timeTomorrowFajrMs != null) await HomeWidget.saveWidgetData<int>('time_tomorrow_fajr_ms', timeTomorrowFajrMs);
 
     if (activeMoment != null) await HomeWidget.saveWidgetData<String>('active_moment', activeMoment);
+    if (iqamahFajrMin != null) await HomeWidget.saveWidgetData<int>('iqamah_fajr_min', iqamahFajrMin);
+    if (iqamahDhuhrMin != null) await HomeWidget.saveWidgetData<int>('iqamah_dhuhr_min', iqamahDhuhrMin);
+    if (iqamahAsrMin != null) await HomeWidget.saveWidgetData<int>('iqamah_asr_min', iqamahAsrMin);
+    if (iqamahMaghribMin != null) await HomeWidget.saveWidgetData<int>('iqamah_maghrib_min', iqamahMaghribMin);
+    if (iqamahIshaMin != null) await HomeWidget.saveWidgetData<int>('iqamah_isha_min', iqamahIshaMin);
+    if (isInIqamah != null) await HomeWidget.saveWidgetData<bool>('is_in_iqamah', isInIqamah);
     if (ayahPoolJson != null) await HomeWidget.saveWidgetData<String>('ayah_pool_json', ayahPoolJson);
     if (dhikrPoolJson != null) await HomeWidget.saveWidgetData<String>('dhikr_pool_json', dhikrPoolJson);
     // لون تمييز الودجت — يطابق باقة `kAppAccentColors` المختارة بالتطبيق

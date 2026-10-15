@@ -253,6 +253,7 @@ class FontDownloadController extends Notifier<FontDownloadState> {
       state = state.copyWith(errorMessage: 'حدث خطأ أثناء التنزيل الجماعي: $e');
     } finally {
       state = state.copyWith(isBulkRunning: false, currentPage: null);
+      ref.invalidate(fontDownloadedCountProvider(edition));
     }
   }
 

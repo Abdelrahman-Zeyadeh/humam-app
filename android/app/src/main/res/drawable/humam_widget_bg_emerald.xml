@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- باقة "الزمردي الإسلامي" — accent.primaryLight → accent.primaryDark. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <corners android:radius="20dp" />
+    <corners android:radius="22dp" />
     <gradient
         android:type="linear"
         android:angle="135"
-        android:startColor="#135D48"
-        android:endColor="#0D2E24" />
-    <stroke android:width="1dp" android:color="#591B8A72" />
+        android:startColor="#0E4D40"
+        android:centerColor="#135B4C"
+        android:endColor="#09352B" />
+    <stroke android:width="1.2dp" android:color="#66D4AF67" />
 </shape>

@@ -20,7 +20,7 @@ Future<void> showTasbihPhrasePicker(
 }) async {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final accent = themeAccent(context);
-  final fg = isDark ? AppColors.inkOnDark : AppColors.navy;
+  final fg = isDark ? AppColors.inkOnDark : const Color(0xFF135B4C);
   final surface = isDark ? AppColors.surfaceDark : Colors.white;
   final border = isDark ? AppColors.lineDark : AppColors.line;
 

@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/data/user/user_prefs.dart';
-import '../../../core/theme/app_accent_colors.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/mushaf_palettes.dart';
 import '../../mushaf/font_download_screen.dart';
+import '../../mushaf/font_download_service.dart';
 import '../../mushaf/mushaf_page_provider.dart';
 import '../../mushaf/mushaf_settings.dart';
 import 'settings_section_helpers.dart';
@@ -68,11 +68,11 @@ class AppearanceSettingsSection extends ConsumerWidget {
                   ),
                 ],
                 const SizedBox(height: 16),
-                const SubHeader('لون تمييز التطبيق'),
-                const _AppAccentSection(),
-                const SizedBox(height: 16),
                 const SubHeader('لون خلفية ونصوص صفحة المصحف'),
                 const _MushafColorSection(),
+                const SizedBox(height: 16),
+                const SubHeader('حجم نصوص التطبيق العامة'),
+                const _GlobalTextScaleSelector(),
                 const SizedBox(height: 16),
                 const SubHeader('طبعة خط المصحف'),
                 const _MushafFontEditionSection(),
@@ -88,79 +88,30 @@ class AppearanceSettingsSection extends ConsumerWidget {
   }
 }
 
-/// دوائر لون تمييز التطبيق العام — نفس تصميم [_PaletteSwatch] بالضبط،
-/// من قائمة `kAppAccentColors` المحدودة (كلها ألوان هوية معتمدة أصلاً).
-/// **موحَّد بصرياً مع [_PaletteSwatch]** (دائرة + حلقة اختيار + تسمية
-/// سطر واحد تحتها) — كانا مختلفَين شكلاً (هذا بطاقة مؤطَّرة أكبر، ذاك
-/// دائرة بسيطة) رغم كونهما نفس فكرة "اختيار لون من لوحة جاهزة"، بشكوى
-/// صريحة "مش متناسقة... ماخذة مساحة كتير". التوحيد على النمط الأبسط
-/// (الدائرة) قلَّص المساحة العمودية أيضاً.
-class _AppAccentSection extends ConsumerWidget {
-  const _AppAccentSection();
+class _GlobalTextScaleSelector extends ConsumerWidget {
+  const _GlobalTextScaleSelector();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.watch(accentColorVersionProvider);
-    final selected = ref.read(userPrefsProvider).accentColorId;
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: [
-        for (final accent in kAppAccentColors)
-          InkWell(
-            borderRadius: BorderRadius.circular(40),
-            onTap: () async {
-              await ref.read(userPrefsProvider).setAccentColorId(accent.id);
-              ref.read(accentColorVersionProvider.notifier).bump();
-            },
-            child: SizedBox(
-              width: 60,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        colors: [accent.primaryLight, accent.color],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      border: Border.all(
-                        color: accent.id == selected
-                            ? themeAccent(context)
-                            : Colors.transparent,
-                        width: 3,
-                      ),
-                    ),
-                    alignment: Alignment.center,
-                    child: accent.id == selected
-                        ? const Icon(Icons.check, size: 18, color: Colors.white)
-                        : null,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    accent.label,
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: onSurface.withValues(alpha: 0.7),
-                    ),
-                  ),
-                ],
-              ),
+    final current = ref.watch(appTextScaleProvider);
+    return SegmentedButton<AppTextScale>(
+      segments: [
+        for (final scale in AppTextScale.values)
+          ButtonSegment(
+            value: scale,
+            label: Text(
+              scale.label,
+              style: const TextStyle(fontSize: 12),
             ),
           ),
       ],
+      selected: {current},
+      onSelectionChanged: (s) =>
+          ref.read(appTextScaleProvider.notifier).set(s.first),
     );
   }
 }
+
 
 /// شبكة لوحات ألوان صفحة المصحف — لوحات جاهزة (راجع `mushaf_palettes.dart`)
 /// لا منتقي ألوان حرّ، بطلب صاحب المشروع "شو الأفضل" لقسم "ألوان" (توصية:
@@ -360,16 +311,55 @@ class _MushafFontEditionSection extends ConsumerWidget {
               Expanded(child: _FontEditionPreviewCard(edition: edition)),
           ],
         ),
-        const SizedBox(height: 6),
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton.icon(
-            icon: const Icon(Icons.download_outlined, size: 16),
-            label: const Text('تنزيل كل صفحات هذه الطبعة', style: TextStyle(fontSize: 12)),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => FontDownloadScreen(edition: current)),
-            ),
-          ),
+        const SizedBox(height: 10),
+        Consumer(
+          builder: (context, ref, _) {
+            final (first, last) = downloadableRangeFor(current);
+            final total = last - first + 1;
+            final countAsync = ref.watch(fontDownloadedCountProvider(current));
+            final downloaded = countAsync.value ?? 0;
+            final isAllDone = downloaded >= total;
+
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: themeAccent(context).withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: themeAccent(context).withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    isAllDone ? Icons.check_circle_outline : Icons.download_outlined,
+                    size: 18,
+                    color: isAllDone ? AppColors.tealDeep : themeAccent(context),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      isAllDone
+                          ? 'طبعة ${current.label} مكتملة التحميل ($downloaded/$total)'
+                          : 'المحمّل من هذه الطبعة: $downloaded من $total صفحة',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => FontDownloadScreen(edition: current)),
+                    ),
+                    child: Text(
+                      isAllDone ? 'إدارة' : 'تنزيل الباقي',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: themeAccent(context),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         ),
       ],
     );
@@ -427,6 +417,26 @@ class _FontEditionPreviewCard extends ConsumerWidget {
               MushafFontEdition.v4Tajweed => 'V4 Tajweed',
             },
             style: TextStyle(fontSize: 10, color: isDark ? Colors.white54 : Colors.black45),
+          ),
+          const SizedBox(height: 2),
+          Consumer(
+            builder: (context, ref, _) {
+              final countAsync = ref.watch(fontDownloadedCountProvider(edition));
+              final (first, last) = downloadableRangeFor(edition);
+              final total = last - first + 1;
+              final count = countAsync.value ?? 0;
+              final isComplete = count >= total;
+              return Text(
+                '$count/$total',
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                  color: isComplete
+                      ? AppColors.tealDeep
+                      : (isDark ? Colors.white38 : Colors.black38),
+                ),
+              );
+            },
           ),
         ],
       ),

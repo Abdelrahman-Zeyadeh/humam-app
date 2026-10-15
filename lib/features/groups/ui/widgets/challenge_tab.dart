@@ -7,6 +7,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../notifications/adhan_notification_service.dart';
 import '../../models/faith_group.dart';
 import '../../services/groups_service.dart';
+import '../../services/social_safety_service.dart';
 
 /// تبويب "تحدي جماعي": يعرض التحدي النشط الحالي (إن وُجد) بموعد نهائي
 /// وتقدّم كل عضو نحو الهدف الرقمي، مع زر لإنشاء تحدٍ جديد ولإضافة تقدّمك،
@@ -61,7 +62,12 @@ class ChallengeTab extends ConsumerWidget {
               child: CircularProgressIndicator(),
             ),
           ),
-          error: (e, _) => Center(child: Text('خطأ في جلب التحدي: $e')),
+          error: (_, __) => const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32),
+              child: Text('تعذّر تحميل التحدي الحالي. يرجى التحقق من اتصال الإنترنت.'),
+            ),
+          ),
         ),
         const SizedBox(height: 24),
         _ChallengeHistorySection(groupId: groupId, isDark: isDark),
@@ -488,7 +494,22 @@ Future<void> _showContributeDialog(
 
   if (confirmed != true) return;
   final addValue = int.tryParse(valueCtrl.text.trim()) ?? 0;
-  if (addValue <= 0) return;
+  
+  final validation = ProgressValidator.validateChallengeContribution(
+    unit: challenge.unit,
+    addValue: addValue,
+  );
+  if (!validation.isValid) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(validation.error ?? 'قيمة غير صالحة'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+    return;
+  }
 
   final userPrefs = ref.read(userPrefsProvider);
   await GroupsService.instance.contributeToChallenge(

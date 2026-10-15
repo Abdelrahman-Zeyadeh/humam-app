@@ -37,9 +37,10 @@ class DhikrTextFrame extends StatelessWidget {
             textAlign: TextAlign.center,
             textDirection: TextDirection.rtl,
             style: TextStyle(
+              fontFamily: 'AmiriQuran',
               color: done ? onSurface.withValues(alpha: 0.55) : onSurface,
-              fontSize: 15,
-              height: 1.9,
+              fontSize: 16.5,
+              height: 2.0,
               fontWeight: FontWeight.w600,
             ),
           ),

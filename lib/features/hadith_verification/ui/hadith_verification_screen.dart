@@ -1,5 +1,3 @@
-import 'dart:async' show unawaited;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,7 +8,7 @@ import '../../../core/theme/app_card.dart';
 import '../../../core/theme/app_colors.dart';
 import '../models/dorar_hadith_result.dart';
 import '../services/dorar_search_cache.dart';
-import '../services/dorar_search_service.dart';
+import '../services/hadith_verification_service.dart';
 import '../services/dorar_webview_fetcher.dart';
 import 'widgets/dorar_result_card.dart';
 
@@ -43,6 +41,7 @@ class _HadithVerificationScreenState
   int _currentPage = 1;
   bool _hasMorePages = true;
   bool _loadingMore = false;
+  String _filterGrade = 'all';
 
   @override
   void initState() {
@@ -75,90 +74,68 @@ class _HadithVerificationScreenState
       _errorMessage = null;
       _currentPage = 1;
       _hasMorePages = true;
+      _filterGrade = 'all';
     });
 
     try {
-      final cache = ref.read(dorarSearchCacheProvider);
-      // كاش محلي أولاً — الجلب الفعلي يحتاج WebView كاملاً (بطيء نسبياً)،
-      // فتكرار نفس الاستعلام (بحث المستخدم لنفس الحديث مرة ثانية، أو نفس
-      // النص من "التحقق من صحة" بشاشات أخرى) يعيد النتيجة المحفوظة فوراً
-      // بدل تحميل صفحة جديدة كل مرة (راجع `DorarSearchCache` لمدة الصلاحية).
-      final cached = cache.get(q);
-      if (cached != null) {
-        setState(() {
-          _results = cached;
-          _status = _SearchStatus.loaded;
-        });
-        return;
-      }
+      final repo = ref.read(hadithVerificationRepositoryProvider);
+      final result = await repo.verify(
+        q,
+        page: 1,
+        fetchHtml: _fetcherController.fetchHtml,
+      );
 
-      // جلب حقيقي عبر WebView (محرك متصفح حقيقي) لا Dio — راجع توثيق
-      // `DorarWebViewFetcher` لسبب هذا القرار (Cloudflare يرفض طلبات Dio
-      // بـ٤٠٣ مهما كانت الترويسات، حتى مع كوكيز جلسة صالحة).
-      final html = await _fetcherController.fetchHtml(dorarSearchUrl(q));
       if (!mounted || _lastQuery != q) return;
-      final service = ref.read(dorarSearchServiceProvider);
-      final results = service.parseSearchResults(html);
-      unawaited(cache.set(q, results));
-      setState(() {
-        _results = results;
-        _status = _SearchStatus.loaded;
-      });
-    } on DorarBlockedException {
-      // مختلف عمداً عن الرسالة العامة أسفله — "لا نتائج" ليست نفس معنى
-      // "الموقع حجب الطلب مؤقتاً" (راجع توثيق [DorarBlockedException]).
-      if (!mounted || _lastQuery != q) return;
-      setState(() {
-        _status = _SearchStatus.error;
-        _errorMessage =
-            'موسوعة الدرر السنية فرضت حماية مؤقتة على الطلبات الآن. انتظر قليلاً ثم أعد المحاولة.';
-      });
-    } catch (e) {
+
+      if (result.isSuccess) {
+        setState(() {
+          _results = result.results;
+          _status = _SearchStatus.loaded;
+          _hasMorePages = result.hasMorePages;
+        });
+      } else {
+        setState(() {
+          _status = _SearchStatus.error;
+          _errorMessage = result.userMessage ??
+              'تعذر التحقق من الحديث حاليًا، حاول مرة أخرى لاحقًا.';
+        });
+      }
+    } catch (_) {
       if (!mounted || _lastQuery != q) return;
       setState(() {
         _status = _SearchStatus.error;
         _errorMessage =
-            'تعذر الاتصال بموسوعة الدرر السنية. تأكد من اتصال الإنترنت وحاول مجدداً.';
+            'تعذر التحقق من الحديث حاليًا، حاول مرة أخرى لاحقًا.';
       });
     }
   }
 
-  /// يجلب صفحة نتائج إضافية (`_currentPage + 1`) ويلحقها بالنتائج
-  /// المعروضة — بلا كاش (الكاش الحالي يخزّن الصفحة الأولى فقط لكل
-  /// استعلام، راجع `DorarSearchCache`؛ تعميمه لكل الصفحات خارج نطاق هذا
-  /// الإصلاح). فشل جلب صفحة إضافية لا يمسح النتائج المعروضة أصلاً — مجرد
-  /// تنبيه عابر (`SnackBar`).
+  /// يجلب صفحة نتائج إضافية (`_currentPage + 1`) ويلحقها بالنتائج المعروضة
   Future<void> _loadMore() async {
     if (_loadingMore || !_hasMorePages || _status != _SearchStatus.loaded) return;
     setState(() => _loadingMore = true);
     try {
       final nextPage = _currentPage + 1;
-      final cache = ref.read(dorarSearchCacheProvider);
-      // كاش لكل صفحة على حدة الآن (راجع `DorarSearchCache._key`) — رجوع
-      // المستخدم لنفس البحث و"تحميل المزيد" مجدداً يعيد النتيجة المحفوظة
-      // فوراً بدل WebView جديد.
-      final cached = cache.get(_lastQuery, page: nextPage);
-      final List<DorarHadithResult> more;
-      if (cached != null) {
-        more = cached;
-      } else {
-        final html = await _fetcherController.fetchHtml(
-          dorarSearchUrl(_lastQuery, page: nextPage),
-        );
-        final service = ref.read(dorarSearchServiceProvider);
-        more = service.parseSearchResults(html);
-        unawaited(cache.set(_lastQuery, more, page: nextPage));
-      }
+      final repo = ref.read(hadithVerificationRepositoryProvider);
+      final result = await repo.verify(
+        _lastQuery,
+        page: nextPage,
+        fetchHtml: _fetcherController.fetchHtml,
+      );
+
       if (!mounted) return;
       setState(() {
         _loadingMore = false;
-        if (more.isEmpty) {
+        if (!result.isSuccess || result.results.isEmpty) {
           _hasMorePages = false;
           return;
         }
         _currentPage = nextPage;
         final existingIds = _results.map((r) => r.id).toSet();
-        _results = [..._results, ...more.where((r) => !existingIds.contains(r.id))];
+        _results = [
+          ..._results,
+          ...result.results.where((r) => !existingIds.contains(r.id)),
+        ];
       });
     } catch (_) {
       if (!mounted) return;
@@ -185,7 +162,12 @@ class _HadithVerificationScreenState
 
   void _shareResult(DorarHadithResult result) {
     HapticFeedback.lightImpact();
-    Share.share(result.shareText, subject: 'حديث من موسوعة الدرر السنية');
+    SharePlus.instance.share(
+      ShareParams(
+        text: result.shareText,
+        subject: 'حديث من موسوعة الدرر السنية',
+      ),
+    );
   }
 
   @override
@@ -306,7 +288,17 @@ class _HadithVerificationScreenState
                                 });
                               },
                             )
-                          : null,
+                          : IconButton(
+                              icon: const Icon(Icons.content_paste_rounded, size: 18),
+                              tooltip: 'لصق الحديث من الحافظة',
+                              onPressed: () async {
+                                final data = await Clipboard.getData('text/plain');
+                                if (data?.text != null && data!.text!.trim().isNotEmpty) {
+                                  _searchCtrl.text = data.text!.trim();
+                                  _runSearch(data.text!.trim());
+                                }
+                              },
+                            ),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 14,
@@ -482,6 +474,44 @@ class _HadithVerificationScreenState
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
                 ),
+                const SizedBox(height: 28),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'أحاديث شائعة يُكثر السؤال عنها:',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white70 : AppColors.ink,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    'صوموا تصحوا',
+                    'خير الأسماء ما حُمِّد وعُبِّد',
+                    'من لم تنهه صلاته',
+                    'اطلبوا العلم ولو في الصين',
+                    'حب الوطن من الإيمان',
+                    'اختلاف أمتي رحمة',
+                  ].map((text) => ActionChip(
+                    avatar: Icon(Icons.touch_app_outlined, size: 14, color: accent),
+                    label: Text(text, style: const TextStyle(fontSize: 11.5)),
+                    backgroundColor: isDark
+                        ? const Color(0xFF1E2836)
+                        : accent.withValues(alpha: 0.06),
+                    side: BorderSide(
+                      color: isDark ? AppColors.lineDark : AppColors.line,
+                    ),
+                    onPressed: () {
+                      _searchCtrl.text = text;
+                      _runSearch(text);
+                    },
+                  )).toList(),
+                ),
               ],
             ),
           ),
@@ -616,31 +646,144 @@ class _HadithVerificationScreenState
   }
 
   Widget _buildResultsList(Color accent, bool isDark) {
-    return RefreshIndicator(
-      color: accent,
-      onRefresh: () => _runSearch(_lastQuery),
-      child: ListView.separated(
-        physics: const AlwaysScrollableScrollPhysics(
-          parent: BouncingScrollPhysics(),
+    final filtered = _results.where((r) {
+      final g = r.grade ?? '';
+      if (_filterGrade == 'sahih') {
+        return g.contains('صحيح') || g.contains('حسن') || g.contains('إسناده جيد') || g.contains('ثابت');
+      } else if (_filterGrade == 'daeef') {
+        return g.contains('ضعيف') || g.contains('منكر') || g.contains('متروك') || g.contains('لا يصح') || g.contains('إسناده ضعيف');
+      } else if (_filterGrade == 'mawdoo') {
+        return g.contains('موضوع') || g.contains('باطل') || g.contains('كذب') || g.contains('لا أصل له');
+      }
+      return true;
+    }).toList();
+
+    return Column(
+      children: [
+        _buildFilterBar(accent, isDark),
+        Expanded(
+          child: RefreshIndicator(
+            color: accent,
+            onRefresh: () => _runSearch(_lastQuery),
+            child: filtered.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.filter_list_off_rounded,
+                            size: 44,
+                            color: accent.withValues(alpha: 0.5),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'لا توجد نتائج مطابقة لهذا التصنيف',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white70 : AppColors.ink,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          TextButton(
+                            onPressed: () => setState(() => _filterGrade = 'all'),
+                            child: const Text('عرض كافة النتائج'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: BouncingScrollPhysics(),
+                    ),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                    itemCount: filtered.length + (_hasMorePages && _filterGrade == 'all' ? 1 : 0),
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      if (index >= filtered.length) {
+                        return _buildLoadMoreFooter(accent);
+                      }
+                      return DorarResultCard(
+                        result: filtered[index],
+                        accent: accent,
+                        isDark: isDark,
+                        onOpenFullPage: () => _openFullPage(filtered[index]),
+                        onShare: () => _shareResult(filtered[index]),
+                      );
+                    },
+                  ),
+          ),
         ),
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-        // عنصر إضافي بالنهاية: زر "تحميل المزيد"/مؤشّر تحميل/رسالة نهاية
-        // النتائج (راجع `_loadMore`) — لا نعرضه لو صفحة واحدة فقط كافية.
-        itemCount: _results.length + (_hasMorePages ? 1 : 0),
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          if (index >= _results.length) {
-            return _buildLoadMoreFooter(accent);
-          }
-          return DorarResultCard(
-            result: _results[index],
-            accent: accent,
-            isDark: isDark,
-            onOpenFullPage: () => _openFullPage(_results[index]),
-            onShare: () => _shareResult(_results[index]),
-          );
-        },
+      ],
+    );
+  }
+
+  Widget _buildFilterBar(Color accent, bool isDark) {
+    int sahihCount = _results.where((r) {
+      final g = r.grade ?? '';
+      return g.contains('صحيح') || g.contains('حسن') || g.contains('إسناده جيد') || g.contains('ثابت');
+    }).length;
+
+    int daeefCount = _results.where((r) {
+      final g = r.grade ?? '';
+      return g.contains('ضعيف') || g.contains('منكر') || g.contains('متروك') || g.contains('لا يصح') || g.contains('إسناده ضعيف');
+    }).length;
+
+    int mawdooCount = _results.where((r) {
+      final g = r.grade ?? '';
+      return g.contains('موضوع') || g.contains('باطل') || g.contains('كذب') || g.contains('لا أصل له');
+    }).length;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? AppColors.lineDark : AppColors.line,
+          ),
+        ),
       ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: Row(
+          children: [
+            _filterChip('الكل (${_results.length})', 'all', accent, isDark),
+            const SizedBox(width: 8),
+            _filterChip('🟢 صحيح وحسن ($sahihCount)', 'sahih', const Color(0xFF2E7D32), isDark),
+            const SizedBox(width: 8),
+            _filterChip('🔴 ضعيف ومتروك ($daeefCount)', 'daeef', const Color(0xFFE65100), isDark),
+            const SizedBox(width: 8),
+            _filterChip('⚠️ موضوع ومكذوب ($mawdooCount)', 'mawdoo', const Color(0xFFC62828), isDark),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _filterChip(String label, String value, Color color, bool isDark) {
+    final isSelected = _filterGrade == value;
+    return ChoiceChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          color: isSelected ? Colors.white : (isDark ? Colors.white70 : AppColors.ink),
+        ),
+      ),
+      selected: isSelected,
+      selectedColor: color,
+      backgroundColor: isDark ? const Color(0xFF1E2836) : color.withValues(alpha: 0.08),
+      side: BorderSide(
+        color: isSelected ? color : (isDark ? AppColors.lineDark : AppColors.line),
+      ),
+      onSelected: (_) => setState(() => _filterGrade = value),
     );
   }
 

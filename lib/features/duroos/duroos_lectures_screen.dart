@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
+import '../../core/text/arabic_normalizer.dart';
 import '../../core/theme/app_card.dart';
 import '../../core/theme/app_colors.dart';
 import '../audio/quran_audio_handler.dart';
@@ -99,10 +100,20 @@ class _DuroosLecturesScreenState extends ConsumerState<DuroosLecturesScreen> {
           final lectures = await _repository.fetchRss(widget.source.feedUrl!);
           return _LoadResult(categories: const [], lectures: lectures);
         case DuroosSourceKind.midad:
-          final page = await _repository.fetchMidadSearch(
-            widget.source.midadQuery!,
-            isRecitation: widget.source.midadIsRecitation,
-          );
+          final DuroosPage page;
+          if (widget.lg != null && widget.lg != 0) {
+            page = await _repository.fetchMidadCollection(widget.lg!);
+          } else if (widget.source.midadScholarId != null) {
+            page = await _repository.fetchMidadScholar(
+              widget.source.midadScholarId!,
+              isRecitation: widget.source.midadIsRecitation,
+            );
+          } else {
+            page = await _repository.fetchMidadSearch(
+              widget.source.midadQuery!,
+              isRecitation: widget.source.midadIsRecitation,
+            );
+          }
           return _LoadResult(categories: page.categories, lectures: page.lectures);
       }
     } catch (e, st) {
@@ -210,6 +221,7 @@ class _DuroosLecturesScreenState extends ConsumerState<DuroosLecturesScreen> {
         final audioUrl = widget.source.kind == DuroosSourceKind.midad
             ? await _repository.fetchMidadEntryAudio(
                 lecture.midadLessonId!,
+                entryType: lecture.midadEntryType,
                 isRecitation: lecture.midadIsRecitation,
               )
             : lecture.audioUrl!;
@@ -245,8 +257,16 @@ class _DuroosLecturesScreenState extends ConsumerState<DuroosLecturesScreen> {
     } catch (e) {
       debugPrint('DuroosLecturesScreen[${widget.source.id}]: play failed for ${lecture.playbackKey}: $e');
       if (!mounted) return;
+      setState(() => _isLoading = false);
+      final isNotFound = e.toString().contains('404') || e.toString().contains('Response code: 404');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذّر تشغيل المحاضرة: يرجى التحقق من اتصال الإنترنت')),
+        SnackBar(
+          content: Text(
+            isNotFound
+                ? 'عذراً، هذا التسجيل الصوتي غير متوفر على خادم المصدر حالياً'
+                : 'تعذّر تشغيل المحاضرة: يرجى التحقق من اتصال الإنترنت',
+          ),
+        ),
       );
     }
   }
@@ -288,27 +308,26 @@ class _DuroosLecturesScreenState extends ConsumerState<DuroosLecturesScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
+            final err = snapshot.error;
+            final isParse = err is DuroosParseException;
+            final errorText = isParse
+                ? err.message
+                : 'تعذّر تحميل المحتوى: يرجى التحقق من اتصال الإنترنت والمحاولة مجدداً';
+            final errorIcon = isParse ? Icons.cloud_off_outlined : Icons.wifi_off_outlined;
+
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.wifi_off_outlined, size: 40, color: onSurface.withValues(alpha: 0.4)),
+                    Icon(errorIcon, size: 40, color: onSurface.withValues(alpha: 0.4)),
                     const SizedBox(height: 12),
-                    const Text(
-                      'تعذّر تحميل المحتوى: يرجى التحقق من اتصال الإنترنت والمحاولة مجدداً',
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    // تشخيص مؤقت: نص الاستثناء الفعلي — يوضّح إذا كان
-                    // السبب شبكياً حقاً أو خللاً بالتحليل، بلا حاجة لـlogcat.
                     Text(
-                      '${snapshot.error}',
+                      errorText,
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 11, color: onSurface.withValues(alpha: 0.5)),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     OutlinedButton(
                       onPressed: () => setState(() => _future = _load()),
                       child: const Text('إعادة المحاولة'),
@@ -327,57 +346,71 @@ class _DuroosLecturesScreenState extends ConsumerState<DuroosLecturesScreen> {
             );
           }
 
-          // فلترة محلية بعنوان المحاضرة — لا تمسّ التصنيفات (قليلة العدد
-          // عادة، تصفّحها المباشر أسهل من البحث فيها).
+          // فلترة ذكية ومطابقة معربة تبحث في التصنيفات والسلاسل والمحاضرات معاً
           final q = _lectureSearchQuery.trim();
+          final normQ = normalizeArabicSearch(q);
+
+          final filteredCategories = q.isEmpty
+              ? result.categories
+              : result.categories
+                  .where((c) => normalizeArabicSearch(c.title).contains(normQ))
+                  .toList();
+
           final filteredLectures = q.isEmpty
               ? result.lectures
-              : result.lectures.where((l) => l.title.contains(q)).toList();
+              : result.lectures
+                  .where((l) => normalizeArabicSearch(l.title).contains(normQ))
+                  .toList();
 
-          return ListView(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, activeLecture != null ? 100 : 16),
+          final totalItems = result.categories.length + result.lectures.length;
+
+          return Column(
             children: [
-              // شريط بحث بعناوين محاضرات هذا القسم — يظهر فقط لو فيه فعلاً
-              // عدد محاضرات يستحق البحث (بلا داعٍ لقسم بمحاضرة أو اثنتين).
-              if (result.lectures.length > 5) ...[
-                TextField(
-                  controller: _lectureSearchCtrl,
-                  onChanged: (v) => setState(() => _lectureSearchQuery = v),
-                  decoration: InputDecoration(
-                    hintText: 'ابحث بعنوان المحاضرة...',
-                    hintStyle: TextStyle(fontSize: 12.5, color: onSurface.withValues(alpha: 0.5)),
-                    prefixIcon: const Icon(Icons.search, size: 20),
-                    suffixIcon: _lectureSearchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.close, size: 18),
-                            onPressed: () {
-                              _lectureSearchCtrl.clear();
-                              setState(() => _lectureSearchQuery = '');
-                            },
-                          )
-                        : null,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    filled: true,
-                    fillColor: isDark ? const Color(0xFF1E293B) : Colors.grey.shade100,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide.none,
+              // شريط بحث مثبت بالأعلى دائماً وفعّال
+              if (totalItems > 1)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                  child: TextField(
+                    controller: _lectureSearchCtrl,
+                    onChanged: (v) => setState(() => _lectureSearchQuery = v),
+                    decoration: InputDecoration(
+                      hintText: 'ابحث في السلاسل والمحاضرات...',
+                      hintStyle: TextStyle(fontSize: 12.5, color: onSurface.withValues(alpha: 0.5)),
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      suffixIcon: _lectureSearchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.close, size: 18),
+                              onPressed: () {
+                                _lectureSearchCtrl.clear();
+                                setState(() => _lectureSearchQuery = '');
+                              },
+                            )
+                          : null,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF1E293B) : Colors.grey.shade100,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
-              ],
-              if (q.isNotEmpty && filteredLectures.isEmpty && result.categories.isEmpty)
+              Expanded(
+                child: ListView(
+                  padding: EdgeInsets.fromLTRB(16, 8, 16, activeLecture != null ? 100 : 16),
+                  children: [
+              if (q.isNotEmpty && filteredLectures.isEmpty && filteredCategories.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 24),
                   child: Center(
                     child: Text(
-                      'لا توجد محاضرة بعنوان مطابق',
+                      'لا توجد سلسلة أو محاضرة مطابقة للبحث',
                       style: TextStyle(color: onSurface.withValues(alpha: 0.6), fontSize: 13),
                     ),
                   ),
                 ),
-              for (final category in result.categories)
+              for (final category in filteredCategories)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: _ListTile(
@@ -398,22 +431,26 @@ class _DuroosLecturesScreenState extends ConsumerState<DuroosLecturesScreen> {
                     ),
                   ),
                 ),
-              for (final lecture in filteredLectures)
+              for (var i = 0; i < filteredLectures.length; i++)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: _ListTile(
                     isDark: isDark,
                     onSurface: onSurface,
                     icon: Icons.play_circle_outline,
-                    title: lecture.title,
-                    isActive: activeLecture?.playbackKey == lecture.playbackKey,
-                    isPlaying: activeLecture?.playbackKey == lecture.playbackKey && _isPlaying,
-                    isBuffering: activeLecture?.playbackKey == lecture.playbackKey && _isLoading,
-                    onTap: () => _togglePlay(lecture),
+                    title: filteredLectures[i].title,
+                    indexNumber: i + 1,
+                    isActive: activeLecture?.playbackKey == filteredLectures[i].playbackKey,
+                    isPlaying: activeLecture?.playbackKey == filteredLectures[i].playbackKey && _isPlaying,
+                    isBuffering: activeLecture?.playbackKey == filteredLectures[i].playbackKey && _isLoading,
+                    onTap: () => _togglePlay(filteredLectures[i]),
                   ),
                 ),
-            ],
-          );
+              ],
+            ),
+          ),
+        ],
+      );
         },
       ),
       bottomSheet: activeLecture == null
@@ -440,10 +477,11 @@ class _DuroosLecturesScreenState extends ConsumerState<DuroosLecturesScreen> {
   }
 }
 
-/// شريط المشغّل السفلي — منفصل بودجت خاص به عشان تحديث الموضع (عدة مرات
-/// بالثانية عبر `positionStream`) يعيد بناء نفسه فقط، لا كل الشاشة
-/// (القائمة الطويلة فوقه ما تنعاد كتابتها).
-class _PlayerBar extends StatelessWidget {
+/// شريط المشغّل السفلي العائم لدروس العلم — مزوّد بـ:
+/// ١) التحكّم بسرعة التشغيل (1.0x, 1.25x, 1.5x, 1.75x, 2.0x) التي يحتاجها كل طالب علم
+/// ٢) التقديم والتأخير ١٠ ثوانٍ
+/// ٣) شريط تقدّم سلس بتصميم عصري عائم
+class _PlayerBar extends StatefulWidget {
   const _PlayerBar({
     required this.player,
     required this.lecture,
@@ -464,6 +502,28 @@ class _PlayerBar extends StatelessWidget {
   final VoidCallback onTogglePlay;
   final VoidCallback onClose;
 
+  @override
+  State<_PlayerBar> createState() => _PlayerBarState();
+}
+
+class _PlayerBarState extends State<_PlayerBar> {
+  double _speed = 1.0;
+
+  static const List<double> _speeds = [1.0, 1.25, 1.5, 1.75, 2.0];
+
+  void _cycleSpeed() {
+    final idx = _speeds.indexOf(_speed);
+    final next = _speeds[(idx + 1) % _speeds.length];
+    setState(() => _speed = next);
+    widget.player.setSpeed(next);
+  }
+
+  void _seekRelative(int seconds) {
+    final pos = widget.player.position;
+    final target = pos + Duration(seconds: seconds);
+    widget.player.seek(target < Duration.zero ? Duration.zero : target);
+  }
+
   static String _format(Duration d) {
     if (d.isNegative) d = Duration.zero;
     final h = d.inHours;
@@ -474,62 +534,76 @@ class _PlayerBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      margin: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF141A23) : Colors.white,
+        color: widget.isDark ? const Color(0xFF141E28) : Colors.white,
+        borderRadius: BorderRadius.circular(22),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 16, offset: const Offset(0, -4)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: widget.isDark ? 0.45 : 0.16),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
         ],
-        border: Border(top: BorderSide(color: isDark ? AppColors.lineDark : AppColors.line)),
+        border: Border.all(
+          color: (widget.isDark ? AppColors.lineDark : AppColors.gold.withValues(alpha: 0.35)),
+          width: 1.2,
+        ),
       ),
       child: SafeArea(
         top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // شريط التقديم والتأخير والوقت
             StreamBuilder<Duration?>(
-              stream: player.durationStream,
+              stream: widget.player.durationStream,
               builder: (context, durationSnap) {
                 final duration = durationSnap.data ?? Duration.zero;
                 return StreamBuilder<Duration>(
-                  stream: player.positionStream,
+                  stream: widget.player.positionStream,
                   builder: (context, positionSnap) {
                     var position = positionSnap.data ?? Duration.zero;
                     if (duration > Duration.zero && position > duration) position = duration;
                     final maxMs = duration.inMilliseconds > 0 ? duration.inMilliseconds.toDouble() : 1.0;
-                    final onSurface = Theme.of(context).colorScheme.onSurface;
+
                     return Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         SliderTheme(
                           data: SliderTheme.of(context).copyWith(
-                            trackHeight: 2.5,
+                            trackHeight: 3,
                             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
                             overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                            activeTrackColor: themeAccent(context),
+                            inactiveTrackColor: (widget.isDark ? Colors.white : Colors.black).withValues(alpha: 0.12),
+                            thumbColor: themeAccent(context),
                           ),
                           child: Slider(
                             min: 0,
                             max: maxMs,
                             value: position.inMilliseconds.toDouble().clamp(0, maxMs),
-                            activeColor: themeAccent(context),
                             onChanged: duration > Duration.zero
-                                ? (v) => player.seek(Duration(milliseconds: v.round()))
+                                ? (v) => widget.player.seek(Duration(milliseconds: v.round()))
                                 : null,
                           ),
                         ),
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
                                 _format(position),
-                                style: TextStyle(fontSize: 10.5, color: onSurface.withValues(alpha: 0.55)),
+                                style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: onSurface.withValues(alpha: 0.6)),
                               ),
                               Text(
                                 duration > Duration.zero ? '-${_format(duration - position)}' : '--:--',
-                                style: TextStyle(fontSize: 10.5, color: onSurface.withValues(alpha: 0.55)),
+                                style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: onSurface.withValues(alpha: 0.6)),
                               ),
                             ],
                           ),
@@ -540,49 +614,107 @@ class _PlayerBar extends StatelessWidget {
                 );
               },
             ),
+
+            // عنوان المحاضرة
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.lecture.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 18),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    tooltip: 'إغلاق المشغل',
+                    onPressed: widget.onClose,
+                  ),
+                ],
+              ),
+            ),
+
+            // أزرار التحكم الكاملة (سرعة التشغيل + تقديم/تأخير ١٠ث + تشغيل/إيقاف)
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                IconButton(icon: const Icon(Icons.close, size: 20), onPressed: onClose),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    lecture.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                // زر سرعة التشغيل
+                InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: _cycleSpeed,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: themeAccent(context).withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${_speed}x',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        color: themeAccent(context),
+                      ),
+                    ),
                   ),
                 ),
+
+                // تأخير ١٠ ثوانٍ
+                IconButton(
+                  tooltip: 'تأخير ١٠ ثوانٍ',
+                  icon: const Icon(Icons.replay_10_rounded, size: 24),
+                  onPressed: () => _seekRelative(-10),
+                ),
+
+                // زر التشغيل/الإيقاف الرئيسي
                 IconButton.filled(
-                  style: IconButton.styleFrom(backgroundColor: themeAccent(context)),
-                  icon: isLoading
+                  style: IconButton.styleFrom(
+                    backgroundColor: themeAccent(context),
+                    padding: const EdgeInsets.all(10),
+                  ),
+                  icon: widget.isLoading
                       ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
                         )
-                      : Icon(isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white),
-                  onPressed: onTogglePlay,
+                      : Icon(
+                          widget.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                          color: Colors.white,
+                          size: 26,
+                        ),
+                  onPressed: widget.onTogglePlay,
+                ),
+
+                // تقديم ١٠ ثوانٍ
+                IconButton(
+                  tooltip: 'تقديم ١٠ ثوانٍ',
+                  icon: const Icon(Icons.forward_10_rounded, size: 24),
+                  onPressed: () => _seekRelative(10),
                 ),
               ],
             ),
-            // إسناد مضمّن بمصدر المحتوى المعاد بثّه — بواجهة المستخدم
-            // نفسها، لا بملف نصي بعيد لا يراه المستخدم (راجع الملاحظة
-            // الشرعية بمقدمة `duroos_repository.dart`).
+
+            // حقوق ومصدر المادة العلمية
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+              padding: const EdgeInsets.fromLTRB(10, 4, 10, 0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.public, size: 11, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45)),
+                  Icon(Icons.public, size: 10.5, color: onSurface.withValues(alpha: 0.45)),
                   const SizedBox(width: 4),
                   Flexible(
                     child: Text(
-                      sourceCredit,
+                      widget.sourceCredit,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45),
-                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 9.5, color: onSurface.withValues(alpha: 0.45)),
                     ),
                   ),
                 ],
@@ -609,6 +741,7 @@ class _ListTile extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.trailing,
+    this.indexNumber,
     this.isActive = false,
     this.isPlaying = false,
     this.isBuffering = false,
@@ -621,6 +754,7 @@ class _ListTile extends StatelessWidget {
   final String title;
   final String? subtitle;
   final Widget? trailing;
+  final int? indexNumber;
   final bool isActive;
   final bool isPlaying;
   final bool isBuffering;
@@ -628,34 +762,48 @@ class _ListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accent = themeAccent(context);
+
     return Material(
-      color: isActive ? themeAccent(context).withValues(alpha: 0.1) : (isDark ? const Color(0xFF1B232E) : Colors.white),
+      color: isActive ? accent.withValues(alpha: isDark ? 0.18 : 0.08) : (isDark ? const Color(0xFF1B232E) : Colors.white),
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isActive
-                  ? themeAccent(context)
-                  : (isDark ? AppColors.lineDark : AppColors.line).withValues(alpha: 0.7),
-              width: isActive ? 1.8 : 1,
+                  ? accent.withValues(alpha: 0.6)
+                  : (isDark ? AppColors.lineDark : AppColors.line).withValues(alpha: 0.8),
+              width: isActive ? 1.6 : 1,
             ),
           ),
           child: Row(
             children: [
+              // رقم الدرس أو أيقونة التصنيف
               Container(
-                padding: const EdgeInsets.all(10),
+                width: 38,
+                height: 38,
+                alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: isActive ? themeAccent(context) : (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
+                  color: isActive ? accent : accent.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, color: isActive ? Colors.white : themeAccent(context), size: 20),
+                child: indexNumber != null
+                    ? Text(
+                        '$indexNumber',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: isActive ? Colors.white : accent,
+                        ),
+                      )
+                    : Icon(icon, color: isActive ? Colors.white : accent, size: 19),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -667,7 +815,7 @@ class _ListTile extends StatelessWidget {
                       style: TextStyle(
                         fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
                         fontSize: 13,
-                        color: isActive ? themeAccent(context) : onSurface,
+                        color: isActive ? accent : onSurface,
                       ),
                     ),
                     if (subtitle != null) ...[
@@ -682,7 +830,17 @@ class _ListTile extends StatelessWidget {
               else if (trailing != null)
                 trailing!
               else
-                Icon(isPlaying ? Icons.pause_circle_outline : Icons.play_circle_outline, color: onSurface.withValues(alpha: 0.5)),
+                IconButton.filledTonal(
+                  style: IconButton.styleFrom(
+                    backgroundColor: isActive ? accent : null,
+                    foregroundColor: isActive ? Colors.white : null,
+                  ),
+                  icon: Icon(
+                    isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    size: 22,
+                  ),
+                  onPressed: onTap,
+                ),
             ],
           ),
         ),

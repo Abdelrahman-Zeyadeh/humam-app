@@ -4,179 +4,21 @@ import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../theme/app_accent_colors.dart' show kAppAccentColors;
 import 'backup_service.dart';
-import 'user_database.dart';
+// إخفاء أسماء DataClass المولّدة من drift لأنها تتطابق مع نماذج النطاق
+// (HifzPlan/KhatmaPlan/CustomHabit) — في الملف الأصلي كانت النماذج معرّفة
+// محلياً فتتظلّل الأسماء المستوردة تلقائياً؛ بعد نقلها لملف مستقل لزم
+// الإخفاء الصريح كي يبقى المعنى نفسه (نماذج النطاق هي المستخدمة هون،
+// مو صفوف الجداول المولّدة).
+import 'user_database.dart'
+    hide CustomHabit, HifzPlan, KhatmaPlan;
+import 'user_repository_models.dart';
 
-/// خطة ختمة — **أكثر من خطة ممكنة بنفس الوقت** (`id` يميّز كل واحدة)، نفس
-/// مبدأ [HifzPlan] بالضبط. **تقدّم مستقل لكل خطة** (`currentPage`) عن
-/// `ReadingProgress.lastPage` العام — بطلب صاحب المشروع صراحة: خطة الختمة
-/// تبدأ من نقطة يختارها المستخدم بنفسه ([startPage]، ليست بالضرورة
-/// صفحة ١)، و"التقدّم يكون مختلف عن التقدّم الحالي" — نفس مبدأ
-/// [HifzPlan.currentAyahId] بالضبط، يُحدَّث فقط أثناء "تابع القراءة" لهذه
-/// الخطة تحديداً (`MushafScreen.khatmaPracticeMode`/`khatmaPlanId`)، لا
-/// أي تصفّح عادي آخر.
-class KhatmaPlan {
-  const KhatmaPlan({
-    required this.id,
-    required this.startDate,
-    required this.targetDays,
-    required this.startPage,
-    required this.currentPage,
-  });
-  final int id;
-  final DateTime startDate;
-  final int targetDays;
-  final int startPage;
-  final int currentPage;
-
-  /// عدد الصفحات المتبقّية للختمة كاملة من نقطة البداية المختارة —
-  /// ٦٠٤ لو بدأت من الصفحة ١ (نفس الحساب القديم قبل إضافة [startPage]).
-  int get totalPagesToRead => 604 - startPage + 1;
-
-  int get dailyPages => (totalPagesToRead / targetDays).ceil();
-
-  DateTime get expectedEndDate => startDate.add(Duration(days: targetDays));
-
-  int get daysElapsed {
-    final d = DateTime.now().difference(startDate).inDays + 1;
-    return d.clamp(1, targetDays);
-  }
-
-  /// الصفحة المتوقّع الوصول إليها اليوم لو الالتزام تام بالورد اليومي.
-  int get expectedPageByNow =>
-      (startPage - 1 + daysElapsed * dailyPages).clamp(startPage, 604);
-
-  /// نسبة تقدّم **هذه الخطة تحديداً** (لا القراءة العامة) — من [startPage]
-  /// إلى [currentPage] مقارنة بـ[totalPagesToRead].
-  double get progress {
-    if (totalPagesToRead <= 0) return 1;
-    return ((currentPage - startPage + 1) / totalPagesToRead).clamp(0.0, 1.0);
-  }
-}
-
-/// خطة حفظ — نطاق آيات (`ayah_id` عام) ضمن سورة واحدة، ومؤشر تقدّم
-/// (`currentAyahId`) مستقل تماماً عن `ReadingProgress.lastPage` (راجع
-/// `HifzPlans` بـ`user_tables.dart`). **أكثر من خطة ممكنة بنفس الوقت**
-/// (`id` يميّز كل واحدة) — بطلب صاحب المشروع الصريح: بدء خطة جديدة لا
-/// يحذف أو يُعطِّل خططاً سابقة، كل خطة تبقى بتقدّمها وتاريخها الخاص حتى
-/// يحذفها المستخدم صراحة (`UserRepository.cancelHifzPlan`).
-class HifzPlan {
-  const HifzPlan({
-    required this.id,
-    required this.fromAyahId,
-    required this.toAyahId,
-    required this.currentAyahId,
-    required this.createdAt,
-  });
-  final int id;
-  final int fromAyahId;
-  final int toAyahId;
-  final int currentAyahId;
-  final DateTime createdAt;
-
-  int get totalAyahs => toAyahId - fromAyahId + 1;
-
-  double get progress {
-    if (totalAyahs <= 0) return 0;
-    return ((currentAyahId - fromAyahId + 1) / totalAyahs).clamp(0.0, 1.0);
-  }
-}
-
-/// مفاتيح فئات سلاسل الاستمرار المستقلة (`CategoryStreaks.category`) —
-/// ثابتة هون بدل تكرار النصوص الحرفية عبر الملفات. **`dailyWird` استثناء
-/// عمداً**: لا صف له بـ`CategoryStreaks` أصلاً، يبقى مخزَّناً بعمود
-/// `ReadingProgress.streakDays`/`streakLastDay` القديم (`streakDays`/
-/// `bumpStreakIfNewDay` أسفله) — كان موجوداً قبل تقسيم الفئات ولا داعي
-/// لهجرته لتفادي فقد سلسلة المستخدم الحالية.
-class UserCategories {
-  UserCategories._();
-  static const morningAzkar = 'morning_azkar';
-  static const eveningAzkar = 'evening_azkar';
-  static const dailyWird = 'daily_wird';
-  static const hifz = 'hifz';
-  static const nightAzkar = 'night_azkar';
-  static const qiyam = 'qiyam';
-
-  // تذكيرا "حديث اليوم" و"اسم من أسماء الله الحسنى" — يستخدمان نظام
-  // [ActivityReminders] العام نفسه (بلا عمود قاعدة بيانات جديد)، راجع
-  // `reminders_screen.dart` و`adhan_notification_service.dart`
-  // (`scheduleDailyHadithReminder`/`scheduleDailyNameOfAllahReminder`).
-  static const dailyHadith = 'daily_hadith';
-  static const dailyNameOfAllah = 'daily_name_of_allah';
-
-  /// سلسلة استمرار **مجمَّعة**: "هل أُتمَّت أي عادة مخصّصة اليوم؟" — تخصّ
-  /// بطاقة الداشبورد العامة "عاداتي" فقط (راجع `_StreaksRow`)، لا كل عادة
-  /// بمفردها (لكل عادة مخصّصة سلسلتها الخاصة عبر `CustomHabitLogs.count`،
-  /// راجع `UserRepository.customHabitStreakDays`). تُستدعى من
-  /// `addCustomHabitProgress` عند وصول **أي** عادة لهدفها اليومي — يعيد
-  /// استخدام آلية [CategoryStreaks]/[CategoryDailyLog] المختبَرة أصلاً بدل
-  /// بناء كاش مجمَّع جديد.
-  static const customHabitsAny = 'custom_habits_any';
-
-  // --- قسم الصلوات والعبادات (راجع `prayer_screen.dart`) — سلسلة استمرار
-  // مستقلة لكل صلاة فرض على حدة (بطلب صاحب المشروع صراحة: "كل صلاة
-  // منفصلة إذا تمت أو لا").
-  static const fajr = 'prayer_fajr';
-  static const dhuhr = 'prayer_dhuhr';
-  static const asr = 'prayer_asr';
-  static const maghrib = 'prayer_maghrib';
-  static const isha = 'prayer_isha';
-
-  /// **مُستبدَلة** بسبع فئات السنن الفردية أدناه (بطلب صاحب المشروع
-  /// "ضيف كل سنة صلاة... ولا تهبد كم راسك" — تفصيل السنن الرواتب بدل
-  /// خانة واحدة مجمَّعة). أُبقيت الثابتة نفسها كي لا ينكسر أي كود قديم
-  /// يشير إليها، لكن `_PrayersChecklist` لم يعد يستخدمها؛ بيانات
-  /// المستخدمين السابقة تحتها (إن وُجدت) تبقى باسمها بلا هجرة، غير
-  /// معروضة بالواجهة فقط.
-  static const rawatib = 'prayer_rawatib';
-
-  // السبع سنن الفردية (قبلية/بعدية) — راجع تعليق `_PrayersChecklist` بـ
-  // `prayer_screen.dart` لتصنيف كل واحدة (مؤكدة ضمن الاثنتي عشرة، أو
-  // مستحبة غير مؤكدة من "السنن المهجورة") ومصدرها الحديثي.
-  static const sunnahFajrQabliyah = 'sunnah_fajr_qabliyah';
-  static const sunnahDhuhrQabliyah = 'sunnah_dhuhr_qabliyah';
-  static const sunnahDhuhrBadiyah = 'sunnah_dhuhr_badiyah';
-  static const sunnahAsrQabliyah = 'sunnah_asr_qabliyah';
-  static const sunnahMaghribQabliyah = 'sunnah_maghrib_qabliyah';
-  static const sunnahMaghribBadiyah = 'sunnah_maghrib_badiyah';
-  static const sunnahIshaBadiyah = 'sunnah_isha_badiyah';
-  static const sunnahDuha = 'sunnah_duha';
-}
-
-/// عادة مخصّصة يعرّفها المستخدم بنفسه — راجع توثيق [CustomHabits] بـ
-/// `user_tables.dart`. **قابلة للتعدّد** (`id` مستقل)، نفس مبدأ [HifzPlan]/
-/// [KhatmaPlan] بالضبط.
-class CustomHabit {
-  const CustomHabit({
-    required this.id,
-    required this.title,
-    required this.targetDaily,
-    required this.reminderHour,
-    required this.reminderMinute,
-    required this.remindersEnabled,
-    required this.createdAt,
-  });
-  final int id;
-  final String title;
-  final int targetDaily;
-  final int? reminderHour;
-  final int reminderMinute;
-  final bool remindersEnabled;
-  final DateTime createdAt;
-}
-
-/// مفاتيح أنواع "الفواصل" (`ActivityBookmarks.type`) — فاصلة واحدة فقط
-/// لكل نوع بأي لحظة، بخلاف [UserCategories] (سلاسل استمرار) أو خطط الحفظ
-/// (`HifzPlan`، نطاق كامل بتقدّم). راجع توثيق `ActivityBookmarks`
-/// بـ`user_tables.dart`.
-class BookmarkTypes {
-  BookmarkTypes._();
-  static const reading = 'reading';
-  static const hifz = 'hifz';
-  static const review = 'review';
-  static const tadabbur = 'tadabbur';
-  static const all = [reading, hifz, review, tadabbur];
-}
+// نماذج البيانات (KhatmaPlan/HifzPlan/UserCategories/CustomHabit/
+// BookmarkTypes) مفكّكة بملف مستقل لتقليل حجم هذا الملف — إعادة
+// تصديرها من هنا حتى لا ينكسر أي مستهلك قديم يستوردها من user_repository.
+export 'user_repository_models.dart';
 
 /// واجهة واحدة فوق `user.db` تحلّ محل خمس فئات `*_prefs.dart` كانت تغلّف
 /// `SharedPreferences` مباشرة. تحتفظ بنسخة كاملة بالذاكرة (`_bookmarks`،
@@ -210,6 +52,8 @@ class UserRepository {
   // معطَّل افتراضياً عمداً (خلافاً لبقية إعدادات هالملف) — كتم كل إشعارات
   // الجهاز تأثير نظام واسع يستحق موافقة صريحة أولى لا تفعيلاً ضمنياً.
   bool _dndWhileReadingEnabled = false;
+  // وضع "الصامت التلقائي وقت الصلاة" — كتم إشعارات وصوت الجهاز وقت الصلاة
+  bool _dndDuringPrayerEnabled = false;
   bool _autoCloudBackupEnabled = true;
   double? _lat;
   double? _lon;
@@ -265,6 +109,7 @@ class UserRepository {
   // المشروع "خلي المستخدم يقرر... كل كم يبعث ذكر او اشعار" (كان ثابتاً
   // كل ساعة بلا أي تحكّم).
   int _hourlyDhikrIntervalHours = 1;
+  int _hourlyDhikrIntervalMinutes = 60;
 
   /// تكرار كل تذكير عام (بالدقائق) — `null` يعني "مرة واحدة باليوم/الأسبوع"
   /// (السلوك الافتراضي القديم). مفتاح الخريطة هو نفس مفتاح الفئة المستخدَم
@@ -282,6 +127,8 @@ class UserRepository {
     'maghrib': 10,
     'isha': 15,
   };
+  final Map<String, bool> _iqamahNotifEnabled = {};
+  final Map<String, int> _perPrayerPreAdhan = {};
   final Map<String, String> _perPrayerVoices = {};
   final Map<String, String> _perPrayerModes = {};
   final Map<String, int> _prayerOffsets = {};
@@ -306,7 +153,9 @@ class UserRepository {
       _hourlyDhikrEnabled = sp.getBool('hourly_dhikr_enabled') ?? true;
       _hourlyDhikrStartHour = sp.getInt('hourly_dhikr_start_hour') ?? 8;
       _hourlyDhikrEndHour = sp.getInt('hourly_dhikr_end_hour') ?? 23;
-      _hourlyDhikrIntervalHours = sp.getInt('hourly_dhikr_interval_hours') ?? 1;
+      _hourlyDhikrIntervalMinutes = sp.getInt('hourly_dhikr_interval_minutes') ??
+          ((sp.getInt('hourly_dhikr_interval_hours') ?? 1) * 60);
+      _hourlyDhikrIntervalHours = (_hourlyDhikrIntervalMinutes / 60).clamp(1, 24).toInt();
       final rawIntervals = sp.getString('reminder_interval_minutes_map');
       if (rawIntervals != null) {
         final decoded = jsonDecode(rawIntervals) as Map<String, dynamic>;
@@ -502,7 +351,12 @@ class UserRepository {
     _mushafNightMode = mushafColor?.nightMode ?? 'auto';
 
     final appTheme = await appThemeF;
-    _accentColorId = appTheme?.accentColorId ?? 'gold';
+    final savedAccent = appTheme?.accentColorId;
+    if (savedAccent == null || savedAccent == 'gold' || !kAppAccentColors.any((c) => c.id == savedAccent)) {
+      _accentColorId = 'emerald';
+    } else {
+      _accentColorId = savedAccent;
+    }
 
     final checkinSettings = await checkinF;
     _prayerCheckinEnabled = checkinSettings?.enabled ?? false;
@@ -532,10 +386,15 @@ class UserRepository {
       _dailyChallengeCompletedDateKey = sp.getString('daily_challenge_completed_date');
       _listenOnlyModeEnabled = sp.getBool('listen_only_mode_enabled') ?? false;
       _dndWhileReadingEnabled = sp.getBool('dnd_while_reading_enabled') ?? false;
+      _dndDuringPrayerEnabled = sp.getBool('dnd_during_prayer_enabled') ?? false;
       _autoCloudBackupEnabled = sp.getBool('auto_cloud_backup_enabled') ?? true;
       for (final m in ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']) {
         final iq = sp.getInt('iqamah_minutes_$m');
         if (iq != null) _iqamahMinutes[m] = iq;
+        final iqEn = sp.getBool('iqamah_enabled_$m');
+        if (iqEn != null) _iqamahNotifEnabled[m] = iqEn;
+        final pre = sp.getInt('pre_adhan_$m');
+        if (pre != null) _perPrayerPreAdhan[m] = pre;
         final v = sp.getString('voice_id_$m');
         if (v != null) _perPrayerVoices[m] = v;
         final mode = sp.getString('mode_$m');
@@ -566,6 +425,31 @@ class UserRepository {
     try {
       final sp = await SharedPreferences.getInstance();
       await sp.setInt('pre_adhan_minutes', minutes);
+    } catch (_) {}
+  }
+
+  int preAdhanMinutesFor(String prayerKey) =>
+      _perPrayerPreAdhan[prayerKey] ?? _preAdhanMinutes;
+
+  Future<void> setPreAdhanMinutesFor(String prayerKey, int minutes) async {
+    _perPrayerPreAdhan[prayerKey] = minutes;
+    try {
+      final sp = await SharedPreferences.getInstance();
+      await sp.setInt('pre_adhan_$prayerKey', minutes);
+    } catch (_) {}
+  }
+
+  bool iqamahNotificationEnabledFor(String prayerKey) =>
+      _iqamahNotifEnabled[prayerKey] ?? true;
+
+  Future<void> setIqamahNotificationEnabledFor(
+    String prayerKey,
+    bool enabled,
+  ) async {
+    _iqamahNotifEnabled[prayerKey] = enabled;
+    try {
+      final sp = await SharedPreferences.getInstance();
+      await sp.setBool('iqamah_enabled_$prayerKey', enabled);
     } catch (_) {}
   }
 
@@ -1199,6 +1083,109 @@ class UserRepository {
     }
   }
 
+  /// خريطة حالة إتقان حفظ الآيات (متقن: 'mastered' 🟩، يحتاج تعاهد/مراجعة: 'needsReview' 🟨)
+  Future<Map<int, String>> allHifzMasteryMap() async {
+    try {
+      final today = _isoDateKey(DateTime.now());
+      final allRows = await _db.select(_db.hifzAyahReviews).get();
+      final map = <int, String>{};
+
+      for (final r in allRows) {
+        if (r.dueDate.compareTo(today) > 0 || r.repetitions >= 2) {
+          map[r.ayahId] = 'mastered';
+        } else {
+          map[r.ayahId] = 'needsReview';
+        }
+      }
+
+      for (final plan in _hifzPlans) {
+        for (var id = plan.fromAyahId; id <= plan.currentAyahId; id++) {
+          map.putIfAbsent(id, () => 'needsReview');
+        }
+      }
+
+      final hifzBookmarks = await (_db.select(_db.bookmarks)..where((t) => t.label.equals('hifz'))).get();
+      for (final b in hifzBookmarks) {
+        map.putIfAbsent(b.ayahId, () => 'mastered');
+      }
+
+      return map;
+    } catch (e) {
+      debugPrint('تعذّر جلب خريطة إتقان الحفظ: $e');
+      return const {};
+    }
+  }
+
+  /// تعيين حالة إتقان آية محددة يدوياً
+  Future<void> setAyahMasteryStatus(int ayahId, String status) async {
+    final today = _isoDateKey(DateTime.now());
+    final futureDate = _isoDateKey(DateTime.now().add(const Duration(days: 30)));
+    final planId = _hifzPlans.isNotEmpty ? _hifzPlans.first.id : 1;
+
+    try {
+      if (status == 'unmemorized') {
+        await (_db.delete(_db.hifzAyahReviews)..where((t) => t.ayahId.equals(ayahId))).go();
+      } else if (status == 'mastered') {
+        await _db.into(_db.hifzAyahReviews).insertOnConflictUpdate(
+          HifzAyahReviewsCompanion.insert(
+            planId: planId,
+            ayahId: ayahId,
+            dueDate: futureDate,
+            repetitions: const Value(3),
+            easeFactor: const Value(2.5),
+            lastReviewedAt: Value(DateTime.now()),
+          ),
+        );
+      } else if (status == 'needsReview') {
+        await _db.into(_db.hifzAyahReviews).insertOnConflictUpdate(
+          HifzAyahReviewsCompanion.insert(
+            planId: planId,
+            ayahId: ayahId,
+            dueDate: today,
+            repetitions: const Value(1),
+            easeFactor: const Value(2.1),
+            lastReviewedAt: Value(DateTime.now().subtract(const Duration(days: 2))),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('تعذّر تحديث حالة حفظ الآية: $e');
+    }
+  }
+
+  /// تعيين حالة إتقان مجموعة آيات دفعة واحدة (لسورة كاملة أو صفحة أو نطاق)
+  Future<void> setMultipleAyahsMasteryStatus(List<int> ayahIds, String status) async {
+    if (ayahIds.isEmpty) return;
+    final today = _isoDateKey(DateTime.now());
+    final futureDate = _isoDateKey(DateTime.now().add(const Duration(days: 30)));
+    final planId = _hifzPlans.isNotEmpty ? _hifzPlans.first.id : 1;
+
+    try {
+      if (status == 'unmemorized') {
+        await (_db.delete(_db.hifzAyahReviews)..where((t) => t.ayahId.isIn(ayahIds))).go();
+      } else {
+        final isMastered = status == 'mastered';
+        await _db.batch((batch) {
+          batch.insertAllOnConflictUpdate(
+            _db.hifzAyahReviews,
+            ayahIds.map(
+              (id) => HifzAyahReviewsCompanion.insert(
+                planId: planId,
+                ayahId: id,
+                dueDate: isMastered ? futureDate : today,
+                repetitions: Value(isMastered ? 3 : 1),
+                easeFactor: Value(isMastered ? 2.5 : 2.1),
+                lastReviewedAt: Value(isMastered ? DateTime.now() : DateTime.now().subtract(const Duration(days: 2))),
+              ),
+            ).toList(),
+          );
+        });
+      }
+    } catch (e) {
+      debugPrint('تعذّر تحديث دفعة آيات الحفظ: $e');
+    }
+  }
+
   bool get hifzEnabled => _hifzEnabled;
   int? get hifzHour => _hifzHour;
   int get hifzMinute => _hifzMinute;
@@ -1321,6 +1308,17 @@ class UserRepository {
     try {
       final sp = await SharedPreferences.getInstance();
       await sp.setBool('dnd_while_reading_enabled', value);
+    } catch (_) {}
+  }
+
+  /// وضع "الصامت التلقائي وقت الصلاة"
+  bool get dndDuringPrayerEnabled => _dndDuringPrayerEnabled;
+
+  Future<void> setDndDuringPrayerEnabled(bool value) async {
+    _dndDuringPrayerEnabled = value;
+    try {
+      final sp = await SharedPreferences.getInstance();
+      await sp.setBool('dnd_during_prayer_enabled', value);
     } catch (_) {}
   }
 
@@ -1579,22 +1577,31 @@ class UserRepository {
   int get hourlyDhikrStartHour => _hourlyDhikrStartHour;
   int get hourlyDhikrEndHour => _hourlyDhikrEndHour;
   int get hourlyDhikrIntervalHours => _hourlyDhikrIntervalHours;
+  int get hourlyDhikrIntervalMinutes => _hourlyDhikrIntervalMinutes;
 
   Future<void> setHourlyDhikr({
     required bool enabled,
     int? startHour,
     int? endHour,
+    int? intervalMinutes,
     int? intervalHours,
   }) async {
     _hourlyDhikrEnabled = enabled;
     if (startHour != null) _hourlyDhikrStartHour = startHour;
     if (endHour != null) _hourlyDhikrEndHour = endHour;
-    if (intervalHours != null) _hourlyDhikrIntervalHours = intervalHours;
+    if (intervalMinutes != null) {
+      _hourlyDhikrIntervalMinutes = intervalMinutes;
+      _hourlyDhikrIntervalHours = (intervalMinutes / 60).clamp(1, 24).toInt();
+    } else if (intervalHours != null) {
+      _hourlyDhikrIntervalHours = intervalHours;
+      _hourlyDhikrIntervalMinutes = intervalHours * 60;
+    }
     try {
       final sp = await SharedPreferences.getInstance();
       await sp.setBool('hourly_dhikr_enabled', _hourlyDhikrEnabled);
       await sp.setInt('hourly_dhikr_start_hour', _hourlyDhikrStartHour);
       await sp.setInt('hourly_dhikr_end_hour', _hourlyDhikrEndHour);
+      await sp.setInt('hourly_dhikr_interval_minutes', _hourlyDhikrIntervalMinutes);
       await sp.setInt('hourly_dhikr_interval_hours', _hourlyDhikrIntervalHours);
     } catch (_) {}
   }

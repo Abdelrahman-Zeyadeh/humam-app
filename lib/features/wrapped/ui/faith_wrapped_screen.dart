@@ -123,10 +123,10 @@ class _FaithWrappedScreenState extends ConsumerState<FaithWrappedScreen>
             return const Center(child: CircularProgressIndicator(color: AppColors.gold));
           }
           if (snapshot.hasError || !snapshot.hasData) {
-            return Center(
+            return const Center(
               child: Text(
-                'تعذّر تجهيز التقرير: ${snapshot.error}',
-                style: const TextStyle(color: Colors.white70),
+                'تعذّر تجهيز التقرير، يرجى المحاولة لاحقاً.',
+                style: TextStyle(color: Colors.white70),
               ),
             );
           }

@@ -1,3 +1,4 @@
+
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart'
@@ -73,7 +74,10 @@ final _ayahColorTagMapProvider = Provider<Map<int, Color>>((ref) {
 /// رسم صفحة مصحف واحدة: يحمّل تخطيطها وخطها الخاص (`p{page}.ttf`)، ثم
 /// يرسم أسطرها الخمسة عشر بالترتيب. حالة تحميل/خطأ مستقلة عن باقي التطبيق.
 class MushafPageWidget extends ConsumerWidget {
-  const MushafPageWidget({super.key, required this.page});
+  const MushafPageWidget({
+    super.key,
+    required this.page,
+  });
   final int page;
 
   @override
@@ -115,10 +119,16 @@ class MushafPageWidget extends ConsumerWidget {
     final ayahTagColors = ref.watch(_ayahColorTagMapProvider);
     final isDarkTheme = Theme.of(context).brightness == Brightness.dark;
 
+    ref.watch(mushafPaletteVersionProvider);
+    ref.watch(accentColorVersionProvider);
+    final userPrefs = ref.watch(userPrefsProvider);
+
     final content = Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: textSize.horizontalPadding,
-        vertical: 4,
+      padding: EdgeInsets.fromLTRB(
+        textSize.horizontalPadding,
+        4,
+        textSize.horizontalPadding,
+        2,
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -139,12 +149,7 @@ class MushafPageWidget extends ConsumerWidget {
       ),
     );
 
-    // "المصحف الليلي" (راجع MushafColorSettings.nightMode) — قلب ألوان
-    // الصفحة كاملة (بلا لمس منطق ألوان كل عنصر داخلها، البسملة/أسماء
-    // السور/النص العادي كلها تُقلَب معاً تلقائياً) + تعتيم خفيف يريح العين
-    // أكثر من الأبيض المقلوب الخام (رمادي فاتح جداً بدل أبيض ناصع).
-    ref.watch(mushafPaletteVersionProvider);
-    final userPrefs = ref.watch(userPrefsProvider);
+    // "المصحف الليلي"
     final nightMode = userPrefs.mushafNightMode;
     final nightModeActive =
         nightMode == 'on' || (nightMode == 'auto' && isDarkTheme);
@@ -156,6 +161,8 @@ class MushafPageWidget extends ConsumerWidget {
     );
   }
 }
+
+
 
 /// مصفوفة Night Mode دافئة مستوحاة من تطبيق quran_android الرسمي —
 /// تقلب ألوان الصفحة مع تحيّز للدفء (sepia): الأحمر يحتفظ بإزاحة أعلى
@@ -185,27 +192,7 @@ bool _effectivePaletteIsDark(BuildContext context, UserPrefs userPrefs) {
   return themeDark && !nightModeActive;
 }
 
-/// زخرفة معينيّة صغيرة — لمسة واحدة متكرّرة على جانبَي اسم السورة، بلا أي
-/// حركة أو تدرّج (راجع توثيق استخدامها بـ`_PageLineWidget`).
-class _SurahNameOrnament extends StatelessWidget {
-  const _SurahNameOrnament({required this.color});
-  final Color color;
 
-  @override
-  Widget build(BuildContext context) {
-    return Transform.rotate(
-      angle: 0.785398, // ٤٥° — معيّن لا مربّع
-      child: Container(
-        width: 8,
-        height: 8,
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.55),
-          borderRadius: BorderRadius.circular(1.5),
-        ),
-      ),
-    );
-  }
-}
 
 class _PageLineWidget extends ConsumerWidget {
   const _PageLineWidget({
@@ -243,67 +230,15 @@ class _PageLineWidget extends ConsumerWidget {
         // سابقاً. حدّ شعري رفيع + خلفية بشفافية خافتة جداً + زخرفتان
         // صغيرتان معينيّتان على الجانبين — بلا ظل ولا تدرّج ولا حركة
         // (بطلب صاحب المشروع "خفيف لطيف بدون حركات كثيرة مريح للعين").
+        // ترويسة اسم السورة المطابقة تماماً لمصحف المدينة المنورة (مجمع الملك فهد):
+        // شريط زخرفي مذهب مع خرطوشة اسم السورة وجناحين زخرفيين بشموس إسلامية وتوريق نباتي
         return Semantics(
           label: nameAsync.value,
-          child: Center(
-            // `Center` عمداً — بدونه الصندوق كان يتمطّط لعرض الصفحة كامل
-            // (السطر الأب `Column` بـcrossAxisAlignment.stretch)، فبان
-            // "كبير" زيادة رغم صغر ارتفاعه (بلاغ صاحب المشروع). هيك يتقلّص
-            // لعرض محتواه فقط — شارة صغيرة موسّطة لا شريط بعرض الصفحة.
-            child: Container(
-              height: 48,
-              margin: const EdgeInsets.symmetric(vertical: 2),
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: isDark ? 0.09 : 0.05),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: accent.withValues(alpha: 0.22)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _SurahNameOrnament(color: accent),
-                  const SizedBox(width: 6),
-                  ExcludeSemantics(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // غليف `surah{NNN}` يرسم اسم السورة وحده بلا كلمة
-                        // "سورة" (تحقّقنا: هيك مصمَّم الخط نفسه) — نضيفها
-                        // بغليف `surah-icon` من **نفس الخط** (تحقّقنا من
-                        // GSUB: موجود فعلاً)، لا نص AmiriQuran عادي — رسم
-                        // عثماني أصيل متطابق تماماً مع غليف الاسم، لا خط
-                        // واجهة مختلف الطراز (بطلب صاحب المشروع).
-                        Text(
-                          'surah-icon',
-                          style: TextStyle(
-                            color: isDark ? const Color(0xFFF3DA8E) : const Color(0xFF1E1A16),
-                            fontSize: 27,
-                            height: 1.1,
-                            fontFamily: 'SurahNameV4',
-                            fontFeatures: const [FontFeature.enable('liga')],
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'surah${(line.surahRef ?? 1).toString().padLeft(3, '0')}',
-                          style: TextStyle(
-                            color: isDark ? const Color(0xFFF3DA8E) : const Color(0xFF1E1A16),
-                            fontSize: 27,
-                            height: 1.1,
-                            fontFamily: 'SurahNameV4',
-                            fontFeatures: const [FontFeature.enable('liga')],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  _SurahNameOrnament(color: accent),
-                ],
-              ),
-            ),
+          child: MadinahSurahHeaderBanner(
+            surahNumber: line.surahRef ?? 1,
+            surahName: nameAsync.value ?? '',
+            accent: accent,
+            isDark: isDark,
           ),
         );
       case 'basmallah':
@@ -318,17 +253,25 @@ class _PageLineWidget extends ConsumerWidget {
         final fg = palette.fg(isDark);
         final edition = ref.watch(mushafFontEditionProvider);
         final p1FontAsync = ref.watch(pageFontFamilyProvider(1));
-        // V4 Tajweed: لا رمز glyph معروف لبسملة مستقلة بهذه الطبعة (سطر
-        // البسملة بلا كلمات بتخطيط V4 نفسه — لا مصدر بيانات نستنتج منه
-        // الرمز الصحيح، بخلاف V1/V2 يلي رموزهما معروفة يدوياً). نستخدم
-        // نص AmiriQuran العادي دايماً بدل تخمين رمز خاطئ.
-        final p1FontFamily = edition == MushafFontEdition.v4Tajweed ? null : p1FontAsync.value;
-        final basmallahText = p1FontFamily != null
-            ? (edition == MushafFontEdition.v1
-                ? '\ufb51 \ufb52 \ufb53 \ufb54'
-                : 'ﱁ ﱂ ﱃ ﱄ')
-            : 'بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ';
+        final p1FontFamily = p1FontAsync.value;
+        final String basmallahText;
+        if (p1FontFamily != null) {
+          switch (edition) {
+            case MushafFontEdition.v1:
+              basmallahText = '\ufb51 \ufb52 \ufb53 \ufb54';
+              break;
+            case MushafFontEdition.v4Tajweed:
+              basmallahText = '\ufc41 \ufc42 \ufc43 \ufc44';
+              break;
+            case MushafFontEdition.v2:
+              basmallahText = 'ﱁ ﱂ ﱃ ﱄ';
+              break;
+          }
+        } else {
+          basmallahText = 'بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ';
+        }
 
+        final basmallahFontSize = (line.page <= 2) ? 36.0 : (p1FontFamily != null ? 30.0 : 23.0);
         return Center(
           child: FittedBox(
             fit: BoxFit.scaleDown,
@@ -337,7 +280,7 @@ class _PageLineWidget extends ConsumerWidget {
               textDirection: TextDirection.rtl,
               style: TextStyle(
                 color: fg,
-                fontSize: p1FontFamily != null ? 28 : 21,
+                fontSize: basmallahFontSize,
                 height: 1.0,
                 fontFamily: p1FontFamily ?? 'AmiriQuran',
                 fontWeight: FontWeight.normal,
@@ -362,6 +305,7 @@ class _PageLineWidget extends ConsumerWidget {
         // ليملأ العرض كاملاً — والارتفاع يكبر مع العرض بنفس النسبة
         // (fitWidth يكبّر البعدين معاً) فيفيض ويتراكب مع السطر يلي جنبه.
         final isCentered = line.isCentered == 1;
+        final baseFontSize = (line.page <= 2) ? 35.0 : 28.0;
         // آية التلاوة الحالية (لو في تشغيل صوتي جارٍ) — لتظليلها بالسطر.
         // `select` يمنع إعادة بناء كل سطور الصفحة لمجرّد تبديل تشغيل/إيقاف
         // أو تغيير السرعة؛ فقط تغيّر معرّف الآية نفسه يعيد البناء هون.
@@ -389,9 +333,9 @@ class _PageLineWidget extends ConsumerWidget {
               ayahTagColors: ayahTagColors,
               style: TextStyle(
                 fontFamily: fontFamily,
-                fontSize: 28,
+                fontSize: baseFontSize,
                 color: palette.fg(isDark),
-                height: 1,
+                height: 1.22,
               ),
             ),
           ),
@@ -480,7 +424,7 @@ class _TappableAyahLineState extends ConsumerState<_TappableAyahLine> {
   @override
   Widget build(BuildContext context) {
     _disposeRecognizers();
-    final highlightColor = themeAccent(context).withValues(alpha: 0.22);
+    final highlightColor = themeAccent(context).withValues(alpha: 0.28);
     final pendingFrom = widget.pickingHifz
         ? ref.watch(hifzPickerProvider.select((s) => s.pendingFrom))
         : null;
@@ -520,10 +464,9 @@ class _TappableAyahLineState extends ConsumerState<_TappableAyahLine> {
       }
 
       if (isHidden) {
-        // غطاء بخط النظام العادي لا QCF — الغليف نفسه رمز خاص بخط الصفحة،
-        // واستبداله بحرف عادي بنفس الخط ممكن يطلع مربّعاً فارغاً (tofu).
-        // الضغط يكشف آية الكلمة كاملة، لا كلمة وحدها — الحفظ باختبار
-        // الآية ككل أصح من كشف كلمة كلمة.
+        // غطاء ناعم وأنيق يحفظ تناسق واصطفاف أسطر المصحف بالكامل:
+        // نستخدم نفس الغليف الأصلي [glyphText] مع تعتيمه كحجاب خفيف
+        // واللمسة الواحدة تكشف الآية بأكملها بسلاسة تامة.
         final recognizer = TapGestureRecognizer()
           ..onTap = () {
             wordTapConsumedThisGesture = true;
@@ -532,14 +475,23 @@ class _TappableAyahLineState extends ConsumerState<_TappableAyahLine> {
         _recognizers.add(recognizer);
         spans.add(
           TextSpan(
-            text: '■',
+            text: glyphText,
             recognizer: recognizer,
             style: TextStyle(
-              fontFamily: null,
-              color: widget.style.color?.withValues(alpha: 0.28),
+              color: (widget.style.color ?? Colors.black).withValues(alpha: 0.04),
+              backgroundColor: (widget.style.color ?? Colors.black).withValues(alpha: 0.12),
             ),
           ),
         );
+      } else if (widget.memorizationOn) {
+        // الآية مكشوفة في وضع الحفظ: لمسة تعيد إخفاءها للاختبار والتكرار
+        final recognizer = TapGestureRecognizer()
+          ..onTap = () {
+            wordTapConsumedThisGesture = true;
+            ref.read(revealedAyahsProvider.notifier).hide(word.ayahId);
+          };
+        _recognizers.add(recognizer);
+        spans.add(buildWordSpan(recognizer));
       } else if (widget.pickingHifz) {
         // وضع اختيار نطاق الحفظ: يبقى ضغطة عادية فورية (لا مطوّلة) — وضع
         // مقصود مُفعَّل صراحة أصلاً، لا تعارض مع لمسة إخفاء/إظهار القوائم.
@@ -682,8 +634,89 @@ class _PageDownloadPrompt extends ConsumerWidget {
   }
 }
 
-class MushafSurahHeaderPainter extends CustomPainter {
-  const MushafSurahHeaderPainter({required this.accent, required this.isDark});
+class MadinahSurahHeaderBanner extends StatelessWidget {
+  const MadinahSurahHeaderBanner({
+    super.key,
+    required this.surahNumber,
+    required this.surahName,
+    required this.accent,
+    required this.isDark,
+  });
+
+  final int surahNumber;
+  final String surahName;
+  final Color accent;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 35.0,
+      margin: const EdgeInsets.symmetric(vertical: 1.5),
+      child: CustomPaint(
+        painter: MadinahSurahBannerPainter(
+          accent: accent,
+          isDark: isDark,
+        ),
+        child: Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'surah-icon',
+                style: const TextStyle(
+                  color: Color(0xFFFFDF7D),
+                  fontSize: 22.5,
+                  height: 1.05,
+                  fontFamily: 'SurahNameV4',
+                  fontFeatures: [FontFeature.enable('liga')],
+                  shadows: [
+                    Shadow(
+                      color: Color(0x99D4AF37),
+                      blurRadius: 4.0,
+                      offset: Offset(0, 0.5),
+                    ),
+                    Shadow(
+                      color: Color(0x66000000),
+                      blurRadius: 2.0,
+                      offset: Offset(0, 1.0),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'surah${surahNumber.toString().padLeft(3, '0')}',
+                style: const TextStyle(
+                  color: Color(0xFFFFDF7D),
+                  fontSize: 22.5,
+                  height: 1.05,
+                  fontFamily: 'SurahNameV4',
+                  fontFeatures: [FontFeature.enable('liga')],
+                  shadows: [
+                    Shadow(
+                      color: Color(0x99D4AF37),
+                      blurRadius: 4.0,
+                      offset: Offset(0, 0.5),
+                    ),
+                    Shadow(
+                      color: Color(0x66000000),
+                      blurRadius: 2.0,
+                      offset: Offset(0, 1.0),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class MadinahSurahBannerPainter extends CustomPainter {
+  const MadinahSurahBannerPainter({required this.accent, required this.isDark});
   final Color accent;
   final bool isDark;
 
@@ -695,81 +728,182 @@ class MushafSurahHeaderPainter extends CustomPainter {
     final h = size.height;
     final midY = h / 2;
 
-    // ألوان فاخرة ومتناسقة تتبع لوحة المصحف والوضع الليلي/النهاري
-    final goldMain = isDark
-        ? const Color(0xFFD4AF37).withValues(alpha: 0.9)
-        : const Color(0xFF9E782F).withValues(alpha: 0.85);
+    // الخيار C: الشريط المحرابي الأندلسي الفخم (Andalusian Mihrab Arch)
+    // خلفية زمردية ملكية مع إطار مذهب وخرطوشة محرابية أندلسية وخط بماء الذهب
+    final goldBright = const Color(0xFFFFDF7D);
+    final goldMain = isDark ? const Color(0xFFE5C158) : const Color(0xFFD4AF37);
     final goldSoft = isDark
-        ? const Color(0xFFC59B27).withValues(alpha: 0.4)
-        : const Color(0xFFC59B27).withValues(alpha: 0.35);
-    final bgFill = isDark
-        ? const Color(0xFF1E2430).withValues(alpha: 0.6)
-        : const Color(0xFFF7F3E9).withValues(alpha: 0.8);
+        ? const Color(0xFFD4AF37).withValues(alpha: 0.45)
+        : const Color(0xFFC59B27).withValues(alpha: 0.45);
 
-    // 1. الإطار الخارجي المنحني بنعومة
-    final outerRRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(1, 1, w - 2, h - 2),
-      const Radius.circular(8),
+    // التدرج الزمردي الملكي لشريط السورة
+    final emeraldGradient = LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: isDark
+          ? const [
+              Color(0xFF0C241A),
+              Color(0xFF143B2B),
+              Color(0xFF081C14),
+            ]
+          : const [
+              Color(0xFF0F3224),
+              Color(0xFF184A37),
+              Color(0xFF0C271C),
+            ],
     );
 
+    // أرضية الخرطوشة المحرابية المركزية (عمق زمردي مخملي ليبرز الخط الذهبي)
+    final cartoucheFill = isDark ? const Color(0xFF05130D) : const Color(0xFF071B12);
+
+    // 1. الإطار الخارجي العام للشريط مع خلفية زمردية فاخرة
+    final outerRect = Rect.fromLTWH(0.8, 0.8, w - 1.6, h - 1.6);
+    final outerRRect = RRect.fromRectAndRadius(
+      outerRect,
+      const Radius.circular(4.5),
+    );
+
+    // رسم الخلفية الزمردية الملكية بتدرج ناعم
     canvas.drawRRect(
       outerRRect,
       Paint()
-        ..color = bgFill
+        ..shader = emeraldGradient.createShader(outerRect)
         ..style = PaintingStyle.fill,
     );
 
+    // الإطار الخارجي المذهب
     canvas.drawRRect(
       outerRRect,
       Paint()
         ..color = goldMain
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.1,
+        ..strokeWidth = 1.05,
     );
 
-    // 2. خط داخلي خفيف
+    // خط داخلي شعري مذهب
     final innerRRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(3.5, 3.5, w - 7, h - 7),
-      const Radius.circular(5.5),
+      Rect.fromLTWH(2.6, 2.6, w - 5.2, h - 5.2),
+      const Radius.circular(3.0),
     );
     canvas.drawRRect(
       innerRRect,
       Paint()
         ..color = goldSoft
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.6,
+        ..strokeWidth = 0.55,
     );
 
-    // 3. زخرفة نجمية ثمانية إسلامية رقيقة وناعمة على الجانبين (شمسات مصحف المدينة)
-    final sideOffset = (w * 0.08).clamp(24.0, 48.0);
-    _drawDelicateStar(canvas, Offset(sideOffset, midY), h * 0.28, goldMain);
-    _drawDelicateStar(canvas, Offset(w - sideOffset, midY), h * 0.28, goldMain);
+    // 2. الخرطوشة المحرابية الأندلسية المركزية (Mihrab Cartouche)
+    // قوس محرابي مدبب بنهايات حدوة حصان أندلسية رشيقة
+    final cartoucheHalfW = (w * 0.245).clamp(78.0, 112.0);
+    final cLeft = w / 2 - cartoucheHalfW;
+    final cRight = w / 2 + cartoucheHalfW;
+    final topY = 2.6;
+    final botY = h - 2.6;
+    const cuspDepth = 9.0;
 
-    // 4. خط فاصل زخرفي صغير بجانب النجمتين
-    final linePaint = Paint()
-      ..color = goldSoft
-      ..strokeWidth = 0.8;
-    canvas.drawLine(
-      Offset(sideOffset + 12, midY),
-      Offset(sideOffset + 24, midY),
-      linePaint,
+    final mihrabPath = Path();
+    mihrabPath.moveTo(cLeft, topY);
+
+    // الحافة العلوية مع قمة محرابية مدببة رقيقة في المنتصف
+    mihrabPath.lineTo(w / 2 - 14, topY);
+    mihrabPath.quadraticBezierTo(w / 2 - 5, topY - 1.2, w / 2, topY - 1.8);
+    mihrabPath.quadraticBezierTo(w / 2 + 5, topY - 1.2, w / 2 + 14, topY);
+    mihrabPath.lineTo(cRight, topY);
+
+    // القوس المحرابي الأيمن (نهاية حدوة حصان أندلسية مدببة Cusp)
+    mihrabPath.cubicTo(
+      cRight + 2.0, topY + 4.0,
+      cRight + 5.5, midY - 4.5,
+      cRight + cuspDepth, midY,
     );
-    canvas.drawLine(
-      Offset(w - sideOffset - 24, midY),
-      Offset(w - sideOffset - 12, midY),
-      linePaint,
+    mihrabPath.cubicTo(
+      cRight + 5.5, midY + 4.5,
+      cRight + 2.0, botY - 4.0,
+      cRight, botY,
     );
+
+    // الحافة السفلية مع قمة محرابية مماثلة
+    mihrabPath.lineTo(w / 2 + 14, botY);
+    mihrabPath.quadraticBezierTo(w / 2 + 5, botY + 1.2, w / 2, botY + 1.8);
+    mihrabPath.quadraticBezierTo(w / 2 - 5, botY + 1.2, w / 2 - 14, botY);
+    mihrabPath.lineTo(cLeft, botY);
+
+    // القوس المحرابي الأيسر
+    mihrabPath.cubicTo(
+      cLeft - 2.0, botY - 4.0,
+      cLeft - 5.5, midY + 4.5,
+      cLeft - cuspDepth, midY,
+    );
+    mihrabPath.cubicTo(
+      cLeft - 5.5, midY - 4.5,
+      cLeft - 2.0, topY + 4.0,
+      cLeft, topY,
+    );
+    mihrabPath.close();
+
+    // ملء أرضية الخرطوشة المحرابية بالعمق المخملي
+    canvas.drawPath(
+      mihrabPath,
+      Paint()
+        ..color = cartoucheFill
+        ..style = PaintingStyle.fill,
+    );
+
+    // تحديد حد المحراب المذهب
+    canvas.drawPath(
+      mihrabPath,
+      Paint()
+        ..color = goldMain
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.95,
+    );
+
+    // حبات لؤلؤية ذهبية عند رؤوس المحراب الأربعة
+    final pearlPaint = Paint()
+      ..color = goldBright
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(cRight + cuspDepth, midY), 1.2, pearlPaint);
+    canvas.drawCircle(Offset(cLeft - cuspDepth, midY), 1.2, pearlPaint);
+    canvas.drawCircle(Offset(w / 2, topY - 1.2), 1.0, pearlPaint);
+    canvas.drawCircle(Offset(w / 2, botY + 1.2), 1.0, pearlPaint);
+
+    // 3. الزخارف الجانبية الأندلسية (شمسيات قصر الحمراء والأرابيسك في الجناحين)
+    final leftWingCenter = (4.0 + (cLeft - cuspDepth)) / 2;
+    final rightWingCenter = ((cRight + cuspDepth) + (w - 4.0)) / 2;
+    final starRadius = (h * 0.28).clamp(7.0, 9.5);
+
+    _drawAndalusianStar(canvas, Offset(leftWingCenter, midY), starRadius, goldMain, goldBright, goldSoft);
+    _drawAndalusianStar(canvas, Offset(rightWingCenter, midY), starRadius, goldMain, goldBright, goldSoft);
+
+    // نقوش هندسية وتوريق أندلسي ممتد في الجناحين
+    _drawAndalusianArabesque(canvas, 4.0, cLeft - cuspDepth, midY, h, goldSoft, goldBright);
+    _drawAndalusianArabesque(canvas, cRight + cuspDepth, w - 4.0, midY, h, goldSoft, goldBright);
+
+    // منمنمات أركان الشريط
+    _drawCornerAccents(canvas, w, h, goldMain);
   }
 
-  void _drawDelicateStar(
+  /// نجمة قصر الحمراء الثمانية (Moorish 8-pointed star) مع حلقة شمسية وجوهرة مركزية
+  void _drawAndalusianStar(
     Canvas canvas,
     Offset center,
     double radius,
-    Color color,
+    Color goldMain,
+    Color goldBright,
+    Color goldSoft,
   ) {
+    final fillPaint = Paint()
+      ..color = goldMain.withValues(alpha: 0.20)
+      ..style = PaintingStyle.fill;
+    final strokePaint = Paint()
+      ..color = goldMain
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.85;
+
     final starPath = Path();
     const points = 8;
-    final innerR = radius * 0.55;
+    final innerR = radius * 0.52;
     for (int i = 0; i < points * 2; i++) {
       final r = (i % 2 == 0) ? radius : innerR;
       final angle = i * (math.pi / points) - math.pi / 2;
@@ -783,32 +917,109 @@ class MushafSurahHeaderPainter extends CustomPainter {
     }
     starPath.close();
 
-    canvas.drawPath(
-      starPath,
+    canvas.drawPath(starPath, fillPaint);
+    canvas.drawPath(starPath, strokePaint);
+
+    // حلقة داخلية مذهبة
+    canvas.drawCircle(
+      center,
+      radius * 0.44,
       Paint()
-        ..color = color.withValues(alpha: 0.15)
-        ..style = PaintingStyle.fill,
-    );
-    canvas.drawPath(
-      starPath,
-      Paint()
-        ..color = color
+        ..color = goldSoft
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.9,
+        ..strokeWidth = 0.6,
     );
 
-    // نقطة مركزية
+    // جوهرة مركزية ساطعة
     canvas.drawCircle(
       center,
       1.5,
       Paint()
-        ..color = color
+        ..color = goldBright
         ..style = PaintingStyle.fill,
     );
+
+    // حبيبات ذهبية عند الرؤوس الأساسية
+    final dotPaint = Paint()
+      ..color = goldBright.withValues(alpha: 0.75)
+      ..style = PaintingStyle.fill;
+    for (int i = 0; i < 4; i++) {
+      final angle = i * (math.pi / 2);
+      final dx = center.dx + (radius + 2.0) * math.cos(angle);
+      final dy = center.dy + (radius + 2.0) * math.sin(angle);
+      canvas.drawCircle(Offset(dx, dy), 0.75, dotPaint);
+    }
+  }
+
+  /// تموجات أرابيسك وتوريق نباتي أندلسي ممتد في الجناحين
+  void _drawAndalusianArabesque(
+    Canvas canvas,
+    double xStart,
+    double xEnd,
+    double midY,
+    double h,
+    Color color,
+    Color goldBright,
+  ) {
+    final linePaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.65;
+
+    final cx = (xStart + xEnd) / 2;
+    final halfLen = (xEnd - xStart).abs() / 2;
+
+    if (halfLen < 12) return;
+
+    // خط المحور الرابط
+    canvas.drawLine(
+      Offset(cx - halfLen * 0.78, midY),
+      Offset(cx - halfLen * 0.42, midY),
+      linePaint,
+    );
+    canvas.drawLine(
+      Offset(cx + halfLen * 0.42, midY),
+      Offset(cx + halfLen * 0.78, midY),
+      linePaint,
+    );
+
+    // أقواس توريق علوية وسفلية رشيقة
+    final pTop = Path()
+      ..moveTo(cx - halfLen * 0.65, midY)
+      ..quadraticBezierTo(cx - halfLen * 0.32, midY - h * 0.25, cx, midY - h * 0.25)
+      ..quadraticBezierTo(cx + halfLen * 0.32, midY - h * 0.25, cx + halfLen * 0.65, midY);
+    canvas.drawPath(pTop, linePaint);
+
+    final pBottom = Path()
+      ..moveTo(cx - halfLen * 0.65, midY)
+      ..quadraticBezierTo(cx - halfLen * 0.32, midY + h * 0.25, cx, midY + h * 0.25)
+      ..quadraticBezierTo(cx + halfLen * 0.32, midY + h * 0.25, cx + halfLen * 0.65, midY);
+    canvas.drawPath(pBottom, linePaint);
+
+    // حبيبات ذهبية متلألئة على قمم التوريق
+    final dotPaint = Paint()
+      ..color = goldBright
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(cx, midY - h * 0.25), 1.0, dotPaint);
+    canvas.drawCircle(Offset(cx, midY + h * 0.25), 1.0, dotPaint);
+    canvas.drawCircle(Offset(cx - halfLen * 0.78, midY), 0.8, dotPaint);
+    canvas.drawCircle(Offset(cx + halfLen * 0.78, midY), 0.8, dotPaint);
+  }
+
+  void _drawCornerAccents(Canvas canvas, double w, double h, Color color) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    const arm = 4.6;
+    canvas.drawCircle(const Offset(arm, arm), 1.1, paint);
+    canvas.drawCircle(Offset(w - arm, arm), 1.1, paint);
+    canvas.drawCircle(Offset(arm, h - arm), 1.1, paint);
+    canvas.drawCircle(Offset(w - arm, h - arm), 1.1, paint);
   }
 
   @override
-  bool shouldRepaint(covariant MushafSurahHeaderPainter oldDelegate) =>
+  bool shouldRepaint(covariant MadinahSurahBannerPainter oldDelegate) =>
       oldDelegate.accent != accent || oldDelegate.isDark != isDark;
 }
 

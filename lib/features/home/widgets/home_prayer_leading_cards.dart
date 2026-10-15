@@ -5,7 +5,10 @@ import '../../../core/data/user/user_prefs.dart';
 import '../../../core/theme/app_accent_colors.dart';
 import '../../../core/theme/app_card.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../azkar/azkar_full_repository.dart';
+import '../../azkar/azkar_library_category_screen.dart';
 import '../../azkar/azkar_repository.dart' show AzkarPeriod;
+import '../../azkar/azkar_screen.dart';
 import '../../prayer/prayer_location_controller.dart';
 import '../../prayer/prayer_times_service.dart';
 import '../../qiyam/qiyam_screen.dart';
@@ -200,18 +203,40 @@ class LeadingCard extends ConsumerWidget {
   }
 }
 
-class _NightQiyamCard extends StatelessWidget {
+class _NightQiyamCard extends ConsumerWidget {
   const _NightQiyamCard({required this.title, required this.subtitle});
   final String title;
   final String subtitle;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return AppCard(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      onTap: () => Navigator.of(
-        context,
-      ).push(MaterialPageRoute(builder: (_) => const QiyamScreen())),
+      onTap: () async {
+        if (title.contains('النوم')) {
+          final cached = ref.read(sleepAzkarProvider).value;
+          if (cached != null) {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => AzkarLibraryCategoryScreen(category: cached),
+              ),
+            );
+          } else {
+            final cat = await ref.read(sleepAzkarProvider.future);
+            if (context.mounted) {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => AzkarLibraryCategoryScreen(category: cat),
+                ),
+              );
+            }
+          }
+        } else {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const QiyamScreen()),
+          );
+        }
+      },
       child: Row(
         children: [
           const TintedIconBadge(
@@ -264,7 +289,9 @@ class _AzkarLeadingCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return AppCard(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      onTap: () => ref.read(rootTabIndexProvider.notifier).select(3),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => AzkarScreen(period: period)),
+      ),
       child: Row(
         children: [
           TintedIconBadge(icon: icon, color: AppColors.teal, iconColor: AppColors.tealDeep),

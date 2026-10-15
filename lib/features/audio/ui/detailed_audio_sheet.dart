@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../audio_downloads_screen.dart';
 import '../quran_audio_controller.dart';
 import '../reciters.dart';
+import 'reciter_avatar.dart';
 
 /// نافذة خيارات التلاوة السريعة عند الضغط على آية
 class AyahAudioQuickSheet extends ConsumerWidget {
@@ -339,6 +340,7 @@ class _DetailedAudioRangeSheetState extends ConsumerState<DetailedAudioRangeShee
                   children: [
                     ListTile(
                       contentPadding: EdgeInsets.zero,
+                      leading: ReciterAvatar(reciter: reciter, radius: 20),
                       title: Text(
                         reciter.nameAr,
                         style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
@@ -417,6 +419,8 @@ class _DetailedAudioRangeSheetState extends ConsumerState<DetailedAudioRangeShee
                     surahId: _surahId,
                     fromAyah: from,
                     toAyah: to,
+                    rangeRepeat: _rangeRepeat,
+                    ayahRepeat: _ayahRepeat,
                   );
                 },
               ),
@@ -617,10 +621,7 @@ class _ReciterSearchSheetState extends ConsumerState<_ReciterSearchSheet> {
                 final isSelected = r.id == audio.reciterId;
 
                 return ListTile(
-                  leading: Icon(
-                    isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-                    color: isSelected ? themeAccent(context) : onSurface.withValues(alpha: 0.4),
-                  ),
+                  leading: ReciterAvatar(reciter: r, radius: 20),
                   title: Text(
                     r.nameAr,
                     style: TextStyle(
@@ -631,6 +632,11 @@ class _ReciterSearchSheetState extends ConsumerState<_ReciterSearchSheet> {
                   subtitle: r.mode == ReciterAudioMode.perSurahOnly
                       ? const Text('تشغيل السورة كاملة فقط', style: TextStyle(fontSize: 11))
                       : null,
+                  trailing: Icon(
+                    isSelected ? Icons.check_circle_rounded : Icons.radio_button_off,
+                    color: isSelected ? themeAccent(context) : onSurface.withValues(alpha: 0.3),
+                    size: 22,
+                  ),
                   onTap: () {
                     ref.read(quranAudioControllerProvider.notifier).setReciter(r.id);
                     Navigator.of(context).pop();

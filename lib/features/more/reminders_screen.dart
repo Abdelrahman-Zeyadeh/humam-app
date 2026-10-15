@@ -7,19 +7,13 @@ import 'widgets/daily_name_of_allah_reminder_row.dart';
 import 'widgets/evening_summary_reminder_row.dart';
 import 'widgets/hifz_reminder_row.dart';
 import 'widgets/hourly_dhikr_section.dart';
+import 'widgets/prayer_reminders_overview.dart';
 import 'widgets/qiyam_reminder_row.dart';
 import 'widgets/reminder_section_title.dart';
 import 'widgets/sunnah_reminders_section.dart';
 import 'widgets/weekly_summary_reminder_row.dart';
 
 /// شاشة "التذكيرات" — كل ما يخصّ تذكيرات التطبيق مجمَّعاً بمكان واحد
-/// (كانت موزَّعة داخل شاشة الإعدادات نفسها: تذكيرات يومية، أذكار كل ساعة،
-/// تنبيهات السنن). نُقلت هون بالكامل بطلب صاحب المشروع — الإعدادات
-/// أصبحت مخصَّصة للمظهر/الصوت/النسخ الاحتياطي، والتذكيرات قسم مستقل
-/// بشاشة "أدواتي".
-///
-/// الشاشة نفسها مجرّد تنسيق (composition): كل صف/قسم تذكير استُخرج لملفه
-/// الخاص بمجلد `widgets/` (كان ~١٦٧٣ سطراً بملف واحد)، بلا أي تغيير سلوكي.
 class RemindersScreen extends StatelessWidget {
   const RemindersScreen({super.key});
 
@@ -30,6 +24,9 @@ class RemindersScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          const ReminderSectionTitle('تنبيهات الصلاة والأذان والإقامة 🕌'),
+          const PrayerRemindersOverview(),
+          const SizedBox(height: 24),
           const ReminderSectionTitle('تذكيرات يومية'),
           Card(
             margin: EdgeInsets.zero,

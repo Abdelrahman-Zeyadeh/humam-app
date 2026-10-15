@@ -97,6 +97,19 @@ class UserPrefs {
   Future<void> setPreAdhanMinutes(int minutes) =>
       _repo.setPreAdhanMinutes(minutes);
 
+  int preAdhanMinutesFor(String prayerKey) =>
+      _repo.preAdhanMinutesFor(prayerKey);
+  Future<void> setPreAdhanMinutesFor(String prayerKey, int minutes) =>
+      _repo.setPreAdhanMinutesFor(prayerKey, minutes);
+
+  bool iqamahNotificationEnabledFor(String prayerKey) =>
+      _repo.iqamahNotificationEnabledFor(prayerKey);
+  Future<void> setIqamahNotificationEnabledFor(
+    String prayerKey,
+    bool enabled,
+  ) =>
+      _repo.setIqamahNotificationEnabledFor(prayerKey, enabled);
+
   int iqamahMinutesFor(String prayerKey) => _repo.iqamahMinutesFor(prayerKey);
   Future<void> setIqamahMinutesFor(String prayerKey, int minutes) =>
       _repo.setIqamahMinutesFor(prayerKey, minutes);
@@ -174,6 +187,9 @@ class UserPrefs {
     delayMinutes: delayMinutes,
   );
 
+  Future<void> setPostPrayerAzkarEnabled(bool enabled) =>
+      _repo.setPostPrayerAzkarSettings(enabled: enabled);
+
   // --- تذكير "السنن الرواتب" (مستقل عن أذكار بعد الصلاة أعلاه) ---
 
   bool get rawatibEnabled => _repo.rawatibEnabled;
@@ -190,6 +206,13 @@ class UserPrefs {
 
   Future<void> setDndWhileReadingEnabled(bool value) =>
       _repo.setDndWhileReadingEnabled(value);
+
+  // --- وضع "الصامت التلقائي وقت الصلاة" ---
+
+  bool get dndDuringPrayerEnabled => _repo.dndDuringPrayerEnabled;
+
+  Future<void> setDndDuringPrayerEnabled(bool value) =>
+      _repo.setDndDuringPrayerEnabled(value);
 
   // --- نسخ احتياطي سحابي دوري تلقائي (راجع CloudSyncController.maybeAutoSync) ---
 
@@ -227,16 +250,19 @@ class UserPrefs {
   int get hourlyDhikrStartHour => _repo.hourlyDhikrStartHour;
   int get hourlyDhikrEndHour => _repo.hourlyDhikrEndHour;
   int get hourlyDhikrIntervalHours => _repo.hourlyDhikrIntervalHours;
+  int get hourlyDhikrIntervalMinutes => _repo.hourlyDhikrIntervalMinutes;
 
   Future<void> setHourlyDhikr({
     required bool enabled,
     int? startHour,
     int? endHour,
+    int? intervalMinutes,
     int? intervalHours,
   }) => _repo.setHourlyDhikr(
     enabled: enabled,
     startHour: startHour,
     endHour: endHour,
+    intervalMinutes: intervalMinutes,
     intervalHours: intervalHours,
   );
 

@@ -102,6 +102,101 @@ class MainActivity : AudioServiceActivity() {
                 else -> result.notImplemented()
             }
         }
+
+        // قناة خدمة الذكر والتسبيح العائم فوق التطبيقات الأخرى
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.humam.humam_app/floating_dhikr",
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "canDrawOverlays" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        result.success(Settings.canDrawOverlays(this))
+                    } else {
+                        result.success(true)
+                    }
+                }
+                "requestOverlayPermission" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        try {
+                            val intent = Intent(
+                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                android.net.Uri.parse("package:$packageName"),
+                            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            startActivity(intent)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            startActivity(intent)
+                            result.success(true)
+                        }
+                    } else {
+                        result.success(true)
+                    }
+                }
+                "startFloatingDhikr" -> {
+                    val dhikrText = call.argument<String>("dhikrText")
+                    val intent = Intent(this, FloatingDhikrService::class.java).apply {
+                        if (!dhikrText.isNullOrEmpty()) {
+                            putExtra("dhikr_text", dhikrText)
+                        }
+                    }
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            startForegroundService(intent)
+                        } else {
+                            startService(intent)
+                        }
+                        result.success(true)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "تشغيل خدمة الذكر العائم فشل", e)
+                        result.success(false)
+                    }
+                }
+                "stopFloatingDhikr" -> {
+                    try {
+                        val intent = Intent(this, FloatingDhikrService::class.java).apply {
+                            action = FloatingDhikrService.ACTION_STOP
+                        }
+                        startService(intent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                "isFloatingDhikrActive" -> {
+                    result.success(FloatingDhikrService.isRunning)
+                }
+                else -> result.notImplemented()
+            }
+        }
+
+        // قناة إبقاء الشاشة مضاءة أثناء القراءة (Wakelock)
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.humam.humam_app/screen",
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "keepScreenOn" -> {
+                    val enable = call.argument<Boolean>("enable") ?: false
+                    try {
+                        runOnUiThread {
+                            if (enable) {
+                                window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                            } else {
+                                window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                            }
+                        }
+                        result.success(true)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "ضبط إبقاء الشاشة فشل", e)
+                        result.success(false)
+                    }
+                }
+                else -> result.notImplemented()
+            }
+        }
     }
 
     private fun saveImageToGallery(bytes: ByteArray, displayName: String): Map<String, Any?> {

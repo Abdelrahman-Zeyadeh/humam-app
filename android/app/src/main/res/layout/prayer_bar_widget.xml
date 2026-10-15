@@ -4,6 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
+    android:layoutDirection="rtl"
     android:background="@drawable/humam_widget_background"
     android:paddingStart="12dp"
     android:paddingEnd="12dp"
@@ -23,7 +24,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="السبت 09 ربيع الأول 1448"
-            android:textColor="#C5A059"
+            android:textColor="#F5D78E"
             android:textSize="11sp"
             android:textStyle="bold"
             android:gravity="start" />
@@ -31,10 +32,15 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="هُمَام"
-            android:textColor="#80FFFFFF"
-            android:textSize="11sp"
-            android:textStyle="bold" />
+            android:text="✦ هُمَام"
+            android:textColor="#F5D78E"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:background="@drawable/humam_widget_pill_gold" />
     </LinearLayout>
 
     <!-- 2. الصلاة القادمة والعد التنازلي -->
@@ -43,7 +49,7 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:layout_marginTop="3dp">
+        android:layout_marginTop="4dp">
 
         <LinearLayout
             android:layout_width="0dp"
@@ -57,7 +63,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="الفجر"
-                android:textColor="#E7D2A0"
+                android:textColor="#F5D78E"
                 android:textSize="18sp"
                 android:textStyle="bold" />
 
@@ -76,36 +82,35 @@
             android:id="@+id/prayer_bar_countdown"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="بعد 04:40"
-            android:textColor="#E7D2A0"
+            android:text="متبقي 04:40"
+            android:textColor="#F5D78E"
             android:textSize="11sp"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp"
-            android:paddingTop="2dp"
-            android:paddingBottom="2dp"
-            android:background="#1FFFFFFF" />
+            android:textStyle="bold"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp"
+            android:background="@drawable/humam_widget_pill_gold" />
     </LinearLayout>
 
-    <!-- فاصل -->
-    <ImageView
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:layout_marginTop="4dp"
-        android:layout_marginBottom="3dp"
-        android:background="#1FFFFFFF" />
-
-    <!-- 3. شريط مواقيت الصلاة الستة -->
+    <!-- 3. شريط مواقيت الصلاة الستة ككبسولات مدورة -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:gravity="center_vertical"
+        android:layout_marginTop="6dp">
 
         <!-- الفجر -->
         <LinearLayout
+            android:id="@+id/pb_box_fajr"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:layout_marginEnd="3dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:background="@drawable/humam_widget_prayer_active"
             android:orientation="vertical"
             android:gravity="center">
             <TextView
@@ -113,7 +118,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="الفجر"
-                android:textColor="#E7D2A0"
+                android:textColor="#F5D78E"
                 android:textSize="9.5sp"
                 android:textStyle="bold" />
             <TextView
@@ -121,21 +126,21 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="4:42"
-                android:textColor="#E7D2A0"
+                android:textColor="#FFFFFF"
                 android:textSize="10sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <ImageView
-            android:layout_width="1dp"
-            android:layout_height="16dp"
-            android:background="#1AFFFFFF" />
-
         <!-- الشروق -->
         <LinearLayout
+            android:id="@+id/pb_box_sunrise"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:layout_marginEnd="3dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:background="@drawable/humam_widget_prayer_inactive"
             android:orientation="vertical"
             android:gravity="center">
             <TextView
@@ -143,27 +148,27 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="الشروق"
-                android:textColor="#80FFFFFF"
+                android:textColor="#B3FFFFFF"
                 android:textSize="9.5sp" />
             <TextView
                 android:id="@+id/pb_time_sunrise"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="6:07"
-                android:textColor="#80FFFFFF"
+                android:textColor="#CCFFFFFF"
                 android:textSize="10sp" />
         </LinearLayout>
 
-        <ImageView
-            android:layout_width="1dp"
-            android:layout_height="16dp"
-            android:background="#1AFFFFFF" />
-
         <!-- الظهر -->
         <LinearLayout
+            android:id="@+id/pb_box_dhuhr"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:layout_marginEnd="3dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:background="@drawable/humam_widget_prayer_inactive"
             android:orientation="vertical"
             android:gravity="center">
             <TextView
@@ -171,27 +176,27 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="الظهر"
-                android:textColor="#80FFFFFF"
+                android:textColor="#B3FFFFFF"
                 android:textSize="9.5sp" />
             <TextView
                 android:id="@+id/pb_time_dhuhr"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="12:40"
-                android:textColor="#80FFFFFF"
+                android:textColor="#CCFFFFFF"
                 android:textSize="10sp" />
         </LinearLayout>
 
-        <ImageView
-            android:layout_width="1dp"
-            android:layout_height="16dp"
-            android:background="#1AFFFFFF" />
-
         <!-- العصر -->
         <LinearLayout
+            android:id="@+id/pb_box_asr"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:layout_marginEnd="3dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:background="@drawable/humam_widget_prayer_inactive"
             android:orientation="vertical"
             android:gravity="center">
             <TextView
@@ -199,27 +204,27 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="العصر"
-                android:textColor="#80FFFFFF"
+                android:textColor="#B3FFFFFF"
                 android:textSize="9.5sp" />
             <TextView
                 android:id="@+id/pb_time_asr"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="4:17"
-                android:textColor="#80FFFFFF"
+                android:textColor="#CCFFFFFF"
                 android:textSize="10sp" />
         </LinearLayout>
 
-        <ImageView
-            android:layout_width="1dp"
-            android:layout_height="16dp"
-            android:background="#1AFFFFFF" />
-
         <!-- المغرب -->
         <LinearLayout
+            android:id="@+id/pb_box_maghrib"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:layout_marginEnd="3dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:background="@drawable/humam_widget_prayer_inactive"
             android:orientation="vertical"
             android:gravity="center">
             <TextView
@@ -227,27 +232,26 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="المغرب"
-                android:textColor="#80FFFFFF"
+                android:textColor="#B3FFFFFF"
                 android:textSize="9.5sp" />
             <TextView
                 android:id="@+id/pb_time_maghrib"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="7:13"
-                android:textColor="#80FFFFFF"
+                android:textColor="#CCFFFFFF"
                 android:textSize="10sp" />
         </LinearLayout>
 
-        <ImageView
-            android:layout_width="1dp"
-            android:layout_height="16dp"
-            android:background="#1AFFFFFF" />
-
         <!-- العشاء -->
         <LinearLayout
+            android:id="@+id/pb_box_isha"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:background="@drawable/humam_widget_prayer_inactive"
             android:orientation="vertical"
             android:gravity="center">
             <TextView
@@ -255,14 +259,14 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="العشاء"
-                android:textColor="#80FFFFFF"
+                android:textColor="#B3FFFFFF"
                 android:textSize="9.5sp" />
             <TextView
                 android:id="@+id/pb_time_isha"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="8:38"
-                android:textColor="#80FFFFFF"
+                android:textColor="#CCFFFFFF"
                 android:textSize="10sp" />
         </LinearLayout>
     </LinearLayout>

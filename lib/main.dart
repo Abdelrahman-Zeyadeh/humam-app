@@ -171,11 +171,15 @@ Future<void> _initAdhanNotificationsInBackground(
 ) async {
   try {
     await AdhanNotificationService.instance.initialize();
-    await AdhanNotificationService.instance.requestPermissions();
+    final prefs = await SharedPreferences.getInstance();
+    final seenPermissions = prefs.getBool('permissions_seen_v1') ?? false;
+    if (seenPermissions) {
+      await AdhanNotificationService.instance.requestPermissions();
+    }
 
-    // طلب إذن الموقع بعد إذن الإشعارات تلقائياً عند فتح التطبيق
+    // موقع GPS — يُطلب فقط إذا مر المستخدم على شاشة الأذونات مسبقاً
     final loc = container.read(locationPrefsProvider);
-    if (!loc.hasLocation) {
+    if (!loc.hasLocation && seenPermissions) {
       try {
         final serviceEnabled = await Geolocator.isLocationServiceEnabled();
         if (serviceEnabled) {
@@ -220,7 +224,10 @@ Future<void> _initAdhanNotificationsInBackground(
         checkinFirstDelayMinutes: userPrefs.prayerCheckinFirstDelayMinutes,
         postPrayerAzkarEnabled: userPrefs.postPrayerAzkarEnabled,
         postPrayerAzkarDelayMinutes: userPrefs.postPrayerAzkarDelayMinutes,
+        rawatibEnabled: userPrefs.rawatibEnabled,
         getIqamahMinutesFor: (m) => userPrefs.iqamahMinutesFor(m.name),
+        isIqamahEnabledFor: (m) => userPrefs.iqamahNotificationEnabledFor(m.name),
+        getPreAdhanMinutesFor: (m) => userPrefs.preAdhanMinutesFor(m.name),
       );
     }
   } catch (e) {
@@ -384,13 +391,21 @@ Future<void> _initAdhanNotificationsInBackground(
       }
     }
     if (notifPrefs.sunnahFastingEnabled) {
+      final fHour = userPrefs.reminderHourFor('sunnah_fasting_hour') ?? 20;
+      final fMin = userPrefs.reminderMinuteFor('sunnah_fasting_hour');
       await AdhanNotificationService.instance.scheduleFastingReminders(
         enabled: true,
+        hour: fHour,
+        minute: fMin,
       );
     }
     if (notifPrefs.sunnahWhiteDaysEnabled) {
+      final wHour = userPrefs.reminderHourFor('sunnah_white_days_hour') ?? 20;
+      final wMin = userPrefs.reminderMinuteFor('sunnah_white_days_hour');
       await AdhanNotificationService.instance.scheduleWhiteDaysReminder(
         enabled: true,
+        hour: wHour,
+        minute: wMin,
       );
     }
   } catch (e) {
@@ -483,6 +498,7 @@ class HumamApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
     final isAmoled = ref.watch(amoledDarkModeProvider);
+    final textScale = ref.watch(appTextScaleProvider);
     ref.watch(accentColorVersionProvider);
     final accent = appAccentColorById(
       ref.read(userPrefsProvider).accentColorId,
@@ -501,9 +517,14 @@ class HumamApp extends ConsumerWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      builder: (context, child) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: child ?? const SizedBox.shrink(),
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(
+          textScaler: TextScaler.linear(textScale.scale),
+        ),
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: child ?? const SizedBox.shrink(),
+        ),
       ),
       home: const SplashScreen(),
     );

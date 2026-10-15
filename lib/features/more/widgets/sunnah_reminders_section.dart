@@ -19,6 +19,8 @@ import 'reminder_repeat_interval.dart';
 const _kSunnahKahfHourKey = 'sunnah_kahf_hour';
 const _kSunnahSalawatEveHourKey = 'sunnah_salawat_eve_hour';
 const _kSunnahSalawatFridayHourKey = 'sunnah_salawat_friday_hour';
+const _kSunnahFastingHourKey = 'sunnah_fasting_hour';
+const _kSunnahWhiteDaysHourKey = 'sunnah_white_days_hour';
 
 class SunnahRemindersSection extends ConsumerWidget {
   const SunnahRemindersSection({super.key});
@@ -51,6 +53,14 @@ class SunnahRemindersSection extends ConsumerWidget {
     final salawatFridayInterval = userPrefs.reminderIntervalMinutesFor(
       'sunnah_salawat_friday',
     );
+    final fastingHour =
+        userPrefs.reminderHourFor(_kSunnahFastingHourKey) ?? 20;
+    final fastingMinute =
+        userPrefs.reminderMinuteFor(_kSunnahFastingHourKey);
+    final whiteDaysHour =
+        userPrefs.reminderHourFor(_kSunnahWhiteDaysHourKey) ?? 20;
+    final whiteDaysMinute =
+        userPrefs.reminderMinuteFor(_kSunnahWhiteDaysHourKey);
 
     Future<void> applyKahf({int? hour, int? minute, bool? enabled}) async {
       final h = hour ?? kahfHour;
@@ -133,6 +143,30 @@ class SunnahRemindersSection extends ConsumerWidget {
       } else {
         await notifService.cancelRepeatingReminder('sunnah_salawat_friday');
       }
+    }
+
+    Future<void> applyFasting({int? hour, int? minute, bool? enabled}) async {
+      final h = hour ?? fastingHour;
+      final m = minute ?? fastingMinute;
+      final en = enabled ?? prefs.sunnahFastingEnabled;
+      await notifService.requestPermissions();
+      await notifService.scheduleFastingReminders(
+        enabled: en,
+        hour: h,
+        minute: m,
+      );
+    }
+
+    Future<void> applyWhiteDays({int? hour, int? minute, bool? enabled}) async {
+      final h = hour ?? whiteDaysHour;
+      final m = minute ?? whiteDaysMinute;
+      final en = enabled ?? prefs.sunnahWhiteDaysEnabled;
+      await notifService.requestPermissions();
+      await notifService.scheduleWhiteDaysReminder(
+        enabled: en,
+        hour: h,
+        minute: m,
+      );
     }
 
     return Card(
@@ -338,7 +372,7 @@ class SunnahRemindersSection extends ConsumerWidget {
             ),
             title: const Text('صيام الإثنين والخميس'),
             subtitle: Text(
-              'تذكير مساء الأحد والأربعاء لتبييت نية الصيام (الساعة 08:30 م)',
+              'تذكير مساء الأحد والأربعاء لتبييت نية الصيام (${formatTimeOfDay(fastingHour, fastingMinute)})',
               style: TextStyle(
                 fontSize: 12,
                 color: onSurface.withValues(alpha: 0.55),
@@ -346,12 +380,45 @@ class SunnahRemindersSection extends ConsumerWidget {
             ),
             value: prefs.sunnahFastingEnabled,
             onChanged: (v) async {
-              await notifService.requestPermissions();
               await prefs.setSunnahFastingEnabled(v);
-              await notifService.scheduleFastingReminders(enabled: v);
+              await applyFasting(enabled: v);
               ref.read(adhanNotificationVersionProvider.notifier).bump();
             },
           ),
+          if (prefs.sunnahFastingEnabled) ...[
+            ListTile(
+              dense: true,
+              contentPadding: const EdgeInsets.only(right: 16, left: 16),
+              leading: const SizedBox(width: 24),
+              title: Text(
+                'الساعة: ${formatTimeOfDay(fastingHour, fastingMinute)}',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+              trailing: const Icon(Icons.chevron_left, size: 18),
+              onTap: () async {
+                final picked = await showTimePicker(
+                  context: context,
+                  initialEntryMode: TimePickerEntryMode.input,
+                  initialTime: TimeOfDay(
+                    hour: fastingHour,
+                    minute: fastingMinute,
+                  ),
+                );
+                if (picked == null || !context.mounted) return;
+                await userPrefs.setActivityReminder(
+                  _kSunnahFastingHourKey,
+                  enabled: true,
+                  hour: picked.hour,
+                  minute: picked.minute,
+                );
+                ref.read(categoryStreakVersionProvider.notifier).bump();
+                await applyFasting(hour: picked.hour, minute: picked.minute);
+              },
+            ),
+          ],
           const Divider(height: 1),
           SwitchListTile(
             secondary: Icon(
@@ -360,7 +427,7 @@ class SunnahRemindersSection extends ConsumerWidget {
             ),
             title: const Text('صيام الأيام البيض'),
             subtitle: Text(
-              'تذكير ليلة 13 من كل شهر هجري بصيام (13، 14، 15)',
+              'تذكير ليلة 13 من كل شهر هجري بصيام (13، 14، 15) (${formatTimeOfDay(whiteDaysHour, whiteDaysMinute)})',
               style: TextStyle(
                 fontSize: 12,
                 color: onSurface.withValues(alpha: 0.55),
@@ -368,12 +435,45 @@ class SunnahRemindersSection extends ConsumerWidget {
             ),
             value: prefs.sunnahWhiteDaysEnabled,
             onChanged: (v) async {
-              await notifService.requestPermissions();
               await prefs.setSunnahWhiteDaysEnabled(v);
-              await notifService.scheduleWhiteDaysReminder(enabled: v);
+              await applyWhiteDays(enabled: v);
               ref.read(adhanNotificationVersionProvider.notifier).bump();
             },
           ),
+          if (prefs.sunnahWhiteDaysEnabled) ...[
+            ListTile(
+              dense: true,
+              contentPadding: const EdgeInsets.only(right: 16, left: 16),
+              leading: const SizedBox(width: 24),
+              title: Text(
+                'الساعة: ${formatTimeOfDay(whiteDaysHour, whiteDaysMinute)}',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+              trailing: const Icon(Icons.chevron_left, size: 18),
+              onTap: () async {
+                final picked = await showTimePicker(
+                  context: context,
+                  initialEntryMode: TimePickerEntryMode.input,
+                  initialTime: TimeOfDay(
+                    hour: whiteDaysHour,
+                    minute: whiteDaysMinute,
+                  ),
+                );
+                if (picked == null || !context.mounted) return;
+                await userPrefs.setActivityReminder(
+                  _kSunnahWhiteDaysHourKey,
+                  enabled: true,
+                  hour: picked.hour,
+                  minute: picked.minute,
+                );
+                ref.read(categoryStreakVersionProvider.notifier).bump();
+                await applyWhiteDays(hour: picked.hour, minute: picked.minute);
+              },
+            ),
+          ],
         ],
       ),
     );

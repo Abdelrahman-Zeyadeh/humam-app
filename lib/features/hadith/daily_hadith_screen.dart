@@ -24,7 +24,16 @@ import '../story_maker/ui/ayah_story_maker_screen.dart';
 export 'data/daily_hadith_data.dart';
 
 class DailyHadithScreen extends ConsumerStatefulWidget {
-  const DailyHadithScreen({super.key});
+  const DailyHadithScreen({
+    super.key,
+    this.initialIndex,
+    this.initialHadithId,
+    this.scrollToFawaid = false,
+  });
+
+  final int? initialIndex;
+  final int? initialHadithId;
+  final bool scrollToFawaid;
 
   @override
   ConsumerState<DailyHadithScreen> createState() => _DailyHadithScreenState();
@@ -33,6 +42,7 @@ class DailyHadithScreen extends ConsumerStatefulWidget {
 const _kHadithVarietyBannerDismissedKey = 'daily_hadith_variety_banner_dismissed';
 
 class _DailyHadithScreenState extends ConsumerState<DailyHadithScreen> {
+  late final ScrollController _scrollController;
   int _selectedIndex = 0;
   String _selectedCategory = 'الكل';
   String _searchQuery = '';
@@ -41,12 +51,39 @@ class _DailyHadithScreenState extends ConsumerState<DailyHadithScreen> {
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    // تدوير يومي موثوق حسب أيام السنة
-    final dayKey = (now.year * 366) + (now.month * 31) + now.day;
-    _selectedIndex = dayKey % kCuratedDailyHadiths.length;
+    _scrollController = ScrollController();
+    final initialIdx = widget.initialIndex;
+    final initialId = widget.initialHadithId;
+    if (initialIdx != null && initialIdx >= 0 && initialIdx < kCuratedDailyHadiths.length) {
+      _selectedIndex = initialIdx;
+    } else if (initialId != null) {
+      final found = kCuratedDailyHadiths.indexWhere((h) => h.id == initialId);
+      _selectedIndex = found != -1 ? found : 0;
+    } else {
+      final now = DateTime.now();
+      final dayOfYear = now.difference(DateTime(now.year, 1, 1)).inDays;
+      _selectedIndex = dayOfYear % kCuratedDailyHadiths.length;
+    }
     _varietyBannerDismissed =
         ref.read(sharedPreferencesProvider).getBool(_kHadithVarietyBannerDismissedKey) ?? false;
+
+    if (widget.scrollToFawaid) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            260,
+            duration: const Duration(milliseconds: 450),
+            curve: Curves.easeOutCubic,
+          );
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   void _dismissVarietyBanner() {
@@ -156,6 +193,7 @@ class _DailyHadithScreenState extends ConsumerState<DailyHadithScreen> {
         ],
       ),
       body: ListView(
+        controller: _scrollController,
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
           if (!hasDownloadedAnyBook && !_varietyBannerDismissed) ...[

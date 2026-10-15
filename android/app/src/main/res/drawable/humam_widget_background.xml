@@ -1,17 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- خلفية باقة "الكحلي والذهبي" (الافتراضية) — تدرّج accent.primaryLight
-     → accent.primaryDark لباقة `gold` (AppColors.navy → AppColors.navyDeep)
-     + حدّ بلون التمييز نفسه بشفافية ~35%، نفس هوية `PrayerCountdownCard`
-     بالتطبيق تماماً. راجع lib/core/theme/app_accent_colors.dart لمصدر
-     القيم. **هذا الملف أيضاً fallback** لأي `accent_id` غير معروف —
-     راجع WidgetAccentColors.kt لبقية الباقات (emerald/amber/parchment/
-     blue/teal/purple/obsidian). -->
+<!-- خلفية الودجت بهوية التطبيق الحالية (الأخضر الزمردي الملكي والذهبي الدافئ) -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <corners android:radius="20dp" />
+    <corners android:radius="22dp" />
     <gradient
         android:type="linear"
         android:angle="135"
-        android:startColor="#0B2545"
-        android:endColor="#071A33" />
-    <stroke android:width="1dp" android:color="#59C9A24B" />
+        android:startColor="#0E4D40"
+        android:centerColor="#135B4C"
+        android:endColor="#09352B" />
+    <stroke android:width="1.2dp" android:color="#66D4AF67" />
 </shape>

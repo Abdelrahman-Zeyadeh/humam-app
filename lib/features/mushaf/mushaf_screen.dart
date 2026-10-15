@@ -11,6 +11,7 @@ import '../../core/data/user/user_prefs.dart';
 import '../../core/platform/dnd_service.dart';
 import '../../core/data/user/user_repository.dart'
     show BookmarkTypes, UserCategories, UserRepository;
+import '../../core/platform/screen_wakelock_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/mushaf_palettes.dart';
 import '../audio/quran_audio_controller.dart';
@@ -23,6 +24,7 @@ import 'mushaf_search_screen.dart';
 import 'mushaf_settings.dart';
 import 'mushaf_surah_index_sheet.dart';
 import 'tafsir_reading_screen.dart';
+import 'widgets/ayah_share_format.dart' show toArabicDigits;
 import 'widgets/mushaf_chrome_bars.dart';
 
 const int kMushafPageCount = 604;
@@ -44,17 +46,6 @@ class _EasySwipePageScrollPhysics extends PageScrollPhysics {
   @override
   double get minFlingVelocity => kMinFlingVelocity / 2; // أقل من نصف الافتراضي — رمية أخفّ تكفي
 }
-
-/// مفتاح "طيّ" شريط تنبيه تنزيل الخطوط الباقية — **محفوظ بين الجلسات**
-/// (كان قبلاً `bool` محلي بالودجت فقط، يرجع يظهر كل فتح تطبيق جديد رغم
-/// ضغط "لاحقاً" — بلاغ صاحب المشروع "مزعج وماخذ مساحة"). **مستقل لكل طبعة**
-/// (`.name` مضافاً لاحقة) — الشريط هلق يتبع طبعة المصحف المختارة فعلياً
-/// (`fontDownloadedCountProvider`، لا V2 حصراً كالسابق)، فطيّه لطبعة لا
-/// يطويه تلقائياً عن طبعة أخرى بعد تبديل الخط. **لم يعد إخفاءً نهائياً**
-/// (تعديل لاحق: طلب صاحب المشروع تحويله لأيقونة صغيرة قابلة لإعادة الفتح
-/// بدل الاختفاء الكامل) — راجع `_collapseDownloadBanner`/`_expandDownloadBanner`.
-String _fontDownloadBannerDismissedKey(MushafFontEdition edition) =>
-    'mushaf_font_download_banner_dismissed_${edition.name}';
 
 /// شاشة عرض المصحف: تقليب أفقي بين الصفحات (٦٠٤ صفحة)، كل صفحة تُبنى
 /// وتُحمَّل خطها عند زيارتها فقط. الاتجاه العام RTL (مضبوط بجذر التطبيق)
@@ -158,18 +149,23 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
   // [_handleJumpRequest]. بقية استدعاءات `_jumpTo` (فهرس/بحث/صوت) تترك
   // القيمة `false` عمداً فيُمسَح أي تظليل مؤقت سابق طبيعياً بقفزها.
   bool _skipNextHighlightClear = false;
+  int? _lastHandledJumpNonce;
 
   @override
   void initState() {
     super.initState();
+    final pendingJump = ref.read(mushafJumpRequestProvider);
     _currentPage =
-        widget.initialPage ?? ref.read(userPrefsProvider).lastReadPage ?? 1;
+        pendingJump?.page ??
+        widget.initialPage ??
+        ref.read(userPrefsProvider).lastReadPage ??
+        1;
     _controller = PageController(initialPage: _currentPage - 1);
-    final prefs = ref.read(sharedPreferencesProvider);
-    for (final edition in MushafFontEdition.values) {
-      if (prefs.getBool(_fontDownloadBannerDismissedKey(edition)) ?? false) {
-        _collapsedFontDownloadBanners.add(edition.name);
-      }
+    if (pendingJump != null) {
+      _lastHandledJumpNonce = pendingJump.nonce;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _handleJumpRequest(pendingJump);
+      });
     }
     // **لا** تعديل حالة أي Notifier هون (`hifzPickerProvider.notifier.activate()`
     // كان هون سابقاً) — Riverpod يمنع صراحة تعديل حالة provider أثناء
@@ -215,6 +211,21 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
         !widget.pickingHifzRange) {
       unawaited(DndService.setActive(true));
     }
+
+    // إبقاء الشاشة مضاءة أثناء قراءة المصحف
+    if (ref.read(keepScreenOnMushafProvider) && !widget.pickingHifzRange) {
+      unawaited(ScreenWakelockService.setKeepScreenOn(true));
+    }
+
+    // تظليل الآية الحالية إذا كان الصوت يعمل مسبقاً عند فتح المصحف
+    final audio = ref.read(quranAudioControllerProvider);
+    if (audio.isActive && audio.isPlaying && audio.currentAyahId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ref.read(highlightedAyahProvider.notifier).set(audio.currentAyahId);
+        }
+      });
+    }
   }
 
   @override
@@ -223,6 +234,7 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
     _highlightClearTimer?.cancel();
     _readingLogIdleTimer?.cancel();
     _flushReadingLog();
+    unawaited(ScreenWakelockService.setKeepScreenOn(false));
     if (ref.read(userPrefsProvider).dndWhileReadingEnabled &&
         !widget.pickingHifzRange) {
       unawaited(DndService.setActive(false));
@@ -259,16 +271,17 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
 
   /// استجابة لطلب قفز خارجي (متشابهات مثلاً — راجع توثيق
   /// [mushafJumpRequestProvider]): يقفز للصفحة، ويضبط تظليلاً مؤقتاً
-  /// يُمسح تلقائياً بعد ٤ ثوانٍ أو عند أي تغيير صفحة يدوي لاحق
+  /// يُمسح تلقائياً بعد ٥ ثوانٍ أو عند أي تغيير صفحة يدوي لاحق
   /// (`_onPageChanged`)، أيّهما أسبق.
   void _handleJumpRequest(MushafJumpRequest req) {
+    _lastHandledJumpNonce = req.nonce;
     if (req.page != _currentPage) {
       _skipNextHighlightClear = true;
       _jumpTo(req.page);
     }
     _highlightClearTimer?.cancel();
     ref.read(highlightedAyahProvider.notifier).set(req.ayahId);
-    _highlightClearTimer = Timer(const Duration(seconds: 4), () {
+    _highlightClearTimer = Timer(const Duration(seconds: 5), () {
       if (mounted) ref.read(highlightedAyahProvider.notifier).set(null);
     });
   }
@@ -428,19 +441,15 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
     ref.read(qiyamSessionProvider.notifier).recordAyahs(ayahs.map((a) => a.id));
   }
 
-  /// يطوي شريط "تنزيل الخطوط الباقية" لأيقونة صغيرة **لهذه الطبعة تحديداً**
-  /// (لا لهالجلسة فقط، ولا لبقية الطبعات) — محفوظ فيبقى مطوياً بعد إعادة
-  /// فتح التطبيق أيضاً. راجع توثيق [_fontDownloadBannerDismissedKey] أعلى
-  /// الملف و[_expandDownloadBanner] للعملية العكسية.
+  /// يطوي شريط "تنزيل الخطوط الباقية" مؤقتاً لهذه الجلسة الحالية فقط.
+  /// لا يُحفظ بـ SharedPreferences ليعود ويظهر تلقائياً عند إعادة فتح التطبيق.
   void _collapseDownloadBanner(MushafFontEdition edition) {
     setState(() => _collapsedFontDownloadBanners.add(edition.name));
-    ref.read(sharedPreferencesProvider).setBool(_fontDownloadBannerDismissedKey(edition), true);
   }
 
-  /// يعيد فتح الشريط الكامل بعد طيّه لأيقونة — الضغط على الأيقونة الصغيرة.
+  /// يعيد فتح الشريط الكامل بعد طيّه مؤقتاً
   void _expandDownloadBanner(MushafFontEdition edition) {
     setState(() => _collapsedFontDownloadBanners.remove(edition.name));
-    ref.read(sharedPreferencesProvider).setBool(_fontDownloadBannerDismissedKey(edition), false);
   }
 
   /// ينهي جلسة القيام: يحفظ عدد آياتها بـ`QiyamAyahLog` (تراكمي لليوم)،
@@ -484,7 +493,10 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
   Future<void> _followAudioToAyah(int ayahId) async {
     final ayah = await ref.read(quranRepositoryProvider).ayahById(ayahId);
     if (!mounted) return;
-    if (ayah.page != _currentPage) _jumpTo(ayah.page);
+    if (ayah.page != _currentPage) {
+      _skipNextHighlightClear = true;
+      _jumpTo(ayah.page);
+    }
   }
 
   Future<void> _updateHifzProgressForPage(int page) async {
@@ -537,17 +549,34 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
     final downloadState = ref.watch(fontDownloadControllerProvider);
     final chromeVisible = ref.watch(mushafChromeVisibleProvider);
 
-    // متابعة تلقائية لصفحة الصوت الجاري — راجع توثيق [_followAudioToAyah].
+    // متابعة تلقائية وتظليل الآية المقروءة حالياً مع القارئ
     ref.listen<QuranAudioState>(quranAudioControllerProvider, (prev, next) {
-      if (!next.isActive || !next.isPlaying) return;
+      if (!next.isActive || !next.isPlaying) {
+        if (prev?.isPlaying == true) {
+          ref.read(highlightedAyahProvider.notifier).set(null);
+        }
+        return;
+      }
       final ayahId = next.currentAyahId;
       if (ayahId == null || ayahId == prev?.currentAyahId) return;
+      ref.read(highlightedAyahProvider.notifier).set(ayahId);
       unawaited(_followAudioToAyah(ayahId));
     });
 
-    // طلب قفز خارجي (متشابهات مثلاً) — راجع توثيق [mushafJumpRequestProvider].
+    // طلب قفز خارجي (متشابهات أو بحث مثلاً) — راجع توثيق [mushafJumpRequestProvider].
     ref.listen<MushafJumpRequest?>(mushafJumpRequestProvider, (prev, next) {
-      if (next != null && next.nonce != prev?.nonce) _handleJumpRequest(next);
+      if (next != null &&
+          next.nonce != prev?.nonce &&
+          next.nonce != _lastHandledJumpNonce) {
+        _handleJumpRequest(next);
+      }
+    });
+
+    // متابعة تغيير خيار إبقاء الشاشة مضاءة أثناء القراءة
+    ref.listen<bool>(keepScreenOnMushafProvider, (prev, next) {
+      if (!widget.pickingHifzRange) {
+        unawaited(ScreenWakelockService.setKeepScreenOn(next));
+      }
     });
 
     int? pickerPendingFrom;
@@ -576,12 +605,13 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
     final missingPages = totalDownloadable - (downloadedCountAsync.value ?? 0);
     final bulkRunningForCurrentEdition =
         downloadState.isBulkRunning && downloadState.activeEdition == currentFontEdition;
-    final downloadBannerRelevant =
-        !bulkRunningForCurrentEdition && downloadedCountAsync.hasValue && missingPages > 0;
+    final downloadBannerRelevant = missingPages > 0 || bulkRunningForCurrentEdition;
     final showDownloadBanner =
         downloadBannerRelevant && !_collapsedFontDownloadBanners.contains(currentFontEdition.name);
-    // عند إغلاق الشريط لا نريد إبقاء أيقونة عائمة تأخذ مساحة من الشاشة كما طلب المستخدم
-    final showCollapsedDownloadIcon = false;
+    final showCollapsedDownloadIcon =
+        downloadBannerRelevant &&
+        _collapsedFontDownloadBanners.contains(currentFontEdition.name) &&
+        !_collapsedFontDownloadBanners.contains('hide_all_${currentFontEdition.name}');
 
     return Scaffold(
       backgroundColor: bg,
@@ -655,6 +685,186 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
                 ),
               ),
             ),
+          if (widget.hifzPracticeMode && widget.hifzPlanId != null)
+            Consumer(
+              builder: (context, ref, _) {
+                ref.watch(hifzVersionProvider);
+                final plans = ref.watch(hifzPrefsProvider).plans;
+                final plan = plans.cast<HifzPlan?>().firstWhere(
+                  (p) => p?.id == widget.hifzPlanId,
+                  orElse: () => null,
+                );
+                final isMemorization = ref.watch(memorizationModeProvider);
+                return Container(
+                  width: double.infinity,
+                  color: AppColors.navy,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  child: SafeArea(
+                    bottom: false,
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.psychology_rounded,
+                          color: themeAccent(context),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            plan != null
+                                ? 'متابعة الحفظ — تقدم الخطة ${(plan.progress * 100).round()}٪'
+                                : 'وضع متابعة وتثبيت الحفظ',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () => ref.read(memorizationModeProvider.notifier).toggle(),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isMemorization ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                  color: Colors.white,
+                                  size: 13,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  isMemorization ? 'كشف' : 'إخفاء',
+                                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        InkWell(
+                          onTap: () async {
+                            final ayahs = await ref.read(quranRepositoryProvider).ayahsForPage(_currentPage);
+                            if (ayahs.isEmpty || !context.mounted) return;
+                            await ref.read(hifzPrefsProvider).setMultipleAyahsMasteryStatus(
+                              ayahs.map((a) => a.id).toList(),
+                              'mastered',
+                            );
+                            ref.read(hifzVersionProvider.notifier).bump();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('تم تثبيت صفحة $_currentPage كاملة كمتقنة ⭐'),
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: themeAccent(context).withValues(alpha: 0.25),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: themeAccent(context).withValues(alpha: 0.5), width: 0.8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.star_rounded, color: Colors.amber, size: 14),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'تثبيت الصفحة',
+                                  style: TextStyle(
+                                    color: themeAccent(context),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          if (widget.khatmaPracticeMode && widget.khatmaPlanId != null)
+            Consumer(
+              builder: (context, ref, _) {
+                ref.watch(khatmaVersionProvider);
+                final plans = ref.watch(khatmaPrefsProvider).activePlans;
+                final plan = plans.cast<KhatmaPlan?>().firstWhere(
+                  (p) => p?.id == widget.khatmaPlanId,
+                  orElse: () => null,
+                );
+                if (plan == null) return const SizedBox.shrink();
+
+                final remainingToKhatma = (604 - _currentPage).clamp(0, 604);
+                final expectedYesterday =
+                    (plan.startPage - 1 + (plan.daysElapsed - 1) * plan.dailyPages)
+                        .clamp(plan.startPage - 1, 604);
+                final readToday = (_currentPage - expectedYesterday).clamp(0, plan.dailyPages + 20);
+                final remainingToday = (plan.dailyPages - readToday).clamp(0, plan.dailyPages);
+                final doneToday = readToday >= plan.dailyPages;
+
+                return Container(
+                  width: double.infinity,
+                  color: AppColors.navy,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  child: SafeArea(
+                    bottom: false,
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.menu_book_rounded,
+                          color: themeAccent(context),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            doneToday
+                                ? 'أتممت ورد اليوم 🎉 • باقي $remainingToKhatma صفحة لختمتك'
+                                : 'باقي $remainingToday لورد اليوم • باقي $remainingToKhatma لختمتك',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: themeAccent(context).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: themeAccent(context).withValues(alpha: 0.5),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Text(
+                            '${(plan.progress * 100).round()}٪',
+                            style: TextStyle(
+                              color: themeAccent(context),
+                              fontWeight: FontWeight.w800,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
           // شريط رفيع سطر واحد (بدل `MaterialBanner` القديم الكبير بحشوة
           // ٨+صف أزرار كاملة) — بلاغ صاحب المشروع "مزعج وماخذ مساحة".
           // الطيّ **دائم لكل طبعة على حدة** (`_fontDownloadBannerDismissedKey`)
@@ -711,32 +921,48 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
                 ),
               ),
             ),
-          // أيقونة صغيرة بديلة عن الشريط الكامل بعد طيّه — راجع توثيق
-          // `_collapseDownloadBanner`/`_expandDownloadBanner`. تبقى ظاهرة
-          // طالما فيه صفحات ناقصة فعلياً، بمساحة أقل بكثير من الشريط.
           if (showCollapsedDownloadIcon)
             SafeArea(
               bottom: false,
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 10, top: 4),
-                  child: Material(
-                    color: themeAccent(context).withValues(alpha: 0.14),
-                    shape: const CircleBorder(),
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: () => _expandDownloadBanner(currentFontEdition),
-                      child: Padding(
-                        padding: const EdgeInsets.all(6),
-                        child: Icon(
-                          Icons.cloud_download_outlined,
-                          size: 16,
-                          color: themeAccent(context),
-                        ),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: themeAccent(context).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: themeAccent(context).withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    InkWell(
+                      onTap: () async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => FontDownloadScreen(edition: currentFontEdition)),
+                        );
+                      },
+                      onLongPress: () => _expandDownloadBanner(currentFontEdition),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.cloud_download_outlined, size: 14, color: themeAccent(context)),
+                          const SizedBox(width: 5),
+                          Text(
+                            'تنزيل باقي صفحات المصحف ($missingPages)',
+                            style: TextStyle(color: themeAccent(context), fontSize: 11, fontWeight: FontWeight.w700),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    InkWell(
+                      onTap: () {
+                        // إغلاق مؤقت للأيقونة المصغرة أيضاً لهذه الجلسة
+                        setState(() => _collapsedFontDownloadBanners.add('hide_all_${currentFontEdition.name}'));
+                      },
+                      child: Icon(Icons.close, size: 13, color: fg.withValues(alpha: 0.6)),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -762,7 +988,9 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
                       final page = index + 1;
                       return RepaintBoundary(
                         key: ValueKey('mushaf_page_${page}_${textSize.name}'),
-                        child: MushafPageWidget(page: page),
+                        child: MediaQuery.withNoTextScaling(
+                          child: MushafPageWidget(page: page),
+                        ),
                       );
                     },
                   ),
@@ -802,6 +1030,20 @@ class _MushafScreenState extends ConsumerState<MushafScreen> {
                   ),
                 ),
               ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 2, bottom: 4),
+            child: Center(
+              child: Text(
+                toArabicDigits(_currentPage),
+                style: TextStyle(
+                  color: fg.withValues(alpha: 0.65),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Cairo',
+                ),
+              ),
             ),
           ),
         ],

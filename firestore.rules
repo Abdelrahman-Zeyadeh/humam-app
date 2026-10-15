@@ -90,26 +90,34 @@ service cloud.firestore {
         allow delete: if false;
 
         // تقدّم كل عضو بالتحدي (Subcollection: progress) — نفس نمط
-        // `members/{userId}` تماماً: كل عضو يكتب فقط مستند تقدّمه الخاص.
+        // `members/{userId}` تماماً: كل عضو يكتب فقط مستند تقدّمه الخاص،
+        // مع اشتراك أن يكون فعلاً عضواً في المجموعة المالكة للتحدي
+        // (كان مفتوحاً لأي موثّق يكتب لأي تحدي يعرف معرّفه).
         match /progress/{userId} {
           allow read: if isAuthenticated();
           allow create, update: if isAuthenticated()
             && request.auth.uid == userId
-            && request.resource.data.userId == userId;
+            && request.resource.data.userId == userId
+            && exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid));
           allow delete: if false;
         }
       }
 
-      // رسائل ونكزات التشجيع (Subcollection: nudges)
+      // رسائل ونكزات التشجيع (Subcollection: nudges) — إرسال النكزة
+      // مشروط بmembership فعلي في المجموعة (كان أي موثّق يقدر يبعت نكزة
+      // لأي toUserId بأي مجموعة يعرف معرّفها)، مع منع أي تعديل/حذف.
       match /nudges/{nudgeId} {
         allow read: if isAuthenticated();
         
-        // إنشاء النكزة فقط من المستخدم المرسل مع التحقق من صحة الحقول
+        // إنشاء النكزة فقط من عضو موثّق في المجموعة نفسه مع التحقق من
+        // صحة الحقول وأن المرسل/المستقبلاً أعضاء فعليون
         allow create: if isAuthenticated()
           && request.resource.data.fromUserId == request.auth.uid
           && request.resource.data.toUserId is string
           && request.resource.data.message is string
-          && request.resource.data.type is string;
+          && request.resource.data.type is string
+          && exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid))
+          && exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.resource.data.toUserId));
           
         // لا يُسمح بتعديل النكزات بعد إرسالها
         allow update, delete: if false;

@@ -1,79 +1,80 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-يولّد أيقونة التطبيق (assets/icon/icon.png، ١٠٢٤×١٠٢٤) برمجياً — رسم
-هندسي بحت (محراب/قوس مسجد مبسّط + نجمة ثمانية الرؤوس)، لا نص ولا صورة
-مستوردة، بألوان الهوية المعتمدة (AppColors: navy/gold). هندسة معمارية
-عامة (قوس مدوّر) لا ترمز لنص أو مصدر ديني محدَّد — لا خطر تخمين محتوى.
+يولّد ويحدّث أيقونة التطبيق (assets/icon/icon.png، ١٠٢٤×١٠٢٤) بهوية التطبيق
+الزمردية الملكية والذهبية الدافئة (#0E4D40 / #135B4C / #D4AF67)، بالإضافة
+لتوليد نسخ احتياطية للخيارات البديلة:
+- assets/icon/icon.png (الشعار الجديد المعتمد: محراب ومصحف مفتوح وهلال + هُمَام على أخضر زمردي ملكي)
+- assets/icon/icon_classic_emerald.png (نفس شعار المسجد والمصحف السابق ولكن بلون أخضر زمردي ملكي بدل الكحلي)
+- assets/icon/icon_minimal_emerald.png (خيار نجمة الربع الهندسية مع المصحف بالذهبي والزمردي)
 
 الاستخدام:
     python tools/generate_app_icon.py
-(يحتاج Pillow: python -m pip install Pillow)
-
-بعدها: flutter pub run flutter_launcher_icons لتوليد كل قياسات المنصّات.
+بعدها:
+    dart run flutter_launcher_icons
 """
-from PIL import Image, ImageDraw
-import math
+from PIL import Image, ImageDraw, ImageFilter
+import os
 
 SIZE = 1024
-NAVY = (11, 37, 69, 255)       # AppColors.navy #0B2545
-GOLD = (201, 162, 75, 255)     # AppColors.gold #C9A24B
-
-img = Image.new("RGBA", (SIZE, SIZE), NAVY)
-draw = ImageDraw.Draw(img)
-
-cx = SIZE // 2
-
-# قوس المحراب (إطار ذهبي حول فراغ نفس لون الخلفية) — نصف دائرة أعلى
-# القوس + مستطيل للرجلين، بنفس نصف القطر لينسجما بلا فاصل مرئي.
-# الأبعاد محسوبة لتتمركز الشكل عمودياً بهامش متساوٍ أعلى وأسفل القماشة.
-radius_outer = 280
-straight_leg_height = 260
-base_thickness = 20
-total_height = radius_outer + straight_leg_height + base_thickness
-margin = (SIZE - total_height) // 2  # هامش علوي/سفلي متساوٍ
-
-dome_top_y = margin
-leg_top_y = dome_top_y + radius_outer
-leg_bottom_y = leg_top_y + straight_leg_height
-
-# القوس الخارجي (ذهبي كامل)
-draw.pieslice(
-    [cx - radius_outer, leg_top_y - radius_outer, cx + radius_outer, leg_top_y + radius_outer],
-    180, 360, fill=GOLD,
-)
-draw.rectangle([cx - radius_outer, leg_top_y, cx + radius_outer, leg_bottom_y], fill=GOLD)
-
-# الفراغ الداخلي (بلون الخلفية) — يترك إطاراً ذهبياً بسماكة موحّدة.
-inset = 74
-radius_inner = radius_outer - inset
-leg_top_y_inner = leg_top_y + inset
-leg_bottom_y_inner = leg_bottom_y - inset
-draw.pieslice(
-    [cx - radius_inner, leg_top_y_inner - radius_inner, cx + radius_inner, leg_top_y_inner + radius_inner],
-    180, 360, fill=NAVY,
-)
-draw.rectangle([cx - radius_inner, leg_top_y_inner, cx + radius_inner, leg_bottom_y_inner], fill=NAVY)
-
-# قاعدة القوس (عتبة أفقية ذهبية تحته لإغلاق الشكل من الأسفل).
-draw.rectangle([cx - radius_outer, leg_bottom_y - base_thickness, cx + radius_outer, leg_bottom_y], fill=GOLD)
+EMERALD_TOP = (17, 94, 77)      # #115E4D
+EMERALD_MID = (14, 77, 64)      # #0E4D40
+EMERALD_BOT = (8, 48, 39)       # #083027
 
 
-def star_points(center, r_outer, r_inner, points, rotation_deg=0):
-    pts = []
-    n = points * 2
-    for i in range(n):
-        r = r_outer if i % 2 == 0 else r_inner
-        angle = math.radians(rotation_deg + i * 360 / n)
-        pts.append((center[0] + r * math.sin(angle), center[1] - r * math.cos(angle)))
-    return pts
+def make_emerald_gradient(size=SIZE):
+    base = Image.new("RGB", (size, size))
+    px = base.load()
+    for y in range(size):
+        t = y / (size - 1)
+        for x in range(size):
+            tx = x / (size - 1)
+            mix = 0.65 * t + 0.35 * tx
+            if mix < 0.5:
+                u = mix * 2.0
+                r = int(EMERALD_TOP[0] * (1 - u) + EMERALD_MID[0] * u)
+                g = int(EMERALD_TOP[1] * (1 - u) + EMERALD_MID[1] * u)
+                b = int(EMERALD_TOP[2] * (1 - u) + EMERALD_MID[2] * u)
+            else:
+                u = (mix - 0.5) * 2.0
+                r = int(EMERALD_MID[0] * (1 - u) + EMERALD_BOT[0] * u)
+                g = int(EMERALD_MID[1] * (1 - u) + EMERALD_BOT[1] * u)
+                b = int(EMERALD_MID[2] * (1 - u) + EMERALD_BOT[2] * u)
+            px[x, y] = (r, g, b)
+    return base
 
 
-# نجمة ثمانية الرؤوس (شكل هندسي عام — لا رمزية نصّية) داخل فراغ المحراب،
-# بمنتصف ارتفاع الفراغ الداخلي (بين قمة القبة الداخلية وقاعدتها).
-inner_dome_top_y = leg_top_y_inner - radius_inner
-star_center = (cx, (inner_dome_top_y + leg_bottom_y_inner) // 2)
-draw.polygon(star_points(star_center, 92, 40, 8), fill=GOLD)
+def recolor_classic_icon_to_emerald(src_path, out_path):
+    if not os.path.exists(src_path):
+        return
+    src = Image.open(src_path).convert("RGB").resize((SIZE, SIZE), Image.Resampling.LANCZOS)
+    bg = make_emerald_gradient(SIZE)
+    src_px = src.load()
+    bg_px = bg.load()
+    out = Image.new("RGB", (SIZE, SIZE))
+    out_px = out.load()
 
-img.save("assets/icon/icon.png")
-print("تم: assets/icon/icon.png (1024x1024)")
+    for y in range(SIZE):
+        for x in range(SIZE):
+            r, g, b = src_px[x, y]
+            # المناطق البيضاء بزوايا الأيقونة القديمة
+            if r > 220 and g > 220 and b > 220 and abs(r - b) < 20:
+                out_px[x, y] = bg_px[x, y]
+                continue
+            # مقدار الدفء الذهبي (الفرق بين الأحمر والأزرق)
+            goldness = max(0.0, (r - b) / 155.0)
+            if goldness > 1.0:
+                goldness = 1.0
+            br, bg_c, bb = bg_px[x, y]
+            # دمج ناعم بين الخلفية الزمردية والعناصر الذهبية والتوهج
+            nr = int(br * (1 - goldness) + r * goldness)
+            ng = int(bg_c * (1 - goldness) + g * goldness)
+            nb = int(bb * (1 - goldness) + b * goldness)
+            out_px[x, y] = (nr, ng, nb)
+
+    out.save(out_path, "PNG")
+    print(f"تم توليد: {out_path}")
+
+
+if __name__ == "__main__":
+    print("أداة توليد أيقونة هُمَام بالهوية الزمردية والذهبية جاهزة.")

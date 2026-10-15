@@ -28,13 +28,17 @@ class AboutScreen extends StatelessWidget {
                 begin: Alignment.topRight,
                 end: Alignment.bottomLeft,
                 colors: isDark
-                    ? [const Color(0xFF1E2836), const Color(0xFF131D2A)]
-                    : [const Color(0xFF0B2545), const Color(0xFF164B7A)],
+                    ? [const Color(0xFF0E4D40), const Color(0xFF082E26)]
+                    : [const Color(0xFF0E4D40), const Color(0xFF156956), const Color(0xFF09352B)],
               ),
               borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: const Color(0xFFD4AF67).withValues(alpha: 0.45),
+                width: 1.2,
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.2),
+                  color: const Color(0xFF0E4D40).withValues(alpha: 0.25),
                   blurRadius: 16,
                   offset: const Offset(0, 4),
                 ),
@@ -43,17 +47,25 @@ class AboutScreen extends StatelessWidget {
             child: Column(
               children: [
                 Container(
-                  width: 72,
-                  height: 72,
+                  width: 80,
+                  height: 80,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFC9A24B).withValues(alpha: 0.2),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFFC9A24B), width: 2),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFD4AF67), width: 1.8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.25),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  child: const Icon(
-                    Icons.menu_book_rounded,
-                    size: 38,
-                    color: Color(0xFFC9A24B),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: Image.asset(
+                      'assets/icon/icon.png',
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 14),

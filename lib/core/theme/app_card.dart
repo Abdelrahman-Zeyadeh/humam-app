@@ -90,7 +90,7 @@ class GradientAppBar extends StatelessWidget implements PreferredSizeWidget {
   const GradientAppBar({
     super.key,
     required this.title,
-    this.colors = const [AppColors.blue, AppColors.navy],
+    this.colors = const [Color(0xFF1B6E53), Color(0xFF114B3A)],
     this.centerTitle = false,
     this.actions,
     this.leading,

@@ -188,9 +188,17 @@ class _RadioAndDuroosScreenState extends ConsumerState<RadioAndDuroosScreen>
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
           indicatorColor: AppColors.gold,
+          indicatorWeight: 3,
+          labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
           tabs: const [
-            Tab(text: '🔴 بث مباشر'),
-            Tab(text: '🎓 دروس مسجّلة'),
+            Tab(
+              icon: Icon(Icons.podcasts_rounded, size: 20),
+              text: 'إذاعات القرآن والبث الحي',
+            ),
+            Tab(
+              icon: Icon(Icons.school_rounded, size: 20),
+              text: 'الدروس والمحاضرات',
+            ),
           ],
         ),
       ),

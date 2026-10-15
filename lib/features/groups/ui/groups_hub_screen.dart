@@ -74,6 +74,40 @@ class _GroupsHubScreenState extends ConsumerState<GroupsHubScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // بنر الآية المحفزة للصحبة الصالحة
+          Container(
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.teal.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppColors.teal.withValues(alpha: 0.22),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.auto_awesome_rounded,
+                  size: 18,
+                  color: AppColors.teal,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '﴿ وَفِي ذَٰلِكَ فَلْيَتَنَافَسِ الْمُتَنَافِسُونَ ﴾ — تنافسوا في الطاعات وأحيوا سنن اليوم والليلة معاً',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white70 : AppColors.ink,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           // بطاقة إنجاز أعمال اليوم والليلة الشخصية
           MyDeedsCard(deeds: myDeeds, isDark: isDark),
           const SizedBox(height: 18),

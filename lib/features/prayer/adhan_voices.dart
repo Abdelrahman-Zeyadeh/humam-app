@@ -24,22 +24,22 @@ class AdhanVoice {
 const List<AdhanVoice> kAdhanVoices = [
   AdhanVoice(
     id: 'adhan_sunbul',
-    label: 'الشيخ عمر بن نبيل سنبل',
-    subLabel: 'مؤذن المسجد النبوي الشريف - أداء مدني حجازي عريق',
+    label: 'الشيخ الشاب عمر سنبل',
+    subLabel: 'مؤذن المسجد النبوي الشريف - أداء حجازي ندي ومميز',
     assetPath: 'assets/audio/adhan/adhan_sunbul.mp3',
     rawResource: 'adhan_sunbul',
   ),
   AdhanVoice(
     id: 'adhan_makkah',
-    label: 'الشيخ علي بن أحمد ملا',
-    subLabel: 'شيخ مؤذني المسجد الحرام (صوت مكة المكرمة)',
+    label: 'أذان الحرم المكي الشريف',
+    subLabel: 'مكة المكرمة - تسجيل ندي عالي النقاوة',
     assetPath: 'assets/audio/adhan/adhan_makkah.mp3',
     rawResource: 'adhan_makkah',
   ),
   AdhanVoice(
     id: 'adhan_madinah',
     label: 'أذان المسجد النبوي الشريف',
-    subLabel: 'المدينة المنورة - أذان مدني خاشع ومهيب',
+    subLabel: 'المدينة المنورة - تسجيل خاشع ومهيب عالي النقاوة',
     assetPath: 'assets/audio/adhan/adhan_madinah.mp3',
     rawResource: 'adhan_madinah',
   ),
@@ -91,6 +91,13 @@ const List<AdhanVoice> kAdhanVoices = [
     subLabel: 'أذان حجازي خاشع وروحاني',
     assetPath: 'assets/audio/adhan/adhan_saqqaf.m4a',
     rawResource: 'adhan_saqqaf',
+  ),
+  AdhanVoice(
+    id: 'adhan_ibrahim_madani',
+    label: 'الشيخ إبراهيم مدني',
+    subLabel: 'أذان شجي خاشع بنبرة حجازية أصيلة',
+    assetPath: 'assets/audio/adhan/adhan_ibrahim_madani.mp3',
+    rawResource: 'adhan_ibrahim_madani',
   ),
   AdhanVoice(
     id: 'system',

@@ -30,15 +30,18 @@ class AdhanNotificationPrefs {
   /// عند الجدولة الفعلية بدل فحص الاثنين بكل موقع استدعاء.
   bool effectivelyEnabled(PrayerMoment moment) => masterEnabled && isEnabledFor(moment);
 
-  /// نمط التنبيه المخصّص لكل صلاة ('adhan', 'tone', 'silent', 'off')
+  /// نمط التنبيه المخصّص لكل صلاة ('adhan', 'silent', 'off')
   String notificationModeFor(PrayerMoment moment) {
     if (!effectivelyEnabled(moment)) return 'off';
-    return _repo.adhanModeFor(moment.name);
+    final m = _repo.adhanModeFor(moment.name);
+    if (m == 'silent') return 'silent';
+    return 'adhan';
   }
 
   Future<void> setNotificationModeFor(PrayerMoment moment, String mode) async {
-    await _repo.setAdhanModeFor(moment.name, mode);
-    if (mode == 'off') {
+    final cleanMode = mode == 'silent' ? 'silent' : (mode == 'off' ? 'off' : 'adhan');
+    await _repo.setAdhanModeFor(moment.name, cleanMode);
+    if (cleanMode == 'off') {
       await setEnabledFor(moment, false);
     } else {
       await setEnabledFor(moment, true);

@@ -92,11 +92,9 @@ class QiyamReminderRow extends ConsumerWidget {
 
   Future<void> _toggle(BuildContext context, WidgetRef ref, bool value) async {
     final userPrefs = ref.read(userPrefsProvider);
-    if (value && userPrefs.qiyamHour == null) {
-      await _pickTime(context, ref);
-      return;
-    }
-    await userPrefs.setQiyamReminder(enabled: value);
+    final hour = userPrefs.qiyamHour ?? 3;
+    final minute = userPrefs.qiyamMinute;
+    await userPrefs.setQiyamReminder(enabled: value, hour: hour, minute: minute);
     ref.read(categoryStreakVersionProvider.notifier).bump();
     if (!context.mounted) return;
     await _applyState(context, ref);

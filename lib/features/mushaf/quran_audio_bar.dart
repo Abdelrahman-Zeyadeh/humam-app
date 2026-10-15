@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../audio/audio_download_service.dart';
 import '../audio/quran_audio_controller.dart';
 import '../audio/reciters.dart';
+import '../audio/ui/reciter_avatar.dart';
 
 import '../audio/ayah_audio_service.dart';
 
@@ -43,12 +44,10 @@ class QuranAudioBar extends ConsumerWidget {
 
     final controller = ref.read(quranAudioControllerProvider.notifier);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? AppColors.surfaceDark : AppColors.cream;
     final fg = isDark ? AppColors.inkOnDark : AppColors.ink;
     final reciter = reciterById(audio.reciterId);
 
     final accent = themeAccent(context);
-    final dividerColor = isDark ? AppColors.lineDark : AppColors.line;
     final player = ref.watch(ayahAudioPlayerProvider);
 
     return SafeArea(
@@ -92,6 +91,8 @@ class QuranAudioBar extends ConsumerWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       child: Row(
                         children: [
+                          ReciterAvatar(reciter: reciter, radius: 15),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -475,13 +476,6 @@ class _ReciterRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final hue = (reciter.id.hashCode.abs() * 7) % 360;
-    final avatarColor = HSLColor.fromAHSL(
-      1,
-      hue.toDouble(),
-      0.5,
-      isDark ? 0.32 : 0.45,
-    ).toColor();
 
     return Material(
       color: selected
@@ -504,17 +498,9 @@ class _ReciterRow extends StatelessWidget {
           ),
           child: Row(
             children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: avatarColor,
-                child: Text(
-                  reciter.nameAr.characters.first,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                  ),
-                ),
+              ReciterAvatar(
+                reciter: reciter,
+                radius: 20,
               ),
               const SizedBox(width: 12),
               Expanded(

@@ -42,10 +42,17 @@ class DuroosRepository {
             Dio(BaseOptions(
               connectTimeout: const Duration(seconds: 15),
               receiveTimeout: const Duration(seconds: 30),
-              headers: const {'User-Agent': 'Mozilla/5.0'},
+              headers: const {
+                'User-Agent':
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+                'Accept':
+                    'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'ar,en-US;q=0.9,en;q=0.8',
+              },
             ));
 
   final Dio _dio;
+  static final Map<String, DuroosPage> _cache = {};
 
   /// وسوم `<a ...>` كاملة — نطابق الوسم ثم نستخرج سماته بأي ترتيب،
   /// لا تعبيراً مفترضاً تسلسلاً ثابتاً هشّاً.
@@ -56,6 +63,9 @@ class DuroosRepository {
   static final _labelRe = RegExp(r'<label[^>]*>(.*?)</label>', caseSensitive: false, dotAll: true);
 
   Future<DuroosPage> fetchIslamweb(int sid, int lg) async {
+    final cacheKey = 'iw-$sid-$lg';
+    if (_cache.containsKey(cacheKey)) return _cache[cacheKey]!;
+
     final url =
         'https://audio.islamweb.net/audio/index.php?page=lecview&sid=$sid&read=0&lg=$lg&kh=0';
     final response = await _dio.get<String>(
@@ -102,16 +112,43 @@ class DuroosRepository {
       lectures.add(DuroosLecture(title: title, audioUrl: urlMatch.group(1)!));
     }
 
-    // صفحة جُلبت بنجاح لكن لا تصنيفات فيها ولا محاضرات = البنية تغيّرت
-    // أو القسم غير مطابق بصياغتنا — رسالة صريحة مع زر إعادة محاولة
-    // أوضح للمستخدم من "لا يوجد محتوى بهذا القسم حالياً" الصامتة.
+    // جلب الصفحات التالية للمحاضرات لو كان القسم يحتوي على أكثر من ٣٠ محاضرة
+    // نطلب الصفحتين بالتوازي لتوفير الوقت وسرعة الاستجابة الخاطفة مع مهلة سريعة
+    if (categories.isEmpty && lectures.length >= 30) {
+      try {
+        final pagesResponses = await Future.wait([
+          _dio.get<String>(
+            'https://audio.islamweb.net/audio/index.php?page=lecview&sid=$sid&read=0&lg=$lg&kh=0&pageno=2',
+            options: Options(responseType: ResponseType.plain),
+          ),
+          _dio.get<String>(
+            'https://audio.islamweb.net/audio/index.php?page=lecview&sid=$sid&read=0&lg=$lg&kh=0&pageno=3',
+            options: Options(responseType: ResponseType.plain),
+          ),
+        ]).timeout(const Duration(seconds: 4), onTimeout: () => []);
+        for (final pResp in pagesResponses) {
+          final pHtml = pResp.data ?? '';
+          for (final tag in _aTagRe.allMatches(pHtml)) {
+            final tagHtml = tag.group(0)!;
+            final urlMatch = _urlAttrRe.firstMatch(tagHtml);
+            if (urlMatch == null) continue;
+            final title = _decodeEntities(_titleAttrRe.firstMatch(tagHtml)?.group(1)?.trim() ?? '');
+            if (title.isEmpty) continue;
+            lectures.add(DuroosLecture(title: title, audioUrl: urlMatch.group(1)!));
+          }
+        }
+      } catch (_) {}
+    }
+
     if (categories.isEmpty && lectures.isEmpty) {
       throw const DuroosParseException(
         'تعذّر التعرف على محتوى هذه الصفحة (ربما تغيّرت بنية المصدر أو القسم فارغ) — أعد المحاولة.',
       );
     }
 
-    return DuroosPage(categories: categories, lectures: lectures);
+    final result = DuroosPage(categories: categories, lectures: lectures);
+    _cache[cacheKey] = result;
+    return result;
   }
 
   /// موقع midad.com تطبيق Inertia.js — كل الاستجابة HTML عادي، لكن
@@ -135,112 +172,277 @@ class DuroosRepository {
 
   static final _emTagRe = RegExp(r'</?em>');
 
-  /// بحث midad.com عن اسم الشيخ — يرجع محاضرات مفردة فقط (نتجاهل نوع
-  /// "collection" لأنها تحتاج جلباً إضافياً لعناصرها الفرعية، وخارج نطاق
-  /// هذه الميزة حالياً). لا `audioUrl` هنا عمداً — يُجلب لاحقاً لحظة فتح
-  /// المحاضرة تحديداً عبر [fetchMidadEntryAudio] (راجع سبب ذلك بتوثيق
-  /// `DuroosSourceKind.midad`).
-  /// [isRecitation] يبحث عن **تلاوات قرآن** (`/recitation/<id>`، بطلب
-  /// صريح "التلاوات ممكن تضيفها لقسم الاستماع") بدل محاضرات علمية عادية
-  /// (`/lesson/<id>`، الافتراضي). راجع `DuroosSource.midadIsRecitation`.
-  Future<DuroosPage> fetchMidadSearch(
-    String query, {
+  /// جلب سلاسل ومحاضرات الشيخ مباشرة من صفحته على موقع مداد عبر worksIndex
+  Future<DuroosPage> fetchMidadScholar(
+    int scholarId, {
     bool isRecitation = false,
   }) async {
-    // `entry_type` **بلا** `recitation` للمحاضرات العادية عمداً — بطلب
-    // صريح ("رابط السعيدان وعامر بهجت مش شغال، اتاكد منهم"): تحقّقت فعلياً
-    // بمتصفح حقيقي على midad.com، والسبب مزدوج:
-    // ١. إدراج `recitation` بالقائمة كان يُغرق نتائج الشيوخ الذين سجّلوا
-    //    ختمة قرآن أيضاً (كالسعيدان) بمئات نتائج "سورة كذا" (تلاوة، لا
-    //    محاضرة أصلاً)، تتصدّر ترتيب النتائج فتزيح المحاضرات الفعلية خارج
-    //    أول ٢٠ نتيجة المضمَّنة بالصفحة. [isRecitation] يعكس هذا: يطلب
-    //    "recitation" فقط بدل استبعادها — لسور المصحف المرتَّل نفسه.
-    // ٢. `_extractInertiaJson` كان يقرأ `props.data.data.hits` (مستويان
-    //    `data`) — الصحيح فعلياً `props.data.data.data.hits` (**ثلاثة**
-    //    مستويات)، تحقّقت منه مباشرة بمحتوى الصفحة الحقيقي. لو تغيّر بنية
-    //    الموقع لاحقاً (ربما كان صحيحاً سابقاً وتغيّر)، هذا أول موضع يُراجَع.
-    final entryType = isRecitation ? 'recitation' : 'lesson-article-audiobook-video';
-    final url = 'https://midad.com/search'
-        '?q=${Uri.encodeQueryComponent(query)}'
-        '&entry_type=$entryType'
-        '&type=collection-entry';
+    final cacheKey = 'midad-scholar-$scholarId-$isRecitation';
+    if (_cache.containsKey(cacheKey)) return _cache[cacheKey]!;
+
+    final path = isRecitation ? 'recitations' : 'lessons';
     final response = await _dio.get<String>(
-      url,
+      'https://midad.com/scholar/$scholarId/$path',
       options: Options(responseType: ResponseType.plain),
     );
     final html = response.data ?? '';
     final json = _extractInertiaJson(html);
-    final hits =
-        (json?['props']?['data']?['data']?['data']?['hits'] as List?) ??
-        const [];
+    final data = json?['props']?['data'] as Map<String, dynamic>?;
+    final worksIndex = data?['worksIndex'] as List? ?? const [];
 
-    final entryPathSegment = isRecitation ? 'recitation' : 'lesson';
-    final idRe = RegExp('/$entryPathSegment/(\\d+)');
+    final categories = <DuroosCategory>[];
+    final lectures = <DuroosLecture>[];
+    final seenCat = <int>{};
+    final seenLec = <int>{};
+
+    for (final section in worksIndex) {
+      if (section is! Map) continue;
+      final key = section['key'] as String? ?? '';
+      final entries = section['entries'] as List? ?? const [];
+
+      // 1. سلاسل ومجموعات الدروس أو التلاوات
+      if (key == 'lesson_collection' ||
+          key == 'recitation_collection' ||
+          key.contains('collection')) {
+        for (final item in entries) {
+          if (item is! Map) continue;
+          final id = item['id'] is int ? item['id'] as int : null;
+          final title = _decodeEntities(
+              (item['title'] as String? ?? '').replaceAll(_emTagRe, '').trim());
+          if (id != null && title.isNotEmpty && seenCat.add(id)) {
+            final count = item['items_count'] ??
+                item['entries_count'] ??
+                item['count'] ??
+                item['total'];
+            categories.add(DuroosCategory(
+              lg: id,
+              title: title,
+              count: count is int ? count : null,
+            ));
+          }
+        }
+      } else if (key == 'lesson' || key == 'recitation' || key == 'video') {
+        // 2. محاضرات ومقاطع فردية
+        final segment =
+            key == 'video' ? 'video' : (isRecitation ? 'recitation' : 'lesson');
+        for (final item in entries) {
+          if (item is! Map) continue;
+          final id = item['id'] is int ? item['id'] as int : null;
+          final title = _decodeEntities(
+              (item['title'] as String? ?? '').replaceAll(_emTagRe, '').trim());
+          if (id != null && title.isNotEmpty && seenLec.add(id)) {
+            lectures.add(DuroosLecture(
+              title: title,
+              midadLessonId: id,
+              midadEntryType: segment,
+              midadIsRecitation: isRecitation,
+            ));
+          }
+        }
+      }
+    }
+
+    if (categories.isEmpty && lectures.isEmpty) {
+      throw DuroosParseException(
+        isRecitation
+            ? 'تعذّر العثور على تلاوات لهذا الشيخ حالياً — أعد المحاولة.'
+            : 'تعذّر العثور على محاضرات لهذا الشيخ حالياً — أعد المحاولة.',
+      );
+    }
+
+    final result = DuroosPage(categories: categories, lectures: lectures);
+    _cache[cacheKey] = result;
+    return result;
+  }
+
+  /// جلب نتائج البحث لشخصية معينة على midad.com بسرعة خاطفة ودعم السلاسل والمحاضرات والفيديوهات
+  Future<DuroosPage> fetchMidadSearch(
+    String query, {
+    bool isRecitation = false,
+  }) async {
+    final cacheKey = 'midad-$query-$isRecitation';
+    if (_cache.containsKey(cacheKey)) return _cache[cacheKey]!;
+
+    final entryType = isRecitation ? 'recitation' : 'lesson-article-audiobook-video';
+    final categories = <DuroosCategory>[];
     final lectures = <DuroosLecture>[];
     final seen = <int>{};
-    for (final hit in hits) {
+    final seenColl = <int>{};
+
+    // جلب الصفحات بالتوازي للحصول على استجابة فورية دون أي تأخير
+    Future<List<dynamic>> fetchPageHits(int page) async {
+      try {
+        final url = 'https://midad.com/search'
+            '?q=${Uri.encodeQueryComponent(query)}'
+            '&entry_type=$entryType'
+            '&type=collection-entry'
+            '&page=$page';
+        final response = await _dio.get<String>(
+          url,
+          options: Options(responseType: ResponseType.plain),
+        );
+        final html = response.data ?? '';
+        final json = _extractInertiaJson(html);
+        return (json?['props']?['data']?['data']?['data']?['hits'] as List?) ?? const [];
+      } catch (_) {
+        return const [];
+      }
+    }
+
+    final pagesHits = await Future.wait([fetchPageHits(1), fetchPageHits(2)]);
+    final allHits = [...pagesHits[0], ...pagesHits[1]];
+
+    final entryIdRe = RegExp(r'/(?:lesson|video|audiobook|recitation|entry)/(\d+)');
+    final collIdRe = RegExp(r'/collection/(\d+)');
+
+    for (final hit in allHits) {
       if (hit is! Map) continue;
-      if (hit['type'] != 'entry') continue; // نتجاهل "collection" — راجع التوثيق أعلاه
-      final entryUrl = hit['url'] as String? ?? '';
-      final idMatch = idRe.firstMatch(entryUrl);
-      if (idMatch == null) continue;
-      final id = int.parse(idMatch.group(1)!);
-      if (!seen.add(id)) continue;
       final rawTitle = (hit['title'] as String? ?? '').replaceAll(_emTagRe, '');
       final title = _decodeEntities(rawTitle.trim());
       if (title.isEmpty) continue;
+
+      final hitType = hit['type'] as String? ?? '';
+      final url = hit['url'] as String? ?? '';
+
+      // 1. إذا كان العنصر سلسلة أو مجموعة (collection)
+      if (hitType == 'collection') {
+        final idMatch = collIdRe.firstMatch(url);
+        final id = idMatch != null
+            ? int.tryParse(idMatch.group(1)!)
+            : (hit['id'] is int ? hit['id'] as int : null);
+        if (id != null && seenColl.add(id)) {
+          final count = hit['items_count'] ?? hit['entries_count'] ?? hit['count'];
+          categories.add(DuroosCategory(
+            lg: id,
+            title: title,
+            count: count is int ? count : null,
+          ));
+        }
+        continue;
+      }
+
+      // 2. إذا كان العنصر محاضرة أو مقطع صوتي/مرئي
+      final idMatch = entryIdRe.firstMatch(url);
+      if (idMatch == null) continue;
+      final id = int.parse(idMatch.group(1)!);
+      if (!seen.add(id)) continue;
+
+      final segment = url.contains('/video/') ? 'video' : (isRecitation ? 'recitation' : 'lesson');
       lectures.add(
-        DuroosLecture(title: title, midadLessonId: id, midadIsRecitation: isRecitation),
+        DuroosLecture(
+          title: title,
+          midadLessonId: id,
+          midadEntryType: segment,
+          midadIsRecitation: isRecitation,
+        ),
       );
     }
 
-    if (lectures.isEmpty) {
+    if (categories.isEmpty && lectures.isEmpty) {
       throw DuroosParseException(
         isRecitation
-            ? 'تعذّر العثور على تلاوات لهذا الشيخ (ربما تغيّرت بنية الموقع أو لا نتائج) — أعد المحاولة.'
-            : 'تعذّر العثور على محاضرات لهذا الشيخ (ربما تغيّرت بنية الموقع أو لا نتائج) — أعد المحاولة.',
+            ? 'تعذّر العثور على تلاوات لهذا الشيخ — أعد المحاولة.'
+            : 'تعذّر العثور على محاضرات لهذا الشيخ — أعد المحاولة.',
       );
     }
-    return DuroosPage(categories: const [], lectures: lectures);
+    final result = DuroosPage(categories: categories, lectures: lectures);
+    _cache[cacheKey] = result;
+    return result;
   }
 
-  /// رابط الصوت الفعلي لمحاضرة/تلاوة midad محدَّدة — **موقّع ومؤقت** (AWS
-  /// S3 signed URL، صلاحيته أسبوع تقريباً وقت الجلب)، لذا يُطلَب هنا لحظياً
-  /// عند فتح العنصر لا وقت البحث — يضمن رابطاً صالحاً دوماً بلا تخزين
-  /// أو تحديث يدوي (راجع توثيق `DuroosSourceKind.midad`). [isRecitation]
-  /// يبدّل مسار الصفحة (`/recitation/` بدل `/lesson/`) **و** مفتاح JSON
-  /// المقروء (`recitation` بدل `lesson`) — تحقّقت من الاختلافين معاً
-  /// مباشرة بمتصفح حقيقي (بنيتا الاستجابة متشابهتان لكن غير متطابقتين).
-  Future<String> fetchMidadEntryAudio(int entryId, {bool isRecitation = false}) async {
-    final pathSegment = isRecitation ? 'recitation' : 'lesson';
-    final jsonKey = isRecitation ? 'recitation' : 'lesson';
+  /// جلب محتويات سلسلة/مجموعة دروس كاملة من موقع مداد
+  Future<DuroosPage> fetchMidadCollection(int collectionId) async {
+    final cacheKey = 'coll-$collectionId';
+    if (_cache.containsKey(cacheKey)) return _cache[cacheKey]!;
+
+    final response = await _dio.get<String>(
+      'https://midad.com/collection/$collectionId',
+      options: Options(responseType: ResponseType.plain),
+    );
+    final html = response.data ?? '';
+    final json = _extractInertiaJson(html);
+    final data = json?['props']?['data'] as Map<String, dynamic>?;
+
+    final dynamic entriesRaw = data?['entries']?['data'] ??
+        data?['collection']?['entries'] ??
+        data?['entries'];
+
+    final entries = entriesRaw is List ? entriesRaw : const [];
+    final lectures = <DuroosLecture>[];
+    final seen = <int>{};
+    final entryIdRe = RegExp(r'/(?:lesson|video|audiobook|recitation|entry)/(\d+)');
+
+    for (final e in entries) {
+      if (e is! Map) continue;
+      final id = e['id'] is int ? e['id'] as int : null;
+      final rawTitle = (e['title'] as String? ?? '').replaceAll(_emTagRe, '');
+      final title = _decodeEntities(rawTitle.trim());
+      final url = e['url'] as String? ?? '';
+      final matchedId = id ?? (entryIdRe.firstMatch(url) != null ? int.parse(entryIdRe.firstMatch(url)!.group(1)!) : null);
+      if (matchedId == null || !seen.add(matchedId) || title.isEmpty) continue;
+
+      final typeStr = (e['type'] as String? ?? url);
+      final segment = typeStr.contains('video') ? 'video' : 'lesson';
+      lectures.add(DuroosLecture(
+        title: title,
+        midadLessonId: matchedId,
+        midadEntryType: segment,
+      ));
+    }
+
+    final result = DuroosPage(categories: const [], lectures: lectures);
+    _cache[cacheKey] = result;
+    return result;
+  }
+
+  /// رابط الصوت الفعلي لمحاضرة/تلاوة midad محدَّدة
+  Future<String> fetchMidadEntryAudio(
+    int entryId, {
+    String entryType = 'lesson',
+    bool isRecitation = false,
+  }) async {
+    final pathSegment = isRecitation ? 'recitation' : entryType;
     final response = await _dio.get<String>(
       'https://midad.com/$pathSegment/$entryId',
       options: Options(responseType: ResponseType.plain),
     );
     final html = response.data ?? '';
     final json = _extractInertiaJson(html);
-    final resources = (json?['props']?['data']?[jsonKey]?['resources'] as List?) ?? const [];
+    final data = json?['props']?['data'] as Map<String, dynamic>?;
+
+    List? resources = (data?[pathSegment]?['resources'] as List?);
+    if (resources == null || resources.isEmpty) {
+      if (data != null) {
+        for (final k in data.keys) {
+          if (data[k] is Map && (data[k] as Map).containsKey('resources')) {
+            resources = data[k]['resources'] as List?;
+            if (resources != null && resources.isNotEmpty) break;
+          }
+        }
+      }
+    }
+    resources ??= const [];
 
     String? mp3Url;
     String? anyAudioUrl;
     for (final r in resources) {
       if (r is! Map) continue;
-      if (r['type'] != 'audio') continue;
       final path = r['path'] as String?;
       if (path == null || path.isEmpty) continue;
-      anyAudioUrl ??= path;
-      // قد يتوفّر نفس الدرس بصيغة `rm` قديمة إضافة لـmp3 — نفضّل mp3
-      // دوماً حين متاحاً (راجع مثال حقيقي بالتعليق أعلى الملف).
-      if (Uri.parse(path).path.toLowerCase().endsWith('.mp3')) {
-        mp3Url = path;
-        break;
+      final type = r['type'] as String? ?? '';
+      if (type == 'audio' || type == 'video') {
+        anyAudioUrl ??= path;
+        final cleanPath = Uri.tryParse(path)?.path.toLowerCase() ?? '';
+        if (cleanPath.endsWith('.mp3')) {
+          mp3Url = path;
+          break;
+        }
       }
     }
     final resolved = mp3Url ?? anyAudioUrl;
     if (resolved == null) {
       throw const DuroosParseException(
-        'تعذّر العثور على رابط صوتي لهذه المحاضرة (ربما تغيّرت بنية الموقع) — أعد المحاولة.',
+        'تعذّر العثور على رابط صوتي لهذه المحاضرة — أعد المحاولة.',
       );
     }
     return resolved;

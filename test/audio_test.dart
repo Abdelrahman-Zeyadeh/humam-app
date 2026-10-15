@@ -15,11 +15,11 @@ void main() {
       'alafasy', 'dossari', 'muaiqly', 'qatami', 'ajamy', 'ghamadi', 'fares_abbad',
       'shuraym', 'sudais', 'juhaynee', 'hudhaify', 'qasim', 'jaber', 'ayyoub', 'basfar',
       'shatri', 'rifai', 'budair', 'tunaiji', 'matroud', 'akhdar',
-      'baleela', 'barhaji', 'talib_hamid', 'qarafi', 'badr_turki', 'buaijan', 'abkar', 'hazza',
+      'baleela', 'barhaji', 'talib_hamid', 'qarafi', 'badr_turki', 'buaijan', 'abkar', 'hazza', 'saeedan',
     });
     // القرّاء بنمط سورة كاملة
     for (final id in [
-      'baleela', 'barhaji', 'talib_hamid', 'qarafi', 'badr_turki', 'buaijan', 'abkar', 'hazza',
+      'baleela', 'barhaji', 'talib_hamid', 'qarafi', 'badr_turki', 'buaijan', 'abkar', 'hazza', 'saeedan',
     ]) {
       expect(reciterById(id).mode, ReciterAudioMode.perSurahOnly, reason: id);
     }
@@ -44,8 +44,8 @@ void main() {
   });
 
   test('رابط سورة بندر بليلة كاملة بصيغة SSS.mp3', () {
-    expect(surahAudioUrl('baleela', 1), 'https://media.way2quran.com/bandar-balila/hafs-an-asim/001.mp3');
-    expect(surahAudioUrl('baleela', 114), 'https://media.way2quran.com/bandar-balila/hafs-an-asim/114.mp3');
+    expect(surahAudioUrl('baleela', 1), 'https://server6.mp3quran.net/balilah/001.mp3');
+    expect(surahAudioUrl('baleela', 114), 'https://server6.mp3quran.net/balilah/114.mp3');
   });
 
   test('لا رابط سورة كاملة للقرّاء المقسَّمين بالآية (يستخدمون طابور آيات بدله)', () {

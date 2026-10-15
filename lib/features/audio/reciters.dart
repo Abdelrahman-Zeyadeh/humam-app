@@ -5,10 +5,19 @@
 enum ReciterAudioMode { perAyah, perSurahOnly }
 
 class Reciter {
-  const Reciter({required this.id, required this.nameAr, required this.mode});
+  const Reciter({
+    required this.id,
+    required this.nameAr,
+    required this.mode,
+    String? imageAsset,
+  }) : _imageAsset = imageAsset;
+
   final String id;
   final String nameAr;
   final ReciterAudioMode mode;
+  final String? _imageAsset;
+
+  String get imageAsset => _imageAsset ?? 'assets/images/reciters/$id.jpg';
 }
 
 /// القرّاء المعتمدون بالتطبيق من مصادر موثوقة (everyayah.com / mp3quran.net)
@@ -53,6 +62,7 @@ const List<Reciter> kReciters = [
   Reciter(id: 'buaijan', nameAr: 'عبد الله البعيجان (إمام المسجد النبوي)', mode: ReciterAudioMode.perSurahOnly),
   Reciter(id: 'abkar', nameAr: 'إدريس أبكر', mode: ReciterAudioMode.perSurahOnly),
   Reciter(id: 'hazza', nameAr: 'هزاع البلوشي', mode: ReciterAudioMode.perSurahOnly),
+  Reciter(id: 'saeedan', nameAr: 'وليد بن راشد السعيدان', mode: ReciterAudioMode.perSurahOnly),
 ];
 
 const String kDefaultReciterId = 'husary';
@@ -105,16 +115,17 @@ String ayahAudioUrl(String reciterId, int surah, int ayah) {
   return 'https://everyayah.com/data/$folder/$s$a.mp3';
 }
 
-/// مسار السيرفر السحابي لقراء السورة الكاملة (Way2Quran / Mp3Quran)
+/// مسار السيرفر السحابي لقراء السورة الكاملة (Mp3Quran)
 String _surahAudioBaseUrl(String reciterId) => switch (reciterId) {
-  'barhaji' => 'https://media.way2quran.com/mohammed-barhaji/hafs-an-asim',
-  'talib_hamid' => 'https://media.way2quran.com/ahmed-bin-talib-hamid/hafs-an-asim',
-  'qarafi' => 'https://media.way2quran.com/abdullah-al-qarafi/hafs-an-asim',
-  'badr_turki' => 'https://media.way2quran.com/badr-al-turki/hafs-an-asim',
-  'buaijan' => 'https://media.way2quran.com/abdullah-al-buaijan/hafs-an-asim',
-  'baleela' => 'https://media.way2quran.com/bandar-balila/hafs-an-asim',
-  'abkar' => 'https://server6.mp3quran.net/abkar',
+  'qarafi' => 'https://server16.mp3quran.net/a_alqrafi/Rewayat-Hafs-A-n-Assem',
+  'barhaji' => 'https://server16.mp3quran.net/M_Burhaji/Rewayat-Hafs-A-n-Assem',
+  'talib_hamid' => 'https://server16.mp3quran.net/a_binhameed/Rewayat-Hafs-A-n-Assem',
+  'baleela' => 'https://server6.mp3quran.net/balilah',
+  'badr_turki' => 'https://server10.mp3quran.net/bader/Rewayat-Hafs-A-n-Assem',
+  'buaijan' => 'https://server8.mp3quran.net/buajan',
+  'abkar' => 'https://server6.mp3quran.net/abkr',
   'hazza' => 'https://server11.mp3quran.net/hazza',
+  'saeedan' => 'https://archive.org/download/Walid-Alsaeedan-1438',
   _ => throw ArgumentError(
     'استخدم قائمة ملفات آيات بدل ملف سورة واحد لهذا القارئ: $reciterId',
   ),

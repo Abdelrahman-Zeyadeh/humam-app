@@ -344,11 +344,15 @@ class QuranAudioController extends Notifier<QuranAudioState> {
     required int surahId,
     required int fromAyah,
     required int toAyah,
+    int rangeRepeat = 1,
+    int ayahRepeat = 1,
   }) async {
     await _playSelection(
       surahId: surahId,
       fromAyah: fromAyah,
       toAyah: toAyah,
+      rangeRepeat: rangeRepeat,
+      ayahRepeat: ayahRepeat,
     );
   }
 
@@ -396,6 +400,8 @@ class QuranAudioController extends Notifier<QuranAudioState> {
     required int surahId,
     int? fromAyah,
     int? toAyah,
+    int rangeRepeat = 1,
+    int ayahRepeat = 1,
   }) async {
     final requestId = ++_playRequestId;
     final reciter = reciterById(state.reciterId);
@@ -441,17 +447,23 @@ class QuranAudioController extends Notifier<QuranAudioState> {
                   .toList();
         if (selected.isEmpty) throw StateError('لا آيات بهذا النطاق');
         baseUris = [];
+        baseAyahIds = [];
+        final actualAyahRepeat = ayahRepeat > 1 ? ayahRepeat : 1;
         for (final a in selected) {
           final local = liveListen
               ? null
               : await localAyahAudioFile(reciter.id, a.surah, a.ayah);
           if (requestId != _playRequestId) return;
-          baseUris.add(local?.uri ?? Uri.parse(ayahAudioUrl(reciter.id, a.surah, a.ayah)));
+          final uri = local?.uri ?? Uri.parse(ayahAudioUrl(reciter.id, a.surah, a.ayah));
+          for (var r = 0; r < actualAyahRepeat; r++) {
+            baseUris.add(uri);
+            baseAyahIds.add(a.id);
+          }
         }
-        baseAyahIds = [for (final a in selected) a.id];
       }
 
-      final multiplier = state.repeat.multiplier;
+      final customRangeRepeat = rangeRepeat > 1 ? rangeRepeat : null;
+      final multiplier = customRangeRepeat ?? state.repeat.multiplier;
       final loopAll = state.repeat == RepeatOption.infinite;
       final finalUris = multiplier == null
           ? baseUris

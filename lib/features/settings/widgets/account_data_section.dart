@@ -32,9 +32,9 @@ class AccountDataSection extends ConsumerWidget {
               Icons.auto_awesome_rounded,
               color: AppColors.goldDeep,
             ),
-            title: const Text('كتالوج التطبيق والجولة التعريفية'),
+            title: const Text('دليل ومزايا تطبيق هُمَام'),
             subtitle: const Text(
-              'استعراض مميزات التطبيق التفاعلية مع دوائر التركيز والشرح',
+              'دليل موجز وأنيق يستعرض مميزات وأقسام التطبيق الأساسية',
               style: TextStyle(fontSize: 12),
             ),
             trailing: const Icon(Icons.chevron_left_rounded),

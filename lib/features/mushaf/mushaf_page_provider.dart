@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/data/quran/quran_providers.dart';
 import '../../core/data/quran/quran_repository.dart';
+import '../../core/text/arabic_normalizer.dart' show surahShortName;
 import 'mushaf_font_service.dart';
 import 'mushaf_settings.dart';
 
@@ -43,4 +44,39 @@ final mushafEditionPreviewProvider =
 
   final fontFamily = await fontService.ensureLoaded(1, edition);
   return (fontFamily: fontFamily, text: text);
+});
+
+/// جزء الصفحة الحالية (أول آية بالصفحة)
+final pageJuzProvider = FutureProvider.family<int, int>((ref, page) async {
+  final ayahs = await ref.watch(quranRepositoryProvider).ayahsForPage(page);
+  return ayahs.isEmpty ? 1 : ayahs.first.juz;
+});
+
+/// حزب الصفحة الحالية
+final pageHizbProvider = FutureProvider.family<int, int>((ref, page) {
+  return ref.watch(quranRepositoryProvider).hizbForPage(page);
+});
+
+/// ربع-حزب الصفحة الحالية
+final pageRubProvider = FutureProvider.family<int, int>((ref, page) {
+  return ref.watch(quranRepositoryProvider).rubForPage(page);
+});
+
+/// رقم سورة الصفحة الحالية (أول آية بالصفحة)
+final pageSurahIdProvider = FutureProvider.family<int, int>((ref, page) async {
+  final ayahs = await ref.watch(quranRepositoryProvider).ayahsForPage(page);
+  return ayahs.isEmpty ? 1 : ayahs.first.surah;
+});
+
+/// اسم سورة الصفحة الحالية
+final pageSurahNameProvider = FutureProvider.family<String, int>((
+  ref,
+  page,
+) async {
+  final quran = ref.watch(quranRepositoryProvider);
+  final ayahs = await quran.ayahsForPage(page);
+  if (ayahs.isEmpty) return '';
+  final surah = await quran.surahById(ayahs.first.surah);
+  if (surah.id == 5) return 'المائدة';
+  return surahShortName(surah.nameAr);
 });

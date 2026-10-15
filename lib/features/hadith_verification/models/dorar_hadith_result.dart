@@ -42,10 +42,11 @@ class DorarHadithResult {
     buffer.writeln();
     if (narrator != null) buffer.writeln('الراوي: $narrator');
     if (muhaddith != null) buffer.writeln('المحدث: $muhaddith');
-    if (source != null)
+    if (source != null) {
       buffer.writeln(
         'المصدر: $source${pageOrNumber != null ? ' - الصفحة أو الرقم: $pageOrNumber' : ''}',
       );
+    }
     if (grade != null) buffer.writeln('خلاصة حكم المحدث: $grade');
     buffer.writeln('موقع الدرر السنية: $permalink');
     return buffer.toString().trim();

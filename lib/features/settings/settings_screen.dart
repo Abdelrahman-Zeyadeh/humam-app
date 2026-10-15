@@ -3,14 +3,10 @@ import 'package:flutter/material.dart';
 import 'widgets/account_data_section.dart';
 import 'widgets/appearance_settings_section.dart';
 import 'widgets/prayer_reminders_section.dart';
+import 'widgets/privacy_settings_section.dart';
 import 'widgets/reading_listening_section.dart';
 
 /// الإعدادات: تجميع تفضيلات عامة مبعثرة سابقاً بين شاشات مختلفة
-///
-/// الشاشة نفسها مجرّد تنسيق (composition) لأربعة أقسام مستقلة بمجلد
-/// `widgets/` (المظهر والألوان، القراءة والاستماع، الصلاة والتذكيرات،
-/// الحساب والبيانات) — استُخرجت من هون أثناء تفكيك الملف، كان ~١٤٥١ سطراً
-/// بكل شي بملف واحد، بلا أي تغيير سلوكي.
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -28,6 +24,8 @@ class SettingsScreen extends StatelessWidget {
           const PrayerRemindersSection(),
           const SizedBox(height: 24),
           const AccountDataSection(),
+          const SizedBox(height: 24),
+          const PrivacySettingsSection(),
         ],
       ),
     );

@@ -460,7 +460,10 @@ class _ActivePlanView extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
+          // --- شريط التقدم اليومي ---
+          _DailyProgressBar(plan: plan),
+          const SizedBox(height: 14),
           // شبكة إحصاءات مصغّرة (بدل قائمة تسمية/قيمة مسطّحة طويلة).
           Row(
             children: [
@@ -524,6 +527,10 @@ class _ActivePlanView extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
+              // زر "تمت القراءة" — يُسجّل صفحات الورد اليومي بدون فتح المصحف
+              // (مفيد لو قرأ المستخدم من مصحف عادي أو بمكان آخر).
+              _MarkDoneButton(plan: plan),
+              const SizedBox(width: 4),
               IconButton(
                 onPressed: onCancel,
                 icon: const Icon(Icons.delete_outline),
@@ -592,3 +599,148 @@ class _StatChip extends StatelessWidget {
 }
 
 String _formatDate(DateTime d) => '${d.year}/${d.month}/${d.day}';
+
+// ---------------------------------------------------------------------------
+// شريط التقدم اليومي
+// ---------------------------------------------------------------------------
+
+/// يحسب كم صفحة قرأ المستخدم اليوم لهذه الخطة (الفرق بين `currentPage`
+/// وما يجب أن تكون عليه في نهاية أمس) ويرسم شريطاً يوضّح التقدم نحو الورد
+/// اليومي الكامل وكم صفحة باقية.
+class _DailyProgressBar extends StatelessWidget {
+  const _DailyProgressBar({required this.plan});
+  final KhatmaPlan plan;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = themeAccent(context);
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    // الصفحة المتوقَّعة في نهاية أمس = المتوقَّعة اليوم ناقص ورد يوم واحد.
+    final expectedYesterday =
+        (plan.startPage - 1 + (plan.daysElapsed - 1) * plan.dailyPages)
+            .clamp(plan.startPage - 1, 604);
+    final readToday = (plan.currentPage - expectedYesterday).clamp(0, plan.dailyPages + 20);
+    final dailyTarget = plan.dailyPages;
+    final remainingToday = (dailyTarget - readToday).clamp(0, dailyTarget);
+    final ratio = dailyTarget > 0
+        ? (readToday / dailyTarget).clamp(0.0, 1.0)
+        : 1.0;
+    final done = readToday >= dailyTarget;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Icon(
+              done ? Icons.check_circle_rounded : Icons.today_outlined,
+              size: 14,
+              color: done ? AppColors.tealDeep : _textSoft(context),
+            ),
+            const SizedBox(width: 5),
+            Expanded(
+              child: Text(
+                done
+                    ? 'أتممت ورد اليوم بحمد الله 🎉'
+                    : 'ورد اليوم: $readToday من $dailyTarget صفحة (متبقٍّ $remainingToday)',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: done ? AppColors.tealDeep : onSurface.withValues(alpha: 0.8),
+                ),
+              ),
+            ),
+            Text(
+              '${(ratio * 100).round()}٪',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: accent,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: LinearProgressIndicator(
+            value: ratio,
+            minHeight: 7,
+            backgroundColor: accent.withValues(alpha: 0.12),
+            valueColor: AlwaysStoppedAnimation(done ? AppColors.tealDeep : accent),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// زر "تمت القراءة"
+// ---------------------------------------------------------------------------
+
+/// زر إجراء يُتيح تسجيل ورد اليوم يدوياً بدون فتح المصحف (إذا قرأ من مصحف ورقي أو مكان آخر).
+class _MarkDoneButton extends ConsumerWidget {
+  const _MarkDoneButton({required this.plan});
+  final KhatmaPlan plan;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final expectedYesterday =
+        (plan.startPage - 1 + (plan.daysElapsed - 1) * plan.dailyPages)
+            .clamp(plan.startPage - 1, 604);
+    final readToday = (plan.currentPage - expectedYesterday).clamp(0, plan.dailyPages + 20);
+    final done = readToday >= plan.dailyPages;
+
+    return Tooltip(
+      message: done ? 'أتممت ورد اليوم' : 'تمت القراءة من مصحف آخر',
+      child: OutlinedButton.icon(
+        icon: Icon(
+          done ? Icons.check_circle_rounded : Icons.done_all_rounded,
+          size: 16,
+          color: done ? AppColors.tealDeep : null,
+        ),
+        label: Text(
+          done ? 'مكتمل' : 'تمت القراءة',
+          style: TextStyle(
+            fontSize: 12,
+            color: done ? AppColors.tealDeep : null,
+          ),
+        ),
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+          minimumSize: const Size(0, 36),
+          side: done
+              ? const BorderSide(color: AppColors.tealDeep, width: 1.3)
+              : null,
+        ),
+        onPressed: done
+            ? null
+            : () async {
+                final newPage = (plan.currentPage + plan.dailyPages).clamp(
+                  plan.currentPage,
+                  604,
+                );
+                await ref
+                    .read(khatmaPrefsProvider)
+                    .updateCurrentPage(plan.id, newPage);
+                // تحديث سلسلة القراءة اليومية أيضاً
+                await ref.read(userPrefsProvider).bumpStreakIfNewDay();
+                ref.read(khatmaVersionProvider.notifier).bump();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'بارك الله فيك، تم احتساب الورد — الصفحة $newPage من ٦٠٤ 📖',
+                      ),
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                }
+              },
+      ),
+    );
+  }
+}
+

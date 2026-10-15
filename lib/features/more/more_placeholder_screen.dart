@@ -2,14 +2,17 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/data/user/hifz_prefs.dart';
 import '../../core/data/user/tool_usage_prefs.dart';
 import '../../core/data/user/user_prefs.dart';
+import '../../core/text/arabic_normalizer.dart';
 import '../../core/theme/app_card.dart';
 import '../../core/theme/app_colors.dart';
 import '../azkar/tasbih_screen.dart';
 import '../fasting/ui/fasting_assistant_screen.dart';
 import '../groups/ui/groups_hub_screen.dart';
-import '../hadith/hadith_hub_screen.dart';
+import '../hadith/hadith_books_screen.dart';
+import '../hifz/hifz_mushaf_screen.dart';
 import '../hifz/hifz_screen.dart';
 import '../hifz/mutashabihat_screen.dart';
 import '../hijri/hijri_calendar_screen.dart';
@@ -24,19 +27,23 @@ import '../profile/achievements_screen.dart';
 import '../profile/profile_stats_screen.dart';
 import '../qiyam/qiyam_screen.dart';
 import '../radio/quran_radio_screen.dart';
-import '../radio/radio_and_duroos_screen.dart';
 import '../tajweed/ui/tajweed_screen.dart';
 import 'reminders_screen.dart';
+import '../notifications/notifications_screen.dart';
 import '../onboarding/onboarding_target_keys.dart';
+import '../settings/permissions_guide_screen.dart';
 import '../settings/settings_screen.dart';
+import '../story_maker/ui/ayah_story_maker_screen.dart';
+import '../hadith_verification/ui/hadith_verification_screen.dart';
 import '../wallpapers/wallpapers_screen.dart';
-import '../wrapped/ui/faith_wrapped_screen.dart';
 
 /// أداة داخل مركز الأدوات
 class _ToolItem {
   const _ToolItem({
     required this.id,
     required this.title,
+    this.nameEn = '',
+    this.keywords = const [],
     required this.icon,
     required this.category,
     required this.color,
@@ -46,6 +53,8 @@ class _ToolItem {
 
   final String id;
   final String title;
+  final String nameEn;
+  final List<String> keywords;
   final IconData icon;
   final String category;
   final Color color;
@@ -85,22 +94,28 @@ Color _toolShade(Color base, int index, int count) {
 
 const List<_CategoryDef> _kToolCategories = [
   _CategoryDef(
-    title: 'عبادات وطاعات',
-    icon: Icons.notifications_none_outlined,
+    title: 'القرآن والتعليم',
+    icon: Icons.menu_book_outlined,
+    color: Color(0xFF2E7D32),
+    darkColor: Color(0xFF81C784),
+  ),
+  _CategoryDef(
+    title: 'الحديث الشريف',
+    icon: Icons.verified_outlined,
+    color: Color(0xFF1E88E5),
+    darkColor: Color(0xFF64B5F6),
+  ),
+  _CategoryDef(
+    title: 'العبادة والشعائر',
+    icon: Icons.nights_stay_outlined,
     color: Color(0xFF9E7A3E),
     darkColor: Color(0xFFD4AF67),
   ),
   _CategoryDef(
-    title: 'الصحبة والمنافسة',
-    icon: Icons.people_alt_outlined,
+    title: 'المجتمع والمتابعة',
+    icon: Icons.emoji_events_outlined,
     color: Color(0xFF3F8275),
     darkColor: Color(0xFF64B5A5),
-  ),
-  _CategoryDef(
-    title: 'المكتبة والعلوم',
-    icon: Icons.menu_book_outlined,
-    color: Color(0xFF6A5787),
-    darkColor: Color(0xFFA592C2),
   ),
 ];
 
@@ -117,13 +132,14 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
 
-  /// الفئات المفتوحة حالياً — كلها **مفتوحة افتراضياً** بطلب صريح لاحق
-  /// (تراجع عن قرار سابق كانت كلها مطوية فيه) — بعد دمج عناصر الحديث
-  /// الثلاثة بمدخل واحد وتقليص القائمة، صار عدد العناصر الإجمالي أصغر بما
-  /// يكفي لعرضها كلها دفعة وحدة بلا إرباك، ويوفّر ضغطة إضافية لكل فتح.
-  late final Set<String> _openCategories = _kToolCategories
-      .map((c) => c.title)
-      .toSet();
+  late Set<String> _openCategories;
+  bool _openCategoriesInitialized = false;
+
+  void _initOpenCategoriesIfNeeded() {
+    if (_openCategoriesInitialized) return;
+    _openCategoriesInitialized = true;
+    _openCategories = _kToolCategories.map((c) => c.title).toSet();
+  }
 
   @override
   void dispose() {
@@ -139,8 +155,9 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
     });
   }
 
-  /// يسجّل ضغطة الاستخدام لتغذية إحصائيات الأدوات
+  /// يسجّل ضغطة الاستخدام ويحفظ الأداة في المستخدمة مؤخراً
   void _handleToolTap(BuildContext context, WidgetRef ref, _ToolItem tool) {
+    ref.read(recentlyUsedToolsProvider.notifier).recordUse(tool.id);
     tool.onTap(context, ref);
     ref.read(toolUsagePrefsProvider).recordTap(tool.id).then((_) {
       if (context.mounted) {
@@ -150,15 +167,15 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
   }
 
   List<_ToolItem> _getAllTools() => [
-    // 1. عبادات وطاعات — الختمة والحفظ أولاً ومميَّزتان (`featured`): أكبر
-    // ميزتين بالتطبيق (خطط متعددة، جدولة، تتبّع تقدّم) لا يجوز تكونا بنفس
-    // وزن أداة بسيطة كالقبلة أو التقويم بقائمة طويلة.
+    // 1. القرآن والتعليم
     _ToolItem(
       id: 'khatma',
       title: 'خطة الختمة',
-      icon: Icons.bookmark_outline,
-      category: 'عبادات وطاعات',
-      color: _toolShade(_kToolCategories[0].color, 0, 8),
+      nameEn: 'Khatma Plan',
+      keywords: const ['ختمة', 'مصحف', 'تلاوة', 'قراءة', 'أجزاء', 'khatma', 'quran'],
+      icon: Icons.menu_book_rounded, // مصحف مفتوح معبّر للختمة
+      category: 'القرآن والتعليم',
+      color: _toolShade(_kToolCategories[0].color, 0, 10),
       featured: true,
       onTap: (ctx, _) => Navigator.of(
         ctx,
@@ -166,133 +183,83 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
     ),
     _ToolItem(
       id: 'hifz',
-      title: 'خطة الحفظ والمراجعة',
-      icon: Icons.sticky_note_2_outlined,
-      category: 'عبادات وطاعات',
-      color: _toolShade(_kToolCategories[0].color, 1, 8),
+      title: 'خطة الحفظ والجدول',
+      nameEn: 'Hifz Plan & Schedule',
+      keywords: const ['حفظ', 'جدول', 'تسميع', 'سورة', 'آيات', 'hifz'],
+      icon: Icons.calendar_month_rounded, // جدول وتقويم الحفظ المعبّر
+      category: 'القرآن والتعليم',
+      color: _toolShade(_kToolCategories[0].color, 1, 10),
       featured: true,
       onTap: (ctx, _) => Navigator.of(
         ctx,
       ).push(MaterialPageRoute(builder: (_) => const HifzScreen())),
     ),
     _ToolItem(
-      id: 'qibla',
-      title: 'اتجاه القبلة',
-      icon: Icons.explore_outlined,
-      category: 'عبادات وطاعات',
+      id: 'hifz_center',
+      title: 'مركز الحفظ والمراجعة الذكي',
+      nameEn: 'Hifz & Review Hub',
+      keywords: const [
+        'مراجعة',
+        'تثبيت',
+        'اختبار',
+        'كويز',
+        'خريطة',
+        'إتقان',
+        'كلمات ناقصة',
+        'تسميع',
+        'حفظ',
+        'review',
+        'hifz',
+        'quiz',
+        'heatmap',
+      ],
+      icon: Icons.fact_check_rounded,
+      category: 'القرآن والتعليم',
       color: _toolShade(_kToolCategories[0].color, 2, 8),
-      onTap: (ctx, _) => Navigator.of(
-        ctx,
-      ).push(MaterialPageRoute(builder: (_) => const QiblaScreen())),
-    ),
-    // رجّعتها بطلب صريح — بشرط توجيه مباشر لشاشة `TasbihScreen` المستقلة
-    // (لا `AzkarLibraryScreen` العامة كالسابق، كانت مطابقة حرفياً لتبويب
-    // "الأذكار" السفلي فاعتُبرت تكراراً؛ هالمرة وجهة مختلفة فعلياً).
-    _ToolItem(
-      id: 'tasbih',
-      title: 'المسبحة الإلكترونية',
-      icon: Icons.grain_rounded,
-      category: 'عبادات وطاعات',
-      color: _toolShade(_kToolCategories[0].color, 3, 8),
-      onTap: (ctx, _) => Navigator.of(
-        ctx,
-      ).push(MaterialPageRoute(builder: (_) => const TasbihScreen())),
+      featured: true,
+      onTap: (ctx, ref) {
+        final plans = ref.read(hifzPrefsProvider).plans;
+        Navigator.of(ctx).push(
+          MaterialPageRoute(
+            builder: (_) => HifzMushafScreen(
+              planId: plans.isNotEmpty ? plans.first.id : null,
+            ),
+          ),
+        );
+      },
     ),
     _ToolItem(
-      id: 'hijri',
-      title: 'التقويم الهجري',
-      icon: Icons.calendar_today_outlined,
-      category: 'عبادات وطاعات',
-      color: _toolShade(_kToolCategories[0].color, 4, 8),
+      id: 'mutashabihat',
+      title: 'متشابهات القرآن الكريم',
+      nameEn: 'Quran Mutashabihat',
+      keywords: const ['متشابهات', 'تشابه', 'آيات', 'مصحف', 'حفظ', 'mutashabihat'],
+      icon: Icons.compare_arrows_rounded,
+      category: 'القرآن والتعليم',
+      color: _toolShade(_kToolCategories[0].color, 5, 10),
       onTap: (ctx, _) => Navigator.of(
         ctx,
-      ).push(MaterialPageRoute(builder: (_) => const HijriCalendarScreen())),
+      ).push(MaterialPageRoute(builder: (_) => const MutashabihatScreen())),
     ),
     _ToolItem(
-      id: 'qiyam',
-      title: 'قيام الليل والوتر',
-      icon: Icons.nights_stay_outlined,
-      category: 'عبادات وطاعات',
-      color: _toolShade(_kToolCategories[0].color, 5, 8),
+      id: 'tajweed',
+      title: 'أحكام التجويد والضبط',
+      nameEn: 'Tajweed Rules',
+      keywords: const ['تجويد', 'أحكام', 'ترتيل', 'مخارج', 'صفات', 'tajweed'],
+      icon: Icons.menu_book_outlined,
+      category: 'القرآن والتعليم',
+      color: _toolShade(_kToolCategories[0].color, 6, 10),
       onTap: (ctx, _) => Navigator.of(
         ctx,
-      ).push(MaterialPageRoute(builder: (_) => const QiyamScreen())),
+      ).push(MaterialPageRoute(builder: (_) => const TajweedScreen())),
     ),
-    _ToolItem(
-      id: 'fasting',
-      title: 'مساعد صيام التطوع',
-      icon: Icons.dark_mode_outlined,
-      category: 'عبادات وطاعات',
-      color: _toolShade(_kToolCategories[0].color, 6, 8),
-      onTap: (ctx, _) => Navigator.of(
-        ctx,
-      ).push(MaterialPageRoute(builder: (_) => const FastingAssistantScreen())),
-    ),
-    // نُقلت من شاشة الإعدادات بالكامل بطلب صريح — التذكيرات كلها هون
-    // بمكان واحد الآن (كانت موزَّعة داخل الإعدادات نفسها)، راجع
-    // `reminders_screen.dart`.
-    _ToolItem(
-      id: 'reminders',
-      title: 'التذكيرات',
-      icon: Icons.notifications_active_outlined,
-      category: 'عبادات وطاعات',
-      color: _toolShade(_kToolCategories[0].color, 7, 8),
-      onTap: (ctx, _) => Navigator.of(
-        ctx,
-      ).push(MaterialPageRoute(builder: (_) => const RemindersScreen())),
-    ),
-
-    // 2. الصحبة والمنافسة
-    _ToolItem(
-      id: 'groups',
-      title: 'مجموعات التنافس',
-      icon: Icons.people_outline,
-      category: 'الصحبة والمنافسة',
-      color: _toolShade(_kToolCategories[1].color, 0, 4),
-      onTap: (ctx, _) => Navigator.of(
-        ctx,
-      ).push(MaterialPageRoute(builder: (_) => const GroupsHubScreen())),
-    ),
-    _ToolItem(
-      id: 'weekly_report',
-      title: 'التقرير الأسبوعي',
-      icon: Icons.bar_chart_rounded,
-      category: 'الصحبة والمنافسة',
-      color: _toolShade(_kToolCategories[1].color, 1, 4),
-      onTap: (ctx, _) => Navigator.of(
-        ctx,
-      ).push(MaterialPageRoute(builder: (_) => const WeeklyReportScreen())),
-    ),
-    _ToolItem(
-      id: 'faith_wrapped',
-      title: 'التقرير الإيماني المرئي (Wrapped)',
-      icon: Icons.auto_awesome_rounded,
-      category: 'الصحبة والمنافسة',
-      color: _toolShade(_kToolCategories[1].color, 2, 4),
-      onTap: (ctx, _) => Navigator.of(
-        ctx,
-      ).push(MaterialPageRoute(builder: (_) => const FaithWrappedScreen())),
-    ),
-    // جديد — تجميع بصري لكل سلاسل الاستمرار الموجودة أصلاً (`CategoryStreaks`)
-    // بشكل أوسمة/درجات، بلا أي جدول قاعدة بيانات جديد. راجع `AchievementsScreen`.
-    _ToolItem(
-      id: 'achievements',
-      title: 'الإنجازات والأوسمة',
-      icon: Icons.emoji_events_outlined,
-      category: 'الصحبة والمنافسة',
-      color: _toolShade(_kToolCategories[1].color, 3, 4),
-      onTap: (ctx, _) => Navigator.of(
-        ctx,
-      ).push(MaterialPageRoute(builder: (_) => const AchievementsScreen())),
-    ),
-
-    // 3. المكتبة والعلوم
     _ToolItem(
       id: 'bookmarks',
       title: 'العلامات المرجعية',
+      nameEn: 'Bookmarks',
+      keywords: const ['علامات', 'فواصل', 'حفظ الصفحة', 'مرجع', 'bookmarks'],
       icon: Icons.bookmark_outline,
-      category: 'المكتبة والعلوم',
-      color: _toolShade(_kToolCategories[2].color, 0, 6),
+      category: 'القرآن والتعليم',
+      color: _toolShade(_kToolCategories[0].color, 7, 10),
       onTap: (ctx, _) => Navigator.of(
         ctx,
       ).push(MaterialPageRoute(builder: (_) => const BookmarksScreen())),
@@ -300,57 +267,137 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
     _ToolItem(
       id: 'notes',
       title: 'ملاحظاتي',
+      nameEn: 'Quran Notes',
+      keywords: const ['ملاحظات', 'تدبر', 'خواطر', 'فوائد', 'تعليق', 'notes'],
       icon: Icons.edit_note_rounded,
-      category: 'المكتبة والعلوم',
-      color: _toolShade(_kToolCategories[2].color, 1, 6),
+      category: 'القرآن والتعليم',
+      color: _toolShade(_kToolCategories[0].color, 8, 10),
       onTap: (ctx, _) => Navigator.of(
         ctx,
       ).push(MaterialPageRoute(builder: (_) => const NotesScreen())),
     ),
-    // ثلاثة عناصر سابقة ("موسوعة الحديث"/"التحقق من صحة الحديث"/"حديث
-    // اليوم والفوائد") دُمجت بمدخل واحد بطلب صريح لتقليل زحمة هالقائمة —
-    // راجع تعليق `HadithHubScreen` لتفاصيل قرار الدمج (بطاقات لا تبويبات).
-    // إحصاء "الأكثر استخداماً" لأي ضغطة قديمة على المعرّفات الثلاثة
-    // القديمة تُتجاهَل بأمان تلقائياً (نفس آلية `radio_duroos` أعلاه).
     _ToolItem(
-      id: 'hadith_hub',
-      title: 'الحديث الشريف',
-      icon: Icons.menu_book_outlined,
-      category: 'المكتبة والعلوم',
-      color: _toolShade(_kToolCategories[2].color, 2, 6),
+      id: 'story_maker',
+      title: 'صانع بطاقات الآيات والستوري',
+      nameEn: 'Ayah Story Maker',
+      keywords: const ['ستوري', 'بطاقات', 'تصميم', 'مشاركة', 'آية', 'story', 'maker'],
+      icon: Icons.photo_size_select_actual_outlined,
+      category: 'القرآن والتعليم',
+      color: _toolShade(_kToolCategories[0].color, 9, 10),
+      featured: true,
       onTap: (ctx, _) => Navigator.of(
         ctx,
-      ).push(MaterialPageRoute(builder: (_) => const HadithHubScreen())),
+      ).push(MaterialPageRoute(builder: (_) => const AyahStoryMakerScreen())),
+    ),
+
+    // 2. الحديث الشريف
+    _ToolItem(
+      id: 'hadith_verification',
+      title: 'التحقق من صحة الحديث (الدرر السنية)',
+      nameEn: 'Hadith Verification',
+      keywords: const ['حديث', 'صحة الحديث', 'درر سنية', 'تخريج', 'سند', 'dorar', 'hadith', 'verification'],
+      icon: Icons.verified_outlined,
+      category: 'الحديث الشريف',
+      color: _toolShade(_kToolCategories[1].color, 0, 2),
+      featured: true,
+      onTap: (ctx, _) => Navigator.of(
+        ctx,
+      ).push(MaterialPageRoute(builder: (_) => const HadithVerificationScreen())),
+    ),
+    _ToolItem(
+      id: 'hadith_hub',
+      title: 'موسوعة وكتب الحديث الشريف',
+      nameEn: 'Hadith Library & Search',
+      keywords: const ['حديث', 'كتب', 'بخاري', 'مسلم', 'نووي', 'رياض الصالحين', 'سنن', 'أربعين', 'hadith'],
+      icon: Icons.auto_stories_outlined,
+      category: 'الحديث الشريف',
+      color: _toolShade(_kToolCategories[1].color, 1, 2),
+      onTap: (ctx, _) => Navigator.of(
+        ctx,
+      ).push(MaterialPageRoute(builder: (_) => const HadithBooksScreen())),
+    ),
+
+    // 3. العبادة والشعائر
+    _ToolItem(
+      id: 'qiyam',
+      title: 'قيام الليل والوتر',
+      nameEn: 'Qiyam Al-Layl & Witr',
+      keywords: const ['قيام', 'ليل', 'وتر', 'تهجد', 'ثلث الليل', 'صلاة', 'qiyam', 'witr'],
+      icon: Icons.nights_stay_outlined,
+      category: 'العبادة والشعائر',
+      color: _toolShade(_kToolCategories[2].color, 0, 8),
+      onTap: (ctx, _) => Navigator.of(
+        ctx,
+      ).push(MaterialPageRoute(builder: (_) => const QiyamScreen())),
+    ),
+    _ToolItem(
+      id: 'fasting',
+      title: 'مساعد صيام التطوع',
+      nameEn: 'Fasting Assistant',
+      keywords: const ['صيام', 'تطوع', 'إثنين وخميس', 'أيام البيض', 'عاشوراء', 'عرفة', 'fasting'],
+      icon: Icons.dark_mode_outlined,
+      category: 'العبادة والشعائر',
+      color: _toolShade(_kToolCategories[2].color, 1, 8),
+      onTap: (ctx, _) => Navigator.of(
+        ctx,
+      ).push(MaterialPageRoute(builder: (_) => const FastingAssistantScreen())),
+    ),
+    _ToolItem(
+      id: 'qibla',
+      title: 'اتجاه القبلة',
+      nameEn: 'Qibla Direction',
+      keywords: const ['قبلة', 'كعبة', 'بوصلة', 'اتجاه', 'صلاة', 'qibla', 'compass'],
+      icon: Icons.explore_outlined,
+      category: 'العبادة والشعائر',
+      color: _toolShade(_kToolCategories[2].color, 2, 8),
+      onTap: (ctx, _) => Navigator.of(
+        ctx,
+      ).push(MaterialPageRoute(builder: (_) => const QiblaScreen())),
+    ),
+    _ToolItem(
+      id: 'tasbih',
+      title: 'المسبحة الإلكترونية',
+      nameEn: 'Electronic Tasbih',
+      keywords: const ['تسبيح', 'سبحة', 'مسبحة', 'استغفار', 'أذكار', 'عداد', 'tasbih'],
+      icon: Icons.grain_rounded,
+      category: 'العبادة والشعائر',
+      color: _toolShade(_kToolCategories[2].color, 3, 8),
+      onTap: (ctx, _) => Navigator.of(
+        ctx,
+      ).push(MaterialPageRoute(builder: (_) => const TasbihScreen())),
+    ),
+    _ToolItem(
+      id: 'hijri',
+      title: 'التقويم الهجري',
+      nameEn: 'Hijri Calendar',
+      keywords: const ['تقويم', 'هجري', 'تاريخ', 'شهر', 'مناسبات', 'hijri', 'calendar'],
+      icon: Icons.calendar_today_outlined,
+      category: 'العبادة والشعائر',
+      color: _toolShade(_kToolCategories[2].color, 4, 8),
+      onTap: (ctx, _) => Navigator.of(
+        ctx,
+      ).push(MaterialPageRoute(builder: (_) => const HijriCalendarScreen())),
     ),
     _ToolItem(
       id: 'names_of_allah',
       title: 'أسماء الله الحسنى والتدبر',
+      nameEn: 'Names of Allah',
+      keywords: const ['أسماء الله', 'حسنى', 'تدبر', 'معاني', 'names of allah'],
       icon: Icons.auto_awesome_rounded,
-      category: 'المكتبة والعلوم',
-      color: _toolShade(_kToolCategories[2].color, 3, 6),
+      category: 'العبادة والشعائر',
+      color: _toolShade(_kToolCategories[2].color, 5, 8),
       onTap: (ctx, _) => Navigator.of(
         ctx,
       ).push(MaterialPageRoute(builder: (_) => const NamesOfAllahScreen())),
     ),
-    // نُقل من قسم "الصلاة والتذكيرات" بالإعدادات (بطلب صريح) — أحكام
-    // التجويد وألوانه علم قرآني عام، مالوش علاقة بالصلاة/الأذان، فمكانه
-    // الطبيعي هون مع بقية أدوات "المكتبة والعلوم". راجع `TajweedScreen`.
-    _ToolItem(
-      id: 'tajweed',
-      title: 'أحكام التجويد والضبط',
-      icon: Icons.menu_book_outlined,
-      category: 'المكتبة والعلوم',
-      color: _toolShade(_kToolCategories[2].color, 4, 6),
-      onTap: (ctx, _) => Navigator.of(
-        ctx,
-      ).push(MaterialPageRoute(builder: (_) => const TajweedScreen())),
-    ),
     _ToolItem(
       id: 'radio',
       title: 'الإذاعات والبث المباشر',
+      nameEn: 'Quran Radio & Broadcasts',
+      keywords: const ['إذاعة', 'بث مباشر', 'راديو', 'تلاوات', 'radio'],
       icon: Icons.podcasts_rounded,
-      category: 'المكتبة والعلوم',
-      color: _toolShade(_kToolCategories[2].color, 5, 7),
+      category: 'العبادة والشعائر',
+      color: _toolShade(_kToolCategories[2].color, 6, 8),
       onTap: (ctx, _) => Navigator.of(
         ctx,
       ).push(MaterialPageRoute(builder: (_) => const QuranRadioScreen(isStandalone: true))),
@@ -358,43 +405,107 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
     _ToolItem(
       id: 'duroos',
       title: 'الدروس والمحاضرات العلمية',
+      nameEn: 'Islamic Lessons & Lectures',
+      keywords: const ['دروس', 'محاضرات', 'خطب', 'شروح', 'علم', 'duroos', 'lectures'],
       icon: Icons.school_outlined,
-      category: 'المكتبة والعلوم',
-      color: _toolShade(_kToolCategories[2].color, 6, 8),
+      category: 'العبادة والشعائر',
+      color: _toolShade(_kToolCategories[2].color, 7, 8),
       onTap: (ctx, _) => Navigator.of(
         ctx,
       ).push(MaterialPageRoute(builder: (_) => const DuroosScreen(isStandalone: true))),
     ),
+
+    // 4. المجتمع والمتابعة
+    _ToolItem(
+      id: 'groups',
+      title: 'مجموعات التنافس (الصحبة الصالحة)',
+      nameEn: 'Community Groups',
+      keywords: const ['مجموعات', 'صحبة', 'تنافس', 'تحدي', 'أصدقاء', 'groups', 'community'],
+      icon: Icons.people_outline,
+      category: 'المجتمع والمتابعة',
+      color: _toolShade(_kToolCategories[3].color, 0, 7),
+      onTap: (ctx, _) => Navigator.of(
+        ctx,
+      ).push(MaterialPageRoute(builder: (_) => const GroupsHubScreen())),
+    ),
+    _ToolItem(
+      id: 'achievements',
+      title: 'الإنجازات والأوسمة',
+      nameEn: 'Achievements & Badges',
+      keywords: const ['إنجازات', 'أوسمة', 'شارات', 'تصنيف', 'achievements', 'badges', 'leaderboards'],
+      icon: Icons.emoji_events_outlined,
+      category: 'المجتمع والمتابعة',
+      color: _toolShade(_kToolCategories[3].color, 1, 7),
+      onTap: (ctx, _) => Navigator.of(
+        ctx,
+      ).push(MaterialPageRoute(builder: (_) => const AchievementsScreen())),
+    ),
+    _ToolItem(
+      id: 'weekly_report',
+      title: 'التقرير الأسبوعي',
+      nameEn: 'Weekly Report',
+      keywords: const ['تقرير', 'أسبوعي', 'إحصائيات', 'متابعة', 'weekly', 'report'],
+      icon: Icons.bar_chart_rounded,
+      category: 'المجتمع والمتابعة',
+      color: _toolShade(_kToolCategories[3].color, 2, 7),
+      onTap: (ctx, _) => Navigator.of(
+        ctx,
+      ).push(MaterialPageRoute(builder: (_) => const WeeklyReportScreen())),
+    ),
+
+    _ToolItem(
+      id: 'reminders',
+      title: 'منبهات الطاعات والأذكار',
+      nameEn: 'Worship Alarms & Reminders',
+      keywords: const ['تذكير', 'منبه', 'تنبيهات', 'أذكار الصباح', 'أذكار المساء', 'قيام', 'reminders'],
+      icon: Icons.notifications_active_outlined,
+      category: 'المجتمع والمتابعة',
+      color: _toolShade(_kToolCategories[3].color, 4, 7),
+      onTap: (ctx, _) => Navigator.of(
+        ctx,
+      ).push(MaterialPageRoute(builder: (_) => const RemindersScreen())),
+    ),
+    _ToolItem(
+      id: 'notifications',
+      title: 'سجل الإشعارات الواردة',
+      nameEn: 'Incoming Notifications Log',
+      keywords: const ['إشعارات', 'تنبيهات', 'سجل', 'صندوق', 'notifications'],
+      icon: Icons.notifications_none_outlined,
+      category: 'المجتمع والمتابعة',
+      color: _toolShade(_kToolCategories[3].color, 5, 7),
+      onTap: (ctx, _) => Navigator.of(
+        ctx,
+      ).push(MaterialPageRoute(builder: (_) => const NotificationsScreen())),
+    ),
     _ToolItem(
       id: 'wallpapers',
       title: 'خلفيات هُمَام',
+      nameEn: 'Islamic Wallpapers',
+      keywords: const ['خلفيات', 'صور', 'فذكر', 'wallpapers'],
       icon: Icons.wallpaper_rounded,
-      category: 'المكتبة والعلوم',
-      color: _toolShade(_kToolCategories[2].color, 7, 9),
+      category: 'المجتمع والمتابعة',
+      color: _toolShade(_kToolCategories[3].color, 6, 7),
       onTap: (ctx, _) => Navigator.of(
         ctx,
       ).push(MaterialPageRoute(builder: (_) => const WallpapersScreen())),
     ),
     _ToolItem(
-      id: 'mutashabihat',
-      title: 'متشابهات القرآن الكريم',
-      icon: Icons.compare_arrows_rounded,
-      category: 'المكتبة والعلوم',
-      color: _toolShade(_kToolCategories[2].color, 8, 9),
+      id: 'permissions',
+      title: 'أذونات وصلاحيات التطبيق',
+      nameEn: 'App Permissions & Privacy',
+      keywords: const ['أذونات', 'صلاحيات', 'إذن', 'موقع', 'إشعارات', 'بطارية', 'permissions'],
+      icon: Icons.security_rounded,
+      category: 'المجتمع والمتابعة',
+      color: const Color(0xFF1B8A72),
       onTap: (ctx, _) => Navigator.of(
         ctx,
-      ).push(MaterialPageRoute(builder: (_) => const MutashabihatScreen())),
+      ).push(MaterialPageRoute(builder: (_) => const PermissionsGuideScreen())),
     ),
-
-    // فئة "خدمات وتخصيص" (كانت آخر فئة) صارت فاضية بالكامل وأُزيلت —
-    // "التلاوات المحملة"/"الإعدادات العامة"/"دليل دقة الأذان"/"عن هُمَام"
-    // أُزيلت سابقاً (تكرار مع الإعدادات/الترس)، و"استوديو بطاقات الآيات
-    // والستوري" أُزيل بطلب صريح لاحق (يُفتح من داخل شاشة "مشاركة" الآية
-    // مباشرة — زر 🎨 بـ`ayah_share_sheet.dart` — فمش محتاج مدخل مستقل هون).
   ];
 
   @override
   Widget build(BuildContext context) {
+    _initOpenCategoriesIfNeeded();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final allTools = _getAllTools();
@@ -402,25 +513,30 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
         ? const Color(0xFF243040)
         : const Color(0xFFECE5D6);
 
-    final filteredTools = _searchQuery.trim().isEmpty
+    final queryTrimmed = _searchQuery.trim();
+    final normQuery = normalizeArabicSearch(queryTrimmed.toLowerCase());
+    final filteredTools = queryTrimmed.isEmpty
         ? allTools
-        : allTools
-              .where(
-                (t) =>
-                    t.title.contains(_searchQuery.trim()) ||
-                    t.category.contains(_searchQuery.trim()),
-              )
-              .toList();
+        : allTools.where((t) {
+            if (normalizeArabicSearch(t.title).contains(normQuery)) return true;
+            if (t.nameEn.toLowerCase().contains(queryTrimmed.toLowerCase())) return true;
+            if (normalizeArabicSearch(t.category).contains(normQuery)) return true;
+            for (final kw in t.keywords) {
+              if (normalizeArabicSearch(kw).contains(normQuery) ||
+                  kw.toLowerCase().contains(queryTrimmed.toLowerCase())) {
+                return true;
+              }
+            }
+            return false;
+          }).toList();
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        // هيدر بتدرّج مطابق لأسلوب لوحة التصميم المعتمدة — `AppBar` عادي
-        // بلا لمس هيكل الجسم، فقط زُيِّن بصرياً (`flexibleSpace`).
         appBar: GradientAppBar(
           title: 'أدواتي',
           centerTitle: true,
-          colors: const [AppColors.blue, AppColors.navy],
+          colors: const [Color(0xFF1B6E53), Color(0xFF114B3A)],
           actions: [
             IconButton(
               icon: const Icon(Icons.settings_outlined),
@@ -472,6 +588,7 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
                             icon: const Icon(Icons.close, size: 18),
+                            tooltip: 'مسح البحث',
                             onPressed: () {
                               _searchCtrl.clear();
                               setState(() => _searchQuery = '');
@@ -488,7 +605,7 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
               ),
             ),
 
-            // في حال البحث: عرض النتائج مباشرة
+            // في حال البحث: عرض نتائج البحث الفورية أو الحالة الفارغة
             if (_searchQuery.trim().isNotEmpty) ...[
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
@@ -503,128 +620,172 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
               ),
               if (filteredTools.isEmpty)
                 Padding(
-                  padding: const EdgeInsets.all(32),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
                   child: Center(
-                    child: Text(
-                      'لم يتم العثور على أي أداة مطابقة للبحث',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: onSurface.withValues(alpha: 0.6),
-                      ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.search_off_rounded,
+                          size: 56,
+                          color: onSurface.withValues(alpha: 0.35),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'لم نجد أي أداة تطابق "$_searchQuery"',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: onSurface.withValues(alpha: 0.8),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'جرّب البحث بكلمات أخرى مثل: حديث، حفظ، صلاة، قبلة، ختمة',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: onSurface.withValues(alpha: 0.5),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                          icon: const Icon(Icons.clear_rounded, size: 16),
+                          label: const Text('مسح البحث'),
+                        ),
+                      ],
                     ),
                   ),
                 )
               else
-                for (int i = 0; i < filteredTools.length; i++) ...[
-                  _ToolListTile(
-                    tool: filteredTools[i],
-                    isDark: isDark,
-                    onTap: () => _handleToolTap(context, ref, filteredTools[i]),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                  child: GridView.builder(
+                    padding: EdgeInsets.zero,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 8,
+                      crossAxisSpacing: 8,
+                      childAspectRatio: 2.75,
+                    ),
+                    itemCount: filteredTools.length,
+                    itemBuilder: (context, i) => _ToolGridCard(
+                      tool: filteredTools[i],
+                      isDark: isDark,
+                      onTap: () => _handleToolTap(context, ref, filteredTools[i]),
+                    ),
                   ),
-                  if (i < filteredTools.length - 1)
-                    Divider(height: 1, thickness: 0.7, color: dividerColor),
-                ],
+                ),
             ] else ...[
-              // 3. قسم الأكثر استخداماً
-              _PinnedMostUsedSection(
+              // 4. قسم المفضلة (يظهر فقط عند وجود مفضلات)
+              _FavoritesSection(
                 allTools: allTools,
                 isDark: isDark,
                 onToolTap: (t) => _handleToolTap(context, ref, t),
               ),
 
-              // 4. القوائم المبوّبة القابلة للطي
-              for (
-                int catIdx = 0;
-                catIdx < _kToolCategories.length;
-                catIdx++
-              ) ...[
-                Builder(
-                  builder: (context) {
-                    final category = _kToolCategories[catIdx];
-                    final catTools = allTools
-                        .where((t) => t.category == category.title)
-                        .toList();
-                    if (catTools.isEmpty) return const SizedBox.shrink();
+              // 5. قسم المستخدمة مؤخراً
+              _RecentlyUsedSection(
+                allTools: allTools,
+                isDark: isDark,
+                onToolTap: (t) => _handleToolTap(context, ref, t),
+              ),
 
-                    final catColor = isDark
-                        ? category.darkColor
-                        : category.color;
-                    final isOpen = _openCategories.contains(category.title);
+              // 6. القوائم المبوّبة القابلة للطي
+              for (int catIdx = 0; catIdx < _kToolCategories.length; catIdx++) ...[
+                  Builder(
+                    builder: (context) {
+                      final category = _kToolCategories[catIdx];
+                      final catTools = allTools
+                          .where((t) => t.category == category.title)
+                          .toList();
+                      if (catTools.isEmpty) return const SizedBox.shrink();
 
-                    return Column(
-                      key: catIdx == 0
-                          ? toolsKhatmaCardKey
-                          : catIdx == 1
-                              ? toolsGroupsCardKey
-                              : catIdx == 2
-                                  ? toolsHadithCardKey
-                                  : null,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // ترويسة الفئة القابلة للضغط للطي والفتح (اليمين: أيقونة مرقّمة + العنوان | الشمال: سهم الطي)
-                        InkWell(
-                          onTap: () => _toggleCategory(category.title),
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
-                            child: Row(
-                              children: [
-                                // أيقونة الفئة داخل شارة دائرية ملوّنة — أكثر
-                                // وضوحاً وتعبيراً من أيقونة صغيرة عارية بجانب
-                                // النص، وتُميّز بداية كل فئة بصرياً بسرعة.
-                                IconBadge(icon: category.icon, color: catColor, tintAlpha: 0.15),
-                                const SizedBox(width: 10),
-                                Text(
-                                  category.title,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w800,
-                                    color: catColor,
+                      final catColor = isDark
+                          ? category.darkColor
+                          : category.color;
+                      final isOpen = _openCategories.contains(category.title);
+
+                      return Column(
+                        key: catIdx == 0
+                            ? toolsKhatmaCardKey
+                            : catIdx == 1
+                                ? toolsHadithCardKey
+                                : catIdx == 3
+                                    ? toolsGroupsCardKey
+                                    : null,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // ترويسة الفئة القابلة للطي
+                          InkWell(
+                            onTap: () => _toggleCategory(category.title),
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                              child: Row(
+                                children: [
+                                  IconBadge(icon: category.icon, color: catColor, tintAlpha: 0.15),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    category.title,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                      color: catColor,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 6),
-                                // عدد أدوات الفئة — يعطي فكرة سريعة عن حجمها
-                                // قبل حتى التمرير خلالها.
-                                Text(
-                                  '(${catTools.length})',
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: catColor.withValues(alpha: 0.6),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    '(${catTools.length})',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: catColor.withValues(alpha: 0.6),
+                                    ),
                                   ),
-                                ),
-                                const Spacer(),
-                                // سهم الدوران لحالة الطي/الفتح على الشمال في RTL
-                                AnimatedRotation(
-                                  duration: const Duration(milliseconds: 200),
-                                  turns: isOpen ? 0 : 0.25,
-                                  child: Icon(
-                                    Icons.keyboard_arrow_down_rounded,
-                                    size: 20,
-                                    color:
-                                        (isDark
-                                                ? Colors.white70
-                                                : const Color(0xFF6B5840))
-                                            .withValues(alpha: 0.6),
+                                  const Spacer(),
+                                  AnimatedRotation(
+                                    duration: const Duration(milliseconds: 200),
+                                    turns: isOpen ? 0 : 0.25,
+                                    child: Icon(
+                                      Icons.keyboard_arrow_down_rounded,
+                                      size: 20,
+                                      color: (isDark
+                                              ? Colors.white70
+                                              : const Color(0xFF6B5840))
+                                          .withValues(alpha: 0.6),
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
-                        ),
 
-                        // محتوى الفئة القابل للطي والفتح
-                        AnimatedSize(
-                          duration: const Duration(milliseconds: 220),
-                          curve: Curves.easeInOut,
-                          child: isOpen
-                              ? Column(
-                                  children: [
-                                    for (
-                                      int i = 0;
-                                      i < catTools.length;
-                                      i++
-                                    ) ...[
-                                      _ToolListTile(
+                          // محتوى الفئة
+                          AnimatedSize(
+                            duration: const Duration(milliseconds: 220),
+                            curve: Curves.easeInOut,
+                            child: isOpen
+                                ? Padding(
+                                    padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
+                                    child: GridView.builder(
+                                      padding: EdgeInsets.zero,
+                                      shrinkWrap: true,
+                                      physics: const NeverScrollableScrollPhysics(),
+                                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: 2,
+                                        mainAxisSpacing: 8,
+                                        crossAxisSpacing: 8,
+                                        childAspectRatio: 2.75,
+                                      ),
+                                      itemCount: catTools.length,
+                                      itemBuilder: (context, i) => _ToolGridCard(
                                         tool: catTools[i],
                                         isDark: isDark,
                                         onTap: () => _handleToolTap(
@@ -633,24 +794,15 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
                                           catTools[i],
                                         ),
                                       ),
-                                      if (i < catTools.length - 1)
-                                        Divider(
-                                          height: 1,
-                                          thickness: 0.7,
-                                          color: dividerColor,
-                                        ),
-                                    ],
-                                  ],
-                                )
-                              : const SizedBox.shrink(),
-                        ),
-
-                        // فاصل أسفل نهاية كل فئة
-                        Divider(height: 1, thickness: 0.7, color: dividerColor),
-                      ],
-                    );
-                  },
-                ),
+                                    ),
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                          Divider(height: 1, thickness: 0.7, color: dividerColor),
+                        ],
+                      );
+                    },
+                  ),
               ],
             ],
           ],
@@ -660,9 +812,9 @@ class _MorePlaceholderScreenState extends ConsumerState<MorePlaceholderScreen> {
   }
 }
 
-/// قسم الأكثر استخداماً المثبّت أعلى القوائم
-class _PinnedMostUsedSection extends ConsumerWidget {
-  const _PinnedMostUsedSection({
+/// قسم المفضلة أعلى الشاشة
+class _FavoritesSection extends ConsumerWidget {
+  const _FavoritesSection({
     required this.allTools,
     required this.isDark,
     required this.onToolTap,
@@ -674,25 +826,17 @@ class _PinnedMostUsedSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final userPinned = ref.watch(pinnedToolsProvider);
-    final mostUsed = ref.watch(mostUsedToolIdsProvider).value ?? const <String>[];
-
-    // لو المستخدم خصص أدوات مثبتة نعرضها، وإلا نعرض الأكثر استخداماً تلقائياً
-    final activeIds = userPinned.isNotEmpty
-        ? userPinned
-        : mostUsed;
-
-    if (activeIds.isEmpty) return const SizedBox.shrink();
+    final pinnedIds = ref.watch(pinnedToolsProvider);
+    if (pinnedIds.isEmpty) return const SizedBox.shrink();
 
     final byId = {for (final t in allTools) t.id: t};
-    final pinned = [
-      for (final id in activeIds)
+    final favoriteTools = [
+      for (final id in pinnedIds)
         if (byId[id] case final tool?) tool,
     ];
-    if (pinned.isEmpty) return const SizedBox.shrink();
+    if (favoriteTools.isEmpty) return const SizedBox.shrink();
 
     final onSurface = Theme.of(context).colorScheme.onSurface;
-    final isCustomPinned = userPinned.isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
@@ -701,49 +845,48 @@ class _PinnedMostUsedSection extends ConsumerWidget {
         children: [
           Row(
             children: [
-              Icon(
-                isCustomPinned ? Icons.push_pin_rounded : Icons.star_rounded,
-                size: 16,
+              const Icon(
+                Icons.star_rounded,
+                size: 18,
                 color: AppColors.goldDeep,
               ),
               const SizedBox(width: 6),
               Text(
-                isCustomPinned ? 'أدواتي المثبتة' : 'الأكثر استخدامًا',
+                'المفضلة',
                 style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  color: onSurface.withValues(alpha: 0.85),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: onSurface.withValues(alpha: 0.9),
                 ),
               ),
-              const Spacer(),
-              if (isCustomPinned)
-                GestureDetector(
-                  onTap: () {
-                    for (final id in [...userPinned]) {
-                      ref.read(pinnedToolsProvider.notifier).togglePin(id);
-                    }
-                  },
-                  child: Text(
-                    'إعادة ضبط',
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      color: onSurface.withValues(alpha: 0.5),
-                    ),
-                  ),
+              const SizedBox(width: 6),
+              Text(
+                '(${favoriteTools.length})',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.goldDeep,
                 ),
+              ),
             ],
           ),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              for (final tool in pinned)
-                Expanded(
-                  child: _PinnedToolTile(
-                    tool: tool,
-                    onTap: () => onToolTap(tool),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final tool in favoriteTools)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 8),
+                    child: _ToolCompactCard(
+                      tool: tool,
+                      isDark: isDark,
+                      isFavorite: true,
+                      onTap: () => onToolTap(tool),
+                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -751,37 +894,291 @@ class _PinnedMostUsedSection extends ConsumerWidget {
   }
 }
 
-class _PinnedToolTile extends StatelessWidget {
-  const _PinnedToolTile({required this.tool, required this.onTap});
+/// قسم المستخدمة مؤخراً
+class _RecentlyUsedSection extends ConsumerWidget {
+  const _RecentlyUsedSection({
+    required this.allTools,
+    required this.isDark,
+    required this.onToolTap,
+  });
+
+  final List<_ToolItem> allTools;
+  final bool isDark;
+  final void Function(_ToolItem) onToolTap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final recentIds = ref.watch(recentlyUsedToolsProvider);
+    if (recentIds.isEmpty) return const SizedBox.shrink();
+
+    final byId = {for (final t in allTools) t.id: t};
+    final recentTools = [
+      for (final id in recentIds)
+        if (byId[id] case final tool?) tool,
+    ];
+    if (recentTools.isEmpty) return const SizedBox.shrink();
+
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.history_rounded,
+                size: 18,
+                color: onSurface.withValues(alpha: 0.7),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'المستخدمة مؤخراً',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: onSurface.withValues(alpha: 0.9),
+                ),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () => ref.read(recentlyUsedToolsProvider.notifier).clear(),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(40, 24),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  'مسح',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: onSurface.withValues(alpha: 0.5),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final tool in recentTools)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 8),
+                    child: _ToolCompactCard(
+                      tool: tool,
+                      isDark: isDark,
+                      isFavorite: ref.watch(pinnedToolsProvider).contains(tool.id),
+                      onTap: () => onToolTap(tool),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// بطاقة أداة مدمجة لقسمي المفضلة والمستخدمة مؤخراً
+class _ToolCompactCard extends StatelessWidget {
+  const _ToolCompactCard({
+    required this.tool,
+    required this.isDark,
+    required this.isFavorite,
+    required this.onTap,
+  });
 
   final _ToolItem tool;
+  final bool isDark;
+  final bool isFavorite;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
-        child: Column(
-          children: [
-            IconBadge(icon: tool.icon, color: tool.color, large: true, tintAlpha: 0.12),
-            const SizedBox(height: 6),
-            Text(
-              tool.title,
-              maxLines: 2,
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: FontWeight.w600,
-                height: 1.2,
-                color: onSurface.withValues(alpha: 0.75),
+
+    return Material(
+      color: isDark ? const Color(0xFF1E2630) : const Color(0xFFFAF7F2),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: isDark ? const Color(0xFF2E3A4A) : const Color(0xFFEADBCA),
+          width: 1.2,
+        ),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          width: 82,
+          padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF131A24) : Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(
+                      tool.icon,
+                      size: 18,
+                      color: isDark ? const Color(0xFFD4AF67) : const Color(0xFF8C6B45),
+                    ),
+                  ),
+                  if (isFavorite)
+                    const PositionedDirectional(
+                      top: -2,
+                      start: -2,
+                      child: Icon(Icons.star_rounded, size: 14, color: AppColors.goldDeep),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 5),
+              Text(
+                tool.title,
+                maxLines: 1,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  height: 1.2,
+                  color: onSurface.withValues(alpha: 0.85),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// بطاقة الأداة المستطيلة الأنيقة (تصميم متقابل اثنتين اثنتين بشكل مستطيل بلوري جميل)
+class _ToolGridCard extends ConsumerWidget {
+  const _ToolGridCard({
+    required this.tool,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  final _ToolItem tool;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final isPinned = ref.watch(pinnedToolsProvider).contains(tool.id);
+
+    return Material(
+      color: isDark ? const Color(0xFF1E2632) : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: isDark
+              ? const Color(0xFF2B3848)
+              : (tool.featured
+                  ? const Color(0xFFC5A059).withValues(alpha: 0.38)
+                  : const Color(0xFFEADBCA).withValues(alpha: 0.85)),
+          width: tool.featured ? 1.2 : 1.0,
+        ),
+      ),
+      elevation: isDark ? 0 : 0.6,
+      shadowColor: Colors.black.withValues(alpha: 0.04),
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: () {
+          ref.read(pinnedToolsProvider.notifier).togglePin(tool.id);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              duration: const Duration(seconds: 1),
+              content: Text(
+                isPinned
+                    ? 'تمت إزالة "${tool.title}" من المفضلة'
+                    : 'تمت إضافة "${tool.title}" إلى المفضلة ⭐',
               ),
             ),
-          ],
+          );
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? tool.color.withValues(alpha: 0.22)
+                      : tool.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: tool.color.withValues(alpha: isDark ? 0.35 : 0.22),
+                    width: 0.8,
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  tool.icon,
+                  size: 21,
+                  color: isDark
+                      ? const Color(0xFFD4AF67)
+                      : (tool.color.computeLuminance() > 0.4
+                          ? const Color(0xFF8C6B45)
+                          : tool.color),
+                ),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            tool.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              height: 1.25,
+                              color: onSurface.withValues(alpha: 0.92),
+                            ),
+                          ),
+                        ),
+                        if (isPinned)
+                          const Padding(
+                            padding: EdgeInsetsDirectional.only(start: 3),
+                            child: Icon(
+                              Icons.star_rounded,
+                              size: 14,
+                              color: AppColors.goldDeep,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -828,7 +1225,6 @@ class _ProfileHeaderCard extends ConsumerWidget {
           ),
           child: Row(
             children: [
-              // الصورة الرمزية على اليمين
               CircleAvatar(
                 radius: 22,
                 backgroundColor: AppColors.navy,
@@ -844,7 +1240,6 @@ class _ProfileHeaderCard extends ConsumerWidget {
                     : null,
               ),
               const SizedBox(width: 12),
-              // النصوص في المنتصف
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -870,7 +1265,6 @@ class _ProfileHeaderCard extends ConsumerWidget {
                   ],
                 ),
               ),
-              // السهم على الشمال
               Icon(
                 Icons.chevron_left,
                 color: onSurface.withValues(alpha: 0.5),
@@ -884,100 +1278,3 @@ class _ProfileHeaderCard extends ConsumerWidget {
   }
 }
 
-class _ToolListTile extends ConsumerWidget {
-  const _ToolListTile({
-    required this.tool,
-    required this.isDark,
-    required this.onTap,
-  });
-
-  final _ToolItem tool;
-  final bool isDark;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    final isPinned = ref.watch(pinnedToolsProvider).contains(tool.id);
-
-    return InkWell(
-      onTap: onTap,
-      onLongPress: () {
-        ref.read(pinnedToolsProvider.notifier).togglePin(tool.id);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            duration: const Duration(seconds: 2),
-            content: Text(
-              isPinned
-                  ? 'تمت إزالة "${tool.title}" من أدواتك المثبتة'
-                  : 'تم تثبيت "${tool.title}" في أعلى شاشة أدواتي 📌',
-            ),
-          ),
-        );
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-        child: Row(
-          children: [
-            // أيقونة الأداة داخل خلفية دائرية ملوّنة (على اليمين في RTL)
-            IconBadge(icon: tool.icon, color: tool.color, large: true, tintAlpha: 0.14),
-            const SizedBox(width: 12),
-            // عنوان الأداة (+ شارة "مميزة" للأدوات الرئيسية كالختمة/الحفظ)
-            Expanded(
-              child: Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      tool.title,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w700,
-                        color: onSurface.withValues(alpha: 0.9),
-                      ),
-                    ),
-                  ),
-                  if (tool.featured) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.gold.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        'مميزة',
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.goldDeep,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            if (isPinned) ...[
-              const Icon(
-                Icons.push_pin_rounded,
-                size: 16,
-                color: AppColors.goldDeep,
-              ),
-              const SizedBox(width: 8),
-            ],
-            // سهم الانتقال (على الشمال في RTL)
-            Icon(
-              Icons.chevron_left_rounded,
-              size: 20,
-              color: isDark ? Colors.white24 : const Color(0xFFC7BEB0),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

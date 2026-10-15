@@ -37,6 +37,7 @@ class DuroosSource {
     this.initialLg = 0,
     this.feedUrl,
     this.midadQuery,
+    this.midadScholarId,
     this.midadIsRecitation = false,
     this.imageAsset,
   });
@@ -76,6 +77,10 @@ class DuroosSource {
   /// نفس النص يُمرَّر لبحث الموقع (`/search?q=...`).
   final String? midadQuery;
 
+  /// معرّف الشيخ بموقع midad.com لجلب سلاسله ومحاضراته مباشرة وبسرعة خاطفة
+  /// دون الاعتماد على صفحة البحث المتغيرة.
+  final int? midadScholarId;
+
   /// `true` لمصدر **تلاوة قرآن كاملة** (سور مرتَّلة، `/recitation/<id>`)
   /// بدل محاضرات علمية عادية (`/lesson/<id>`) — بطلب صريح "التلاوات
   /// ممكن تضيفها لقسم الاستماع": بعض الشيوخ المُدرَجين هنا أصلاً (بحثاً عن
@@ -103,11 +108,13 @@ class DuroosLecture {
     required this.title,
     this.audioUrl,
     this.midadLessonId,
+    this.midadEntryType = 'lesson',
     this.midadIsRecitation = false,
   }) : assert(audioUrl != null || midadLessonId != null);
   final String title;
   final String? audioUrl;
   final int? midadLessonId;
+  final String midadEntryType;
 
   /// `true` لو [midadLessonId] يشير لصفحة `/recitation/<id>` (تلاوة سورة)
   /// بدل `/lesson/<id>` (محاضرة عادية) — راجع `DuroosSource.midadIsRecitation`
@@ -118,7 +125,7 @@ class DuroosLecture {
   /// `null` (كل محاضرات midad قبل فتحها) — لا نقارن بـ`audioUrl` مباشرة
   /// بمنطق "هل هذه المحاضرة النشطة؟" لأن عدة محاضرات midad قد تشترك
   /// بـ`null` قبل التشغيل فتبدو متطابقة خطأً.
-  String get playbackKey => audioUrl ?? 'midad:$midadLessonId';
+  String get playbackKey => audioUrl ?? 'midad:$midadEntryType:$midadLessonId';
 }
 
 /// نتيجة جلب صفحة واحدة: إما قائمة تصنيفات (يُختار منها) أو قائمة
@@ -224,8 +231,7 @@ const List<DuroosSource> kDuroosSources = [
     category: DuroosCategoryIds.seerahGeneral,
     kind: DuroosSourceKind.islamweb,
     sid: 985,
-    // لسا بلا صورة موثوقة — بانتظار صورة يزوّدها صاحب المشروع لاحقاً
-    // (راجع توثيق `imageAsset` بالأعلى)، تُعرض الأيقونة الاحتياطية حالياً.
+    imageAsset: 'assets/images/scholars/ragheb_sergany.jpg',
   ),
   DuroosSource(
     id: 'huwaini',
@@ -248,6 +254,7 @@ const List<DuroosSource> kDuroosSources = [
     icon: Icons.school_outlined,
     category: DuroosCategoryIds.seerahGeneral,
     kind: DuroosSourceKind.midad,
+    midadScholarId: 36734,
     midadQuery: 'عامر بهجت',
     imageAsset: 'assets/images/scholars/amer_bahjat.jpg',
   ),
@@ -264,7 +271,7 @@ const List<DuroosSource> kDuroosSources = [
     category: DuroosCategoryIds.seerahGeneral,
     kind: DuroosSourceKind.islamweb,
     sid: 41,
-    // لسا بلا صورة موثوقة — راجع توثيق imageAsset بالأعلى.
+    imageAsset: 'assets/images/scholars/saleh_al_alsheikh.jpg',
   ),
   DuroosSource(
     // كان مصدره بودكاست RSS وحيد (شرح العقيدة الطحاوية فقط) — بدّلناه
@@ -277,6 +284,7 @@ const List<DuroosSource> kDuroosSources = [
     icon: Icons.menu_book_outlined,
     category: DuroosCategoryIds.mutoon,
     kind: DuroosSourceKind.midad,
+    midadScholarId: 49601,
     midadQuery: 'صالح بن عبدالعزيز السندي',
     imageAsset: 'assets/images/scholars/saleh_sindi.jpg',
   ),
@@ -287,21 +295,9 @@ const List<DuroosSource> kDuroosSources = [
     icon: Icons.menu_book_outlined,
     category: DuroosCategoryIds.mutoon,
     kind: DuroosSourceKind.midad,
+    midadScholarId: 43414,
     midadQuery: 'وليد بن راشد السعيدان',
-  ),
-  DuroosSource(
-    // تحقّقت مباشرة: نفس الشيخ له مصحف كامل مرتَّل مسجَّل على مِداد (١٤٣٥هـ)
-    // بجانب محاضراته العلمية أعلاه — مصدر منفصل عمداً (`midadIsRecitation:
-    // true` يبدّل نوع البحث ومسار الصفحة كلياً، راجع `duroos_repository.
-    // dart`)، بطلب صريح "التلاوات ممكن تضيفها لقسم الاستماع".
-    id: 'waleed_saeedan_recitation',
-    title: 'مصحف الشيخ وليد السعيدان (مرتَّل)',
-    subtitle: 'تلاوة القرآن الكريم كاملاً — حفص عن عاصم، من موقع مِداد',
-    icon: Icons.auto_stories_outlined,
-    category: DuroosCategoryIds.recitations,
-    kind: DuroosSourceKind.midad,
-    midadQuery: 'وليد بن راشد السعيدان',
-    midadIsRecitation: true,
+    imageAsset: 'assets/images/scholars/waleed_saeedan.jpg',
   ),
   DuroosSource(
     id: 'saleh_fawzan',
@@ -311,6 +307,7 @@ const List<DuroosSource> kDuroosSources = [
     category: DuroosCategoryIds.scholars,
     kind: DuroosSourceKind.islamweb,
     sid: 235,
+    imageAsset: 'assets/images/scholars/saleh_fawzan.jpg',
   ),
   DuroosSource(
     id: 'tarifi',
@@ -320,6 +317,7 @@ const List<DuroosSource> kDuroosSources = [
     category: DuroosCategoryIds.mutoon,
     kind: DuroosSourceKind.islamweb,
     sid: 2102,
+    imageAsset: 'assets/images/scholars/tarifi.jpg',
   ),
   DuroosSource(
     id: 'hasan_bukhari',
@@ -329,6 +327,7 @@ const List<DuroosSource> kDuroosSources = [
     category: DuroosCategoryIds.seerahGeneral,
     kind: DuroosSourceKind.islamweb,
     sid: 2066,
+    imageAsset: 'assets/images/scholars/hasan_bukhari.jpg',
   ),
   DuroosSource(
     id: 'mishari_kharraz',
@@ -338,6 +337,7 @@ const List<DuroosSource> kDuroosSources = [
     category: DuroosCategoryIds.seerahGeneral,
     kind: DuroosSourceKind.islamweb,
     sid: 1489,
+    imageAsset: 'assets/images/scholars/mishari_kharraz.jpg',
   ),
   DuroosSource(
     id: 'saad_atiq',
@@ -347,5 +347,6 @@ const List<DuroosSource> kDuroosSources = [
     category: DuroosCategoryIds.seerahGeneral,
     kind: DuroosSourceKind.islamweb,
     sid: 1535,
+    imageAsset: 'assets/images/scholars/saad_atiq.jpg',
   ),
 ];

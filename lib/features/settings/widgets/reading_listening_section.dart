@@ -7,7 +7,10 @@ import '../../../core/theme/app_colors.dart';
 import '../../audio/audio_downloads_screen.dart';
 import '../../audio/quran_audio_controller.dart';
 import '../../audio/reciters.dart';
+import '../../audio/ui/reciter_avatar.dart';
 import '../../home/dashboard_customize_sheet.dart';
+import '../../mushaf/font_download_screen.dart';
+import '../../mushaf/font_download_service.dart';
 import '../../mushaf/mushaf_settings.dart';
 import 'settings_section_helpers.dart';
 
@@ -50,9 +53,9 @@ class ReadingListeningSection extends ConsumerWidget {
               ),
               const Divider(height: 1),
               ListTile(
-                leading: Icon(
-                  Icons.record_voice_over_outlined,
-                  color: themeAccent(context),
+                leading: ReciterAvatar(
+                  reciter: reciterById(audio.reciterId),
+                  radius: 18,
                 ),
                 title: const Text('القارئ الافتراضي للتلاوة'),
                 subtitle: Text(
@@ -65,6 +68,36 @@ class ReadingListeningSection extends ConsumerWidget {
                 trailing: const Icon(Icons.chevron_left),
                 onTap: () =>
                     _showReciterPickerModal(context, ref, audio.reciterId),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: Icon(
+                  Icons.menu_book_outlined,
+                  color: themeAccent(context),
+                ),
+                title: const Text('تنزيل صفحات المصحف كاملاً بلا إنترنت'),
+                subtitle: Consumer(
+                  builder: (context, ref, _) {
+                    final edition = ref.watch(mushafFontEditionProvider);
+                    final (first, last) = downloadableRangeFor(edition);
+                    final total = last - first + 1;
+                    final downloadedAsync = ref.watch(fontDownloadedCountProvider(edition));
+                    final downloaded = downloadedAsync.value ?? 0;
+                    return Text(
+                      'طبعة ${edition.label} — تم تنزيل $downloaded من $total صفحة',
+                      style: const TextStyle(fontSize: 12),
+                    );
+                  },
+                ),
+                trailing: const Icon(Icons.chevron_left),
+                onTap: () {
+                  final edition = ref.read(mushafFontEditionProvider);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => FontDownloadScreen(edition: edition),
+                    ),
+                  );
+                },
               ),
               const Divider(height: 1),
               ListTile(
@@ -165,14 +198,7 @@ void _showReciterPickerModal(
                     final r = kReciters[idx];
                     final isSelected = r.id == currentReciterId;
                     return ListTile(
-                      leading: Icon(
-                        isSelected
-                            ? Icons.radio_button_checked
-                            : Icons.radio_button_off,
-                        color: isSelected
-                            ? themeAccent(context)
-                            : onSurface.withValues(alpha: 0.4),
-                      ),
+                      leading: ReciterAvatar(reciter: r, radius: 20),
                       title: Text(
                         r.nameAr,
                         style: TextStyle(
@@ -188,6 +214,15 @@ void _showReciterPickerModal(
                               style: TextStyle(fontSize: 11),
                             )
                           : null,
+                      trailing: Icon(
+                        isSelected
+                            ? Icons.check_circle_rounded
+                            : Icons.radio_button_off,
+                        color: isSelected
+                            ? themeAccent(context)
+                            : onSurface.withValues(alpha: 0.3),
+                        size: 22,
+                      ),
                       onTap: () {
                         ref
                             .read(quranAudioControllerProvider.notifier)

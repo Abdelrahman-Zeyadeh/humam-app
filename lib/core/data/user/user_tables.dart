@@ -302,7 +302,7 @@ class AyahColorTags extends Table {
 /// بـ`app_colors.dart` فقط (لا لون حرّ جديد)، راجع `app_accent_colors.dart`.
 class AppThemeSettings extends Table {
   IntColumn get id => integer().withDefault(const Constant(1))();
-  TextColumn get accentColorId => text().withDefault(const Constant('gold'))();
+  TextColumn get accentColorId => text().withDefault(const Constant('emerald'))();
 
   @override
   Set<Column> get primaryKey => {id};

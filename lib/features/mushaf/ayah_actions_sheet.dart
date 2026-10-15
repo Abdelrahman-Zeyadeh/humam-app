@@ -9,11 +9,14 @@ import '../../core/data/user/user_prefs.dart';
 import '../../core/data/user/user_repository.dart' show BookmarkTypes;
 import '../../core/text/arabic_normalizer.dart'
     show stripQuranicMarksForDisplay;
+import '../../core/data/user/hifz_prefs.dart';
 import '../../core/theme/app_colors.dart';
 import '../audio/quran_audio_controller.dart'
-    show QuranAudioController, RepeatOption, quranAudioControllerProvider;
+    show RepeatOption, quranAudioControllerProvider;
 import '../audio/ui/detailed_audio_sheet.dart';
 import '../shell/root_shell.dart' show rootTabIndexProvider;
+import '../story_maker/models/story_content.dart';
+import '../story_maker/ui/ayah_story_maker_screen.dart';
 import 'ayah_share_sheet.dart';
 import 'ayah_text_view_screen.dart';
 import 'gharib_words_sheet.dart';
@@ -60,6 +63,12 @@ final _noteProvider = FutureProvider.family<String?, int>((ref, ayahId) {
   return ref.watch(userPrefsProvider).noteForAyah(ayahId);
 });
 
+final _ayahMasteryProvider = FutureProvider.family<String?, int>((ref, ayahId) async {
+  ref.watch(hifzVersionProvider);
+  final map = await ref.watch(hifzPrefsProvider).allMasteryMap();
+  return map[ayahId];
+});
+
 /// شيت سفلي متطور لخدمات الآية (مطابق لصور التصميم الحديثة)
 class AyahActionsSheet extends ConsumerStatefulWidget {
   const AyahActionsSheet({super.key, required this.ayahId});
@@ -101,9 +110,10 @@ class _AyahActionsSheetState extends ConsumerState<AyahActionsSheet> {
     final similarAyahs = similarAyahsAsync.value ?? const <SimilarAyahResult>[];
     final noteAsync = ref.watch(_noteProvider(_currentAyahId));
     final hasNote = (noteAsync.value ?? '').isNotEmpty;
+    final masteryStatusAsync = ref.watch(_ayahMasteryProvider(_currentAyahId));
+    final masteryStatus = masteryStatusAsync.value;
 
     final cardBg = isDark ? const Color(0xFF1B232E) : Colors.white;
-    final dividerColor = isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06);
 
     return GestureDetector(
       onHorizontalDragEnd: (details) {
@@ -123,230 +133,468 @@ class _AyahActionsSheetState extends ConsumerState<AyahActionsSheet> {
         data: (ayah) {
           final surahAsync = ref.watch(_surahByIdProvider(ayah.surah));
           final surah = surahAsync.value;
-          final isBookmarked = prefs.isBookmarked(ayah.id);
           final colorTags = prefs.colorTagsForAyah(ayah.id);
 
-          // شيت سفلي كامل العرض بدل صندوق عائم عرضه ٢٦٠ فقط مُوسَّط بمنتصف
-          // الشاشة — بطلب صريح "شكل القائمة بدائي وفيش تفاعل": الصندوق
-          // الضيّق كان يخالف نمط كل شيتات التطبيق الأخرى (سفلية كاملة
-          // العرض بمقبض سحب، راجع `_ColorTagPickerSheet`/`_BookmarkPickerSheet`
-          // بنفس الملف)، ومساحة لمس محدودة تحسّ التفاعل بطيئاً/جامداً.
-          // أضفنا أيضاً رأس معاينة (سورة/رقم الآية + مقطع من نصها) — كانت
-          // القائمة سابقاً بلا أي سياق يوضّح أي آية يتصرّف المستخدم بها.
           return Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.88,
+            ),
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
             ),
             child: SafeArea(
               top: false,
-              child: Material(
-                color: Colors.transparent,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const SizedBox(height: 10),
-                      Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: onSurface.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      // رأس المعاينة — سورة/رقم الآية + مقطع من النص، يمنح
-                      // القائمة سياقاً واضحاً بدلاً من قائمة إجراءات مجرَّدة.
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 18),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: themeAccent(context).withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                surah != null ? '${surah.nameAr} · ${ayah.ayah}' : '${ayah.ayah}',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: themeAccent(context),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                stripQuranicMarksForDisplay(ayah.textUthmani),
-                                textDirection: TextDirection.rtl,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontFamily: 'AmiriQuran',
-                                  fontSize: 15.5,
-                                  height: 1.6,
-                                  color: onSurface,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Divider(height: 1, color: dividerColor),
-                      // 1. تشغيل إلى نهاية الجزء
-                        _MenuItemTile(
-                          icon: Icons.play_arrow_rounded,
-                          titleBold: 'تشغيل',
-                          titleRest: ' إلى نهاية الجزء',
-                          onTap: () {
-                            if (surah != null) {
-                              Navigator.of(context).pop();
-                              AyahAudioQuickSheet.show(
-                                context,
-                                ayah: ayah,
-                                surah: surah,
-                              );
-                            }
-                          },
-                        ),
-                        Divider(height: 1, color: dividerColor, indent: 14, endIndent: 14),
-
-                        // 2. كرر الآية المختارة
-                        _MenuItemTile(
-                          icon: Icons.repeat_rounded,
-                          titleBold: 'كرر',
-                          titleRest: ' الآية المختارة',
-                          onTap: () {
-                            if (surah != null) {
-                              Navigator.of(context).pop();
-                              ref.read(quranAudioControllerProvider.notifier).setRepeat(RepeatOption.infinite);
-                              ref.read(quranAudioControllerProvider.notifier).playAyah(surah.id, ayah.ayah);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('تم بدء تكرار الآية (${ayah.ayah}) من ${surah.nameAr}'),
-                                  duration: const Duration(seconds: 2),
-                                ),
-                              );
-                            }
-                          },
-                        ),
-                        Divider(height: 1, color: dividerColor, indent: 14, endIndent: 14),
-
-                        // 3. تصنيف/تلوين الآية — بطلب صريح: "تحديد لون
-                        // التمييز" القديم كان يميّز آية واحدة فقط بلون
-                        // ثابت مؤقّت (نفس آلية القفز بمتشابهات/بحث،
-                        // `highlightedAyahProvider` تُصفَّر تلقائياً)، بلا
-                        // أي معنى دائم أو اختيار لون حقيقي. الآن: تصنيف
-                        // **دائم متعدّد الآيات لكل نوع** (حفظ/تلاوة/
-                        // مراجعة/تدبر)، بلون كل نوع الخاص، يظهر بخلفية
-                        // الآية بكل مرة تُفتح فيها الصفحة — راجع
-                        // AyahColorTags و_ColorTagPickerSheet.
-                        _MenuItemTile(
-                          icon: Icons.palette_outlined,
-                          titleBold: colorTags.isEmpty
-                              ? 'تصنيف وتلوين الآية'
-                              : 'تصنيف الآية (${colorTags.length})',
-                          isActive: colorTags.isNotEmpty,
-                          onTap: () {
-                            Navigator.of(context).pop();
-                            _pickColorTags(context, ref, ayah.id);
-                          },
-                        ),
-                        Divider(height: 1, color: dividerColor, indent: 14, endIndent: 14),
-
-                        // 4. إضافة فاصلة
-                        _MenuItemTile(
-                          icon: Icons.bookmark_add_outlined,
-                          titleBold: 'إضافة فاصلة',
-                          onTap: () {
-                            Navigator.of(context).pop();
-                            _pickBookmarkMarker(context, ref, ayah.id);
-                          },
-                        ),
-                        Divider(height: 1, color: dividerColor, indent: 14, endIndent: 14),
-
-                        // 5. التفاسير والتراجم
-                        _MenuItemTile(
-                          icon: Icons.menu_book_outlined,
-                          titleBold: 'التفاسير والتراجم',
-                          onTap: () {
-                            Navigator.of(context).pop();
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => AyahTextViewScreen(
-                                  ayahId: ayah.id,
-                                  kind: AyahTextViewKind.tafsir,
-                                  initialTab: MainTafsirTab.tafasir,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                        Divider(height: 1, color: dividerColor, indent: 14, endIndent: 14),
-
-                        // 6. نسخ
-                        _MenuItemTile(
-                          icon: Icons.copy_outlined,
-                          titleBold: 'نسخ',
-                          onTap: () async {
-                            await Clipboard.setData(
-                              ClipboardData(text: ayah.textUthmani),
-                            );
-                            if (context.mounted) {
-                              Navigator.of(context).pop();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('تم نسخ نص الآية الشريفة بنجاح'),
-                                ),
-                              );
-                            }
-                          },
-                        ),
-                        Divider(height: 1, color: dividerColor, indent: 14, endIndent: 14),
-
-                        // 7. حفظ الآية كصورة
-                        _MenuItemTile(
-                          icon: Icons.image_outlined,
-                          titleBold: 'حفظ الآية كصورة',
-                          onTap: () {
-                            Navigator.of(context).pop();
-                            AyahShareSheet.show(context, ayah.id);
-                          },
-                        ),
-                        Divider(height: 1, color: dividerColor, indent: 14, endIndent: 14),
-
-                        // 8. المتشابهات اللفظية
-                        _MenuItemTile(
-                          icon: Icons.compare_arrows_rounded,
-                          titleBold: 'المتشابهات اللفظية',
-                          trailingBadge: similarAyahs.isNotEmpty
-                              ? '${similarAyahs.length}'
-                              : null,
-                          onTap: () {
-                            Navigator.of(context).pop();
-                            _SimilarAyahsSheet.show(context, similarAyahs);
-                          },
-                        ),
-                        Divider(height: 1, color: dividerColor, indent: 14, endIndent: 14),
-
-                        // 9. تدبر وملاحظة
-                        _MenuItemTile(
-                          icon: hasNote ? Icons.edit_note : Icons.edit_note_outlined,
-                          titleBold: hasNote ? 'ملاحظتي على الآية' : 'تدبر وملاحظة',
-                          isActive: hasNote,
-                          onTap: () {
-                            Navigator.of(context).pop();
-                            _NoteSheet.show(context, ayah.id, noteAsync.value);
-                          },
-                        ),
-                    ],
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 10),
+                  // مقبض السحب
+                  Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: onSurface.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 12),
+
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // 1. بطاقة معاينة الآية والسورة ورقم الصفحة
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? const Color(0xFF131A22)
+                                  : const Color(0xFFF9F7F1),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: (isDark ? AppColors.lineDark : AppColors.line)
+                                    .withValues(alpha: 0.7),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 3.5,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: themeAccent(context).withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        surah != null
+                                            ? '${surah.nameAr} · الآية ${ayah.ayah}'
+                                            : 'الآية ${ayah.ayah}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: themeAccent(context),
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      'صفحة ${ayah.page}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: onSurface.withValues(alpha: 0.55),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '﴿ ${stripQuranicMarksForDisplay(ayah.textUthmani)} ﴾',
+                                  textDirection: TextDirection.rtl,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontFamily: 'AmiriQuran',
+                                    fontSize: 16,
+                                    height: 1.7,
+                                    color: onSurface,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // 2. شريط حالة إتقان ومراجعة الآية
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? const Color(0xFF1E2836).withValues(alpha: 0.6)
+                                  : Colors.grey.withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: (isDark ? AppColors.lineDark : AppColors.line)
+                                    .withValues(alpha: 0.5),
+                              ),
+                            ),
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              physics: const BouncingScrollPhysics(),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.school_outlined,
+                                    size: 16,
+                                    color: themeAccent(context),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'إتقان الحفظ:',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: onSurface.withValues(alpha: 0.75),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  _MasteryChip(
+                                    label: 'متمكن',
+                                    color: const Color(0xFF2E7D32),
+                                    isSelected: masteryStatus == 'mastered',
+                                    onTap: () async {
+                                      await ref
+                                          .read(hifzPrefsProvider)
+                                          .setAyahMasteryStatus(ayah.id, 'mastered');
+                                      ref.read(hifzVersionProvider.notifier).bump();
+                                    },
+                                  ),
+                                  const SizedBox(width: 4),
+                                  _MasteryChip(
+                                    label: 'تثبيت',
+                                    color: const Color(0xFFE65100),
+                                    isSelected: masteryStatus == 'needsReview',
+                                    onTap: () async {
+                                      await ref
+                                          .read(hifzPrefsProvider)
+                                          .setAyahMasteryStatus(ayah.id, 'needsReview');
+                                      ref.read(hifzVersionProvider.notifier).bump();
+                                    },
+                                  ),
+                                  const SizedBox(width: 4),
+                                  _MasteryChip(
+                                    label: 'لم يُحفظ',
+                                    color: Colors.grey,
+                                    isSelected: masteryStatus == null ||
+                                        masteryStatus == 'unmemorized',
+                                    onTap: () async {
+                                      await ref
+                                          .read(hifzPrefsProvider)
+                                          .setAyahMasteryStatus(ayah.id, 'unmemorized');
+                                      ref.read(hifzVersionProvider.notifier).bump();
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+
+                          // 3. صفوف الإجراءات السريعة (Quick Action Cards)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _QuickActionCard(
+                                  icon: Icons.play_arrow_rounded,
+                                  label: 'استماع',
+                                  onTap: () {
+                                    if (surah != null) {
+                                      Navigator.of(context).pop();
+                                      AyahAudioQuickSheet.show(
+                                        context,
+                                        ayah: ayah,
+                                        surah: surah,
+                                      );
+                                    }
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _QuickActionCard(
+                                  icon: Icons.repeat_rounded,
+                                  label: 'كرر الآية',
+                                  onTap: () {
+                                    if (surah != null) {
+                                      Navigator.of(context).pop();
+                                      ref
+                                          .read(quranAudioControllerProvider.notifier)
+                                          .setRepeat(RepeatOption.infinite);
+                                      ref
+                                          .read(quranAudioControllerProvider.notifier)
+                                          .playAyah(surah.id, ayah.ayah);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'تم تكرار الآية (${ayah.ayah}) من سورة ${surah.nameAr}',
+                                          ),
+                                          duration: const Duration(seconds: 2),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _QuickActionCard(
+                                  icon: Icons.palette_outlined,
+                                  label: colorTags.isEmpty
+                                      ? 'تلوين'
+                                      : 'تلوين (${colorTags.length})',
+                                  isActive: colorTags.isNotEmpty,
+                                  onTap: () {
+                                    Navigator.of(context).pop();
+                                    _pickColorTags(context, ref, ayah.id);
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _QuickActionCard(
+                                  icon: Icons.bookmark_add_outlined,
+                                  label: 'فاصلة',
+                                  onTap: () {
+                                    Navigator.of(context).pop();
+                                    _pickBookmarkMarker(context, ref, ayah.id);
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _QuickActionCard(
+                                  icon: hasNote
+                                      ? Icons.edit_note
+                                      : Icons.edit_note_outlined,
+                                  label: hasNote ? 'ملاحظتي' : 'ملاحظة',
+                                  isActive: hasNote,
+                                  onTap: () {
+                                    Navigator.of(context).pop();
+                                    _NoteSheet.show(
+                                      context,
+                                      ayah.id,
+                                      noteAsync.value,
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _QuickActionCard(
+                                  icon: Icons.copy_outlined,
+                                  label: 'نسخ',
+                                  onTap: () async {
+                                    await Clipboard.setData(
+                                      ClipboardData(text: ayah.textUthmani),
+                                    );
+                                    if (context.mounted) {
+                                      Navigator.of(context).pop();
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'تم نسخ نص الآية الشريفة بنجاح',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _QuickActionCard(
+                                  icon: Icons.image_outlined,
+                                  label: 'بطاقة',
+                                  onTap: () {
+                                    Navigator.of(context).pop();
+                                    AyahShareSheet.show(context, ayah.id);
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 18),
+
+                          // 4. عنوان قسم التفسير والعلوم
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 36,
+                                height: 1,
+                                color: (isDark ? AppColors.lineDark : AppColors.line)
+                                    .withValues(alpha: 0.6),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.auto_stories_rounded,
+                                      size: 15,
+                                      color: themeAccent(context),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'التفسير والترجمات والعلوم',
+                                      style: TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w800,
+                                        color: onSurface.withValues(alpha: 0.8),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                width: 36,
+                                height: 1,
+                                color: (isDark ? AppColors.lineDark : AppColors.line)
+                                    .withValues(alpha: 0.6),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+
+                          // 5. شبكة البطاقات المعرفية المتطورة
+                          GridView.count(
+                            crossAxisCount: 2,
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            mainAxisSpacing: 8,
+                            crossAxisSpacing: 8,
+                            childAspectRatio: 2.3,
+                            children: [
+                              _CategoryKnowledgeCard(
+                                title: 'التفسير والترجمات',
+                                icon: Icons.menu_book_rounded,
+                                iconColor: const Color(0xFFD48B28),
+                                onTap: () {
+                                  Navigator.of(context).pop();
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => AyahTextViewScreen(
+                                        ayahId: ayah.id,
+                                        kind: AyahTextViewKind.tafsir,
+                                        initialTab: MainTafsirTab.tafasir,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                              _CategoryKnowledgeCard(
+                                title: 'المتشابهات اللفظية',
+                                icon: Icons.compare_arrows_rounded,
+                                iconColor: const Color(0xFFC0392B),
+                                badgeCount: similarAyahs.length,
+                                onTap: () {
+                                  Navigator.of(context).pop();
+                                  _SimilarAyahsSheet.show(context, similarAyahs);
+                                },
+                              ),
+                              _CategoryKnowledgeCard(
+                                title: 'كلمات غريب القرآن',
+                                icon: Icons.spellcheck_rounded,
+                                iconColor: AppColors.purple,
+                                onTap: () {
+                                  Navigator.of(context).pop();
+                                  GharibWordsSheet.show(context, ayah.id);
+                                },
+                              ),
+                              _CategoryKnowledgeCard(
+                                title: 'صانع بطاقات فَذَكِّرْ',
+                                icon: Icons.style_rounded,
+                                iconColor: AppColors.tealDeep,
+                                onTap: () {
+                                  Navigator.of(context).pop();
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => AyahStoryMakerScreen(
+                                        initialContent: AyahContent(
+                                          ayahId: ayah.id,
+                                          text: ayah.textUthmani,
+                                          surahName: surah?.nameAr ?? '',
+                                          ayahNumber: ayah.ayah,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // 6. الشريط السفلي: التنقل السريع بين الآيات
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xFF1B232E)
+                          : const Color(0xFFF9FAFB),
+                      border: Border(
+                        top: BorderSide(
+                          color: (isDark ? AppColors.lineDark : AppColors.line)
+                              .withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        IconButton.filledTonal(
+                          icon: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                          tooltip: 'الآية السابقة',
+                          onPressed: _currentAyahId > 1 ? () => _stepAyah(-1) : null,
+                        ),
+                        Text(
+                          surah != null
+                              ? '${surah.nameAr} · آية ${ayah.ayah} من ${surah.ayahCount}'
+                              : 'الآية ${ayah.ayah}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: onSurface.withValues(alpha: 0.7),
+                          ),
+                        ),
+                        IconButton.filledTonal(
+                          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 16),
+                          tooltip: 'الآية التالية',
+                          onPressed: _currentAyahId < 6236 ? () => _stepAyah(1) : null,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           );
@@ -372,96 +620,210 @@ class _AyahActionsSheetState extends ConsumerState<AyahActionsSheet> {
   }
 }
 
-class _MenuItemTile extends StatelessWidget {
-  const _MenuItemTile({
+class _MasteryChip extends StatelessWidget {
+  const _MasteryChip({
+    required this.label,
+    required this.color,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final Color color;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withValues(alpha: 0.18) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? color : color.withValues(alpha: 0.35),
+            width: isSelected ? 1.4 : 0.8,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: isSelected
+                    ? color
+                    : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickActionCard extends StatelessWidget {
+  const _QuickActionCard({
     required this.icon,
-    required this.titleBold,
-    this.titleRest,
+    required this.label,
     required this.onTap,
     this.isActive = false,
-    this.trailingBadge,
   });
 
   final IconData icon;
-  final String titleBold;
-  final String? titleRest;
+  final String label;
   final VoidCallback onTap;
   final bool isActive;
-  final String? trailingBadge;
 
   @override
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
-    final accent = themeAccent(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        child: Row(
-          children: [
-            // شارة أيقونة دائرية — بدل أيقونة مجرَّدة، بنفس لغة بقية شيتات
-            // المشروع (`_BookmarkPickerSheet`/`_ColorTagPickerSheet` بنفس
-            // الملف) — تمنح مساحة لمس أوضح وتفاعلاً بصرياً أقوى.
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: (isActive ? accent : onSurface).withValues(alpha: isActive ? 0.15 : 0.06),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                size: 19,
-                color: isActive ? accent : onSurface.withValues(alpha: 0.85),
-              ),
-            ),
-            const SizedBox(width: 12),
-            // النص العريض والمكمل على سطر واحد
-            Expanded(
-              child: RichText(
-                textAlign: TextAlign.start,
-                text: TextSpan(
-                  children: [
-                    TextSpan(
-                      text: titleBold,
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w800,
-                        fontFamily: 'Cairo',
-                        color: isActive ? accent : onSurface,
-                      ),
+    return Material(
+      color: isActive
+          ? themeAccent(context).withValues(alpha: 0.15)
+          : (isDark ? const Color(0xFF1E2836) : Colors.white),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isActive
+                  ? themeAccent(context)
+                  : (isDark ? AppColors.lineDark : AppColors.line).withValues(
+                      alpha: 0.7,
                     ),
-                    if (titleRest != null)
-                      TextSpan(
-                        text: titleRest!,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w500,
-                          fontFamily: 'Cairo',
-                          color: onSurface.withValues(alpha: 0.65),
-                        ),
-                      ),
-                  ],
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 20,
+                color: isActive
+                    ? themeAccent(context)
+                    : onSurface.withValues(alpha: 0.8),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                  color: isActive ? themeAccent(context) : onSurface,
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryKnowledgeCard extends StatelessWidget {
+  const _CategoryKnowledgeCard({
+    required this.title,
+    required this.icon,
+    required this.iconColor,
+    required this.onTap,
+    this.badgeCount,
+  });
+
+  final String title;
+  final IconData icon;
+  final Color iconColor;
+  final VoidCallback onTap;
+  final int? badgeCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Material(
+      color: isDark ? const Color(0xFF1E2836) : Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: (isDark ? AppColors.lineDark : AppColors.line).withValues(
+                alpha: 0.7,
+              ),
             ),
-            if (trailingBadge != null)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Icon(icon, color: iconColor, size: 20),
+              const SizedBox(width: 4),
+              Expanded(
                 child: Text(
-                  trailingBadge!,
+                  title,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: accent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: onSurface,
                   ),
                 ),
               ),
-          ],
+              if (badgeCount != null) ...[
+                const SizedBox(width: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: iconColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: iconColor.withValues(alpha: 0.4),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Text(
+                    '$badgeCount',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: iconColor,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );

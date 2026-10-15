@@ -99,6 +99,8 @@ class DailyHadithCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   '📚 ${hadith.source} · [${hadith.grade}]',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w600,
@@ -106,15 +108,20 @@ class DailyHadithCard extends StatelessWidget {
                   ),
                 ),
               ),
+              const SizedBox(width: 4),
               if (onDesignCard != null)
                 IconButton(
                   icon: const Icon(Icons.palette_outlined, size: 19),
                   tooltip: 'تصميم بطاقة ستوري',
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  padding: const EdgeInsets.all(8),
                   onPressed: onDesignCard,
                 ),
               IconButton(
                 icon: const Icon(Icons.copy_outlined, size: 18),
                 tooltip: 'نسخ الحديث',
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                padding: const EdgeInsets.all(8),
                 onPressed: onCopy,
               ),
             ],

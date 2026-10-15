@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/theme/app_card.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -91,30 +92,77 @@ class _DorarResultCardState extends State<DorarResultCard> {
       child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (result.grade != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: gradeColor.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: gradeColor.withValues(alpha: 0.4)),
-                  ),
-                  child: Row(
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  if (result.grade != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: gradeColor.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: gradeColor.withValues(alpha: 0.4)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(_gradeIcon(result.grade), size: 14, color: gradeColor),
+                          const SizedBox(width: 5),
+                          Text(
+                            result.grade!,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: gradeColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    const SizedBox.shrink(),
+                  Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(_gradeIcon(result.grade), size: 14, color: gradeColor),
-                      const SizedBox(width: 5),
-                      Text(
-                        result.grade!,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: gradeColor,
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        padding: EdgeInsets.zero,
+                        iconSize: 18,
+                        tooltip: 'نسخ الحديث',
+                        icon: Icon(
+                          Icons.copy_rounded,
+                          color: isDark ? Colors.white54 : AppColors.inkSoft,
                         ),
+                        onPressed: () async {
+                          await Clipboard.setData(
+                            ClipboardData(
+                              text: '${result.matn}\n\n[الراوي: ${result.narrator ?? 'غير محدد'} | المحدث: ${result.muhaddith ?? 'غير محدد'} | الدرجة: ${result.grade ?? 'غير محدد'}]',
+                            ),
+                          );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('تم نسخ الحديث بنجاح'),
+                                duration: Duration(seconds: 2),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        _expanded
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
+                        color: isDark ? Colors.white54 : AppColors.inkSoft,
+                        size: 20,
                       ),
                     ],
                   ),
-                ),
+                ],
+              ),
               const SizedBox(height: 10),
               Text(
                 result.matn,

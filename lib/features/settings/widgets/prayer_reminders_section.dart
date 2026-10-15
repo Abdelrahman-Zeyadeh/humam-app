@@ -6,6 +6,7 @@ import 'package:just_audio/just_audio.dart';
 
 import '../../../core/data/user/location_prefs.dart';
 import '../../../core/data/user/user_prefs.dart';
+import '../../../core/platform/dnd_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../notifications/adhan_notification_prefs.dart';
 import '../../notifications/adhan_notification_service.dart';
@@ -54,16 +55,14 @@ class PrayerRemindersSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionTitle('الصلاة والتذكيرات'),
+        const SectionTitle('الصلاة والأذان'),
         Card(
           margin: EdgeInsets.zero,
           child: Column(
             children: [
               const _AdhanVoiceSection(),
               const Divider(height: 1),
-              const _PostPrayerAzkarSection(),
-              const Divider(height: 1),
-              const _RawatibSection(),
+              const _DndDuringPrayerSection(),
               const Divider(height: 1),
               ListTile(
                 leading: Icon(
@@ -214,39 +213,6 @@ class _AdhanVoiceSectionState extends ConsumerState<_AdhanVoiceSection> {
           ),
           trailing: const Icon(Icons.chevron_left),
           onTap: () => _showVoicePickerModal(context, ref, selected),
-        ),
-        const Divider(height: 1),
-        ListTile(
-          leading: Icon(
-            Icons.notifications_active_outlined,
-            color: themeAccent(context),
-          ),
-          title: const Text('إرسال إشعار أذان تجريبي الآن'),
-          subtitle: const Text(
-            'يصلك إشعار حقيقي خلال ٣ ثوانٍ بنفس صوت الأذان المختار للتأكد من الصوت',
-            style: TextStyle(fontSize: 11.5),
-          ),
-          onTap: () async {
-            final messenger = ScaffoldMessenger.of(context);
-            try {
-              await AdhanNotificationService.instance.requestPermissions();
-              await AdhanNotificationService.instance.sendTestNotification(
-                voiceId: selected,
-              );
-              if (!mounted) return;
-              messenger.showSnackBar(
-                const SnackBar(
-                  content: Text('راقب شريط الإشعارات خلال ثوانٍ... 🔔'),
-                  backgroundColor: Color(0xFF1B8A72),
-                ),
-              );
-            } catch (e) {
-              if (!mounted) return;
-              messenger.showSnackBar(
-                SnackBar(content: Text('تعذّر إرسال الإشعار التجريبي: $e')),
-              );
-            }
-          },
         ),
       ],
     );
@@ -399,166 +365,74 @@ class _AdhanVoiceSectionState extends ConsumerState<_AdhanVoiceSection> {
   }
 }
 
-/// تنبيه "أذكار بعد الصلاة" — إعداد مستقل تماماً عن متابعة "هل صليت؟"
-/// وعن إشعار الأذان نفسه (بطلب صريح): إشعار واحد بعد كل صلاة مفروضة، بمدة
-/// قابلة للتخصيص من دخول الوقت، بزرّي "اقرأ الآن"/"×" الفعليين على الإشعار
-/// نفسه. راجع `AdhanNotificationService.rescheduleUpcoming`.
-class _PostPrayerAzkarSection extends ConsumerWidget {
-  const _PostPrayerAzkarSection();
 
-  static const _delayOptions = [3, 5, 10, 15];
+/// ميزة "الصامت التلقائي وقت الصلاة" — كتم صوت الجهاز تلقائياً وقت الصلاة والمساجد
+class _DndDuringPrayerSection extends ConsumerWidget {
+  const _DndDuringPrayerSection();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final userPrefs = ref.watch(userPrefsProvider);
-    final enabled = userPrefs.postPrayerAzkarEnabled;
-    final delay = userPrefs.postPrayerAzkarDelayMinutes;
+    final enabled = userPrefs.dndDuringPrayerEnabled;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.self_improvement_outlined, color: themeAccent(context)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'تنبيه أذكار بعد الصلاة',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: onSurface,
-                  ),
-                ),
-              ),
-              Switch(
-                value: enabled,
-                onChanged: (v) => _apply(context, ref, enabled: v, delay: delay),
-              ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 36),
-            child: Text(
-              'إشعار واحد بعد إقامة كل صلاة (بزرّي "اقرأ الآن"/"×")، يُحسب توقيته بعد وقت الإقامة الفعلي لكل صلاة.',
-              style: TextStyle(fontSize: 11.5, color: onSurface.withValues(alpha: 0.55)),
-            ),
-          ),
-          if (enabled) ...[
-            const SizedBox(height: 10),
-            Padding(
-              padding: const EdgeInsets.only(right: 36),
-              child: Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  Text(
-                    'بعد الإقامة بـ:',
-                    style: TextStyle(fontSize: 12.5, color: onSurface.withValues(alpha: 0.7)),
-                  ),
-                  for (final m in _delayOptions)
-                    ChoiceChip(
-                      label: Text('$m د'),
-                      selected: delay == m,
-                      onSelected: (_) => _apply(context, ref, enabled: true, delay: m),
+    return SwitchListTile.adaptive(
+      secondary: Icon(Icons.do_not_disturb_on_outlined, color: themeAccent(context)),
+      title: const Text('الصامت التلقائي وقت الصلاة'),
+      subtitle: Text(
+        'وضع الهاتف على الصامت تلقائياً عند دخول وقت الصلاة ولغاية انتهاء الصلاة',
+        style: TextStyle(fontSize: 11.5, color: onSurface.withValues(alpha: 0.6)),
+      ),
+      value: enabled,
+      onChanged: (v) async {
+        if (v) {
+          final granted = await DndService.isPolicyAccessGranted();
+          if (!granted) {
+            if (!context.mounted) return;
+            final proceed = await showDialog<bool>(
+              context: context,
+              builder: (dialogContext) => AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                title: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: themeAccent(context).withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.do_not_disturb_on_rounded, color: themeAccent(context), size: 24),
                     ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text('وضع الصامت في المسجد', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+                content: const Text(
+                  'لتفعيل الكتم التلقائي وقت الصلاة دون مقاطعة، يحتاج التطبيق إذن "الوصول لسياسة عدم الإزعاج" من إعدادات النظام.',
+                  style: TextStyle(fontSize: 13, height: 1.5),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(false),
+                    child: const Text('إلغاء'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(true),
+                    child: const Text('فتح الإعدادات'),
+                  ),
                 ],
               ),
-            ),
-          ],
-        ],
-      ),
+            );
+            if (proceed == true) {
+              await DndService.openPolicyAccessSettings();
+            }
+            return;
+          }
+        }
+        await userPrefs.setDndDuringPrayerEnabled(v);
+      },
     );
-  }
-
-  /// **لا يجب أن يرمي هون أي استثناء غير مُمسَك** — نفس قيد
-  /// `PrayerCheckinCard._apply`.
-  Future<void> _apply(
-    BuildContext context,
-    WidgetRef ref, {
-    required bool enabled,
-    required int delay,
-  }) async {
-    final userPrefs = ref.read(userPrefsProvider);
-    await userPrefs.setPostPrayerAzkarSettings(enabled: enabled, delayMinutes: delay);
-    try {
-      if (enabled) await AdhanNotificationService.instance.requestPermissions();
-      await _rescheduleAllPrayerNotifications(ref);
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذّر ضبط تنبيه أذكار بعد الصلاة على هذا الجهاز: $e')),
-      );
-    }
-  }
-}
-
-/// قسم "تذكير السنن الرواتب" — نفس بنية [_PostPrayerAzkarSection] لكن
-/// أبسط (لا خيار مدة تأخير، ثابتة ١٠ دقائق بعد دخول الوقت — راجع
-/// `AdhanNotificationService._scheduleRawatibOne`)، معطَّل افتراضياً.
-class _RawatibSection extends ConsumerWidget {
-  const _RawatibSection();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    final userPrefs = ref.watch(userPrefsProvider);
-    final enabled = userPrefs.rawatibEnabled;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.repeat_rounded, color: themeAccent(context)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'تذكير السنن الرواتب',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: onSurface,
-                  ),
-                ),
-              ),
-              Switch(
-                value: enabled,
-                onChanged: (v) => _apply(context, ref, v),
-              ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 36),
-            child: Text(
-              'تذكير بركعتَي السنة بعد الظهر/المغرب/العشاء، مستقل عن تنبيه أذكار بعد الصلاة أعلاه.',
-              style: TextStyle(fontSize: 11.5, color: onSurface.withValues(alpha: 0.55)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// **لا يجب أن يرمي هون أي استثناء غير مُمسَك** — نفس قيد
-  /// `_PostPrayerAzkarSection._apply`.
-  Future<void> _apply(BuildContext context, WidgetRef ref, bool enabled) async {
-    final userPrefs = ref.read(userPrefsProvider);
-    await userPrefs.setRawatibEnabled(enabled);
-    try {
-      if (enabled) await AdhanNotificationService.instance.requestPermissions();
-      await _rescheduleAllPrayerNotifications(ref);
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذّر ضبط تذكير السنن الرواتب على هذا الجهاز: $e')),
-      );
-    }
   }
 }

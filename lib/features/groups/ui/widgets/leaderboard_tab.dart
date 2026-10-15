@@ -8,9 +8,11 @@ import '../../../../core/theme/app_colors.dart';
 import '../../models/faith_group.dart';
 import '../../providers/groups_providers.dart';
 import '../../services/groups_service.dart';
+import '../../services/social_safety_service.dart';
 import 'group_info_card.dart';
 import 'member_card.dart';
 import 'nudge_dialog.dart';
+import 'report_and_block_dialogs.dart';
 
 /// تبويب "لوحة التنافس": بطاقة معلومات المجموعة ثم قائمة الأعضاء
 /// المرتّبة، مع سحب-للتحديث الذي يزامن إنجاز اليوم للمستخدم الحالي.
@@ -30,6 +32,7 @@ class LeaderboardTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUid = GroupsService.instance.currentUserId;
     final accent = themeAccent(context);
+    final blockedUsers = ref.watch(blockedUsersProvider);
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -77,16 +80,37 @@ class LeaderboardTab extends ConsumerWidget {
 
               return Column(
                 children: [
-                  for (var i = 0; i < members.length; i++)
-                    MemberCard(
-                      member: members[i],
-                      rank: i + 1,
-                      totalMembers: members.length,
-                      isMe: members[i].userId == currentUid,
-                      isDark: isDark,
-                      onNudge: () =>
-                          showNudgeDialog(context, ref, group.id, members[i]),
+                  for (var i = 0; i < members.length; i++) ...[
+                    Builder(
+                      builder: (ctx) {
+                        final member = members[i];
+                        final isBlocked = blockedUsers.contains(member.userId);
+                        return MemberCard(
+                          member: member,
+                          rank: i + 1,
+                          totalMembers: members.length,
+                          isMe: member.userId == currentUid,
+                          isDark: isDark,
+                          isBlocked: isBlocked,
+                          onNudge: () =>
+                              showNudgeDialog(context, ref, group.id, member),
+                          onReport: () => showReportMemberDialog(
+                            context,
+                            ref,
+                            member: member,
+                            groupId: group.id,
+                          ),
+                          onBlock: () {
+                            if (isBlocked) {
+                              ref.read(blockedUsersProvider.notifier).unblockUser(member.userId);
+                            } else {
+                              showBlockMemberDialog(context, ref, member: member);
+                            }
+                          },
+                        );
+                      },
                     ),
+                  ],
                 ],
               );
             },
@@ -96,7 +120,12 @@ class LeaderboardTab extends ConsumerWidget {
                 child: CircularProgressIndicator(),
               ),
             ),
-            error: (e, _) => Center(child: Text('خطأ في جلب الأعضاء: $e')),
+            error: (_, __) => const Center(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: Text('تعذّر تحميل قائمة الأعضاء. يرجى التحقق من اتصال الإنترنت.'),
+              ),
+            ),
           ),
         ],
       ),

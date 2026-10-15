@@ -41,6 +41,44 @@ final themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(
   ThemeModeNotifier.new,
 );
 
+/// خيارات مقياس حجم خطوط التطبيق العامة (Small, Default, Large, Extra Large)
+enum AppTextScale {
+  small(0.85, 'صغير'),
+  normal(1.0, 'افتراضي'),
+  large(1.25, 'كبير'),
+  extraLarge(1.5, 'كبير جداً');
+
+  const AppTextScale(this.scale, this.label);
+  final double scale;
+  final String label;
+}
+
+const _kAppTextScaleKey = 'app_global_text_scale';
+
+class AppTextScaleNotifier extends Notifier<AppTextScale> {
+  @override
+  AppTextScale build() {
+    final raw = ref.watch(sharedPreferencesProvider).getString(_kAppTextScaleKey);
+    return switch (raw) {
+      'small' => AppTextScale.small,
+      'large' => AppTextScale.large,
+      'extraLarge' => AppTextScale.extraLarge,
+      _ => AppTextScale.normal,
+    };
+  }
+
+  Future<void> set(AppTextScale scale) async {
+    state = scale;
+    final prefs = ref.read(sharedPreferencesProvider);
+    await prefs.setString(_kAppTextScaleKey, scale.name);
+  }
+}
+
+final appTextScaleProvider =
+    NotifierProvider<AppTextScaleNotifier, AppTextScale>(
+      AppTextScaleNotifier.new,
+    );
+
 const _kAmoledDarkModeKey = 'app_amoled_dark_mode';
 
 class AmoledDarkModeNotifier extends Notifier<bool> {
@@ -126,11 +164,11 @@ final mushafFontEditionProvider =
 /// `largest` جديدتان تحيطان بالثلاث الأصليتين (`small`/`medium`/`large`
 /// أُبقيت بنفس قيمها بالضبط لتفادي تغيير تجربة من اعتاد عليها).
 enum MushafTextSize {
-  smallest(horizontalPadding: 40),
-  small(horizontalPadding: 28),
-  medium(horizontalPadding: 12),
-  large(horizontalPadding: 2),
-  largest(horizontalPadding: 0);
+  smallest(horizontalPadding: 22),
+  small(horizontalPadding: 18),
+  medium(horizontalPadding: 14),
+  large(horizontalPadding: 10),
+  largest(horizontalPadding: 6);
 
   const MushafTextSize({required this.horizontalPadding});
   final double horizontalPadding;
@@ -162,6 +200,11 @@ class MemorizationModeNotifier extends Notifier<bool> {
   @override
   bool build() => false;
 
+  void set(bool enabled) {
+    state = enabled;
+    if (!state) ref.read(revealedAyahsProvider.notifier).hideAll();
+  }
+
   void toggle() {
     state = !state;
     if (!state) ref.read(revealedAyahsProvider.notifier).hideAll();
@@ -180,6 +223,23 @@ class RevealedAyahsNotifier extends Notifier<Set<int>> {
   Set<int> build() => const {};
 
   void reveal(int ayahId) => state = {...state, ayahId};
+
+  void revealAll(Iterable<int> ayahIds) => state = {...state, ...ayahIds};
+
+  void hide(int ayahId) => state = state.where((id) => id != ayahId).toSet();
+
+  void hideMultiple(Iterable<int> ayahIds) {
+    final toRemove = ayahIds.toSet();
+    state = state.where((id) => !toRemove.contains(id)).toSet();
+  }
+
+  void toggle(int ayahId) {
+    if (state.contains(ayahId)) {
+      hide(ayahId);
+    } else {
+      reveal(ayahId);
+    }
+  }
 
   void hideAll() => state = const {};
 }
@@ -399,3 +459,31 @@ final readingTafsirEditionProvider =
     NotifierProvider<ReadingTafsirEditionNotifier, String>(
       ReadingTafsirEditionNotifier.new,
     );
+
+const _kKeepScreenOnMushafKey = 'keep_screen_on_mushaf';
+
+/// وضع إبقاء الشاشة مضاءة أثناء تصفح وقراءة المصحف
+class KeepScreenOnMushafNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    final prefs = ref.watch(sharedPreferencesProvider);
+    return prefs.getBool(_kKeepScreenOnMushafKey) ?? true;
+  }
+
+  Future<void> toggle() async {
+    final next = !state;
+    state = next;
+    await ref.read(sharedPreferencesProvider).setBool(_kKeepScreenOnMushafKey, next);
+  }
+
+  Future<void> set(bool enabled) async {
+    state = enabled;
+    await ref.read(sharedPreferencesProvider).setBool(_kKeepScreenOnMushafKey, enabled);
+  }
+}
+
+final keepScreenOnMushafProvider =
+    NotifierProvider<KeepScreenOnMushafNotifier, bool>(
+      KeepScreenOnMushafNotifier.new,
+    );
+

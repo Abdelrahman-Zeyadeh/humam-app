@@ -15,6 +15,7 @@ import 'qibla_screen.dart';
 import 'widgets/prayer_checkin_card.dart';
 import 'widgets/prayer_detail_sheet.dart';
 import 'widgets/prayer_display_helpers.dart';
+import 'widgets/prayer_record_section.dart';
 
 /// إعادة تصدير `PrayerChecklistScreen` من موقعها الفعلي
 /// (`widgets/prayer_checklist_screen.dart`) — أُبقيَ هذا التصدير هون لأن
@@ -113,7 +114,10 @@ class PrayerScreen extends ConsumerWidget {
             checkinFirstDelayMinutes: userPrefs.prayerCheckinFirstDelayMinutes,
             postPrayerAzkarEnabled: userPrefs.postPrayerAzkarEnabled,
             postPrayerAzkarDelayMinutes: userPrefs.postPrayerAzkarDelayMinutes,
+            rawatibEnabled: userPrefs.rawatibEnabled,
             getIqamahMinutesFor: (m) => userPrefs.iqamahMinutesFor(m.name),
+            isIqamahEnabledFor: (m) => userPrefs.iqamahNotificationEnabledFor(m.name),
+            getPreAdhanMinutesFor: (m) => userPrefs.preAdhanMinutesFor(m.name),
           );
         }
       } else {
@@ -122,7 +126,9 @@ class PrayerScreen extends ConsumerWidget {
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذّر ضبط إشعارات الأذان على هذا الجهاز: $e')),
+        const SnackBar(
+          content: Text('تعذّر ضبط إشعارات الأذان على هذا الجهاز. يرجى مراجعة إعدادات الإشعارات.'),
+        ),
       );
     }
   }
@@ -167,9 +173,9 @@ class _LocationPrompt extends ConsumerWidget {
             ),
             if (locationState.hasError) ...[
               const SizedBox(height: 12),
-              Text(
-                '${locationState.error}',
-                style: const TextStyle(color: Color(0xFFB3261E), fontSize: 12),
+              const Text(
+                'تعذّر تحديد الموقع عبر GPS. يرجى التحقق من أذونات الموقع والمحاولة مجدداً.',
+                style: TextStyle(color: Color(0xFFB3261E), fontSize: 12),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -342,11 +348,35 @@ class _TimesView extends ConsumerWidget {
               ),
             ),
           ),
+        const SizedBox(height: 8),
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.touch_app_outlined,
+                  size: 14,
+                  color: onSurface.withValues(alpha: 0.45),
+                ),
+                const SizedBox(width: 5),
+                Flexible(
+                  child: Text(
+                    'اضغط مطولاً على أي صلاة لضبط وقتها وأذانها وإقامتها',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: onSurface.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
         const SizedBox(height: 16),
-        // بطلب صاحب المشروع: أُزيلت بطاقة "الصلوات والعبادات" اللي كانت
-        // هون — أصبح الوصول لـ`PrayerChecklistScreen` عبر زر "سجّل صلواتك
-        // وعباداتك" داخل `PrayerCountdownCard` أعلى نفس هذه الشاشة، فبطاقة
-        // ثانية بنفس الوجهة أسفل الشاشة صارت تكراراً لا داعي له.
+        const PrayerRecordSection(),
+        const SizedBox(height: 20),
         PrayerCheckinCard(prefs: prefs),
       ],
     );

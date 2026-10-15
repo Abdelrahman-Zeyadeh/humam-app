@@ -59,8 +59,9 @@ Future<List<String>> hifzReminderMessages(HadithRepository repo) async {
   final bukhari5033 = await repo.hadithByBookAndNumber(1, 5033);
   if (bukhari5033 != null) messages.add(hadithMatnOnly(bukhari5033.content));
 
-  if (messages.isEmpty)
+  if (messages.isEmpty) {
     messages.add('حان وقت التذكير الذي اخترته لمتابعة حفظك');
+  }
   return messages;
 }
 

@@ -14,7 +14,7 @@ import 'widgets/edit_profile_dialog.dart';
 import 'widgets/profile_header.dart';
 import 'widgets/progress_goals_section.dart';
 import 'widgets/today_stats_section.dart';
-import 'widgets/total_stats_section.dart';
+
 
 /// شاشة الملف الشخصي والإحصائيات: تجميع تفضيلات وإحصائيات المستخدم
 /// المبعثرة سابقاً في مكان واحد.
@@ -123,7 +123,6 @@ class _ProfileStatsScreenState extends ConsumerState<ProfileStatsScreen> {
           const SizedBox(height: 20),
           DailyStreakSection(streakDays: streakDays),
           const SizedBox(height: 20),
-          TotalStatsSection(streakDays: streakDays, fajrStreak: fajrStreak),
           const SizedBox(height: 20),
           ProgressGoalsSection(
             morningStreak: morningStreak,

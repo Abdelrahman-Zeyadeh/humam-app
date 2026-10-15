@@ -8,97 +8,132 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/platform/gallery_saver.dart';
+import '../story_maker/ui/widgets/islamic_luxury_card.dart';
 
-class HumamWallpaperPreset {
+/// نموذج خلفية فذكّر الفاخرة
+class FathakkirWallpaperItem {
   final String id;
   final String title;
+  final String caption;
+  final String badgeText;
+  final String mainText;
+  final String topTitle;
+  final String footerText;
   final List<Color> colors;
-  final Alignment begin;
-  final Alignment end;
-  final String defaultText;
-  final String defaultSubText;
   final Color textColor;
   final Color accentColor;
 
-  const HumamWallpaperPreset({
+  const FathakkirWallpaperItem({
     required this.id,
     required this.title,
+    required this.caption,
+    required this.badgeText,
+    required this.mainText,
+    this.topTitle = 'هُمَام',
+    this.footerText = 'ذكّر غيرك',
     required this.colors,
-    this.begin = Alignment.topCenter,
-    this.end = Alignment.bottomCenter,
-    required this.defaultText,
-    required this.defaultSubText,
-    this.textColor = Colors.white,
+    this.textColor = const Color(0xFFE5C378),
     this.accentColor = const Color(0xFFD4AF37),
   });
 }
 
-const List<HumamWallpaperPreset> kHumamWallpapers = [
-  HumamWallpaperPreset(
-    id: 'night_sky',
-    title: 'سماء هادئة',
-    colors: [Color(0xFF0D1B2A), Color(0xFF1B263B), Color(0xFF415A77)],
-    defaultText: 'وَتَوَكَّلْ عَلَى الْحَيِّ الَّذِي لَا يَمُوتُ',
-    defaultSubText: 'سورة الفرقان — آية ٥٨',
-    textColor: Color(0xFFF1F5F9),
-    accentColor: Color(0xFF93C5FD),
+const List<List<Color>> kLuxuryColorThemes = [
+  // 1. عنبر فذكّر (المعتمد في صورة المستخدم)
+  [Color(0xFF1B0E06), Color(0xFF381F0D), Color(0xFF140A04)],
+  // 2. زمردي ملكي
+  [Color(0xFF061A10), Color(0xFF0E3823), Color(0xFF05140C)],
+  // 3. كحلي عميق
+  [Color(0xFF081224), Color(0xFF122347), Color(0xFF050B16)],
+  // 4. أسود مذهب
+  [Color(0xFF111113), Color(0xFF22201C), Color(0xFF0C0C0D)],
+  // 5. عنابي وقار
+  [Color(0xFF1F0814), Color(0xFF3B1228), Color(0xFF16050E)],
+];
+
+const List<FathakkirWallpaperItem> kFathakkirWallpapers = [
+  FathakkirWallpaperItem(
+    id: 'salawat',
+    title: 'الصلاة على النبي',
+    caption: 'كرر تؤجر "الصلاة على النبي"',
+    badgeText: 'كرر تؤجر',
+    mainText: 'اللهم صل\nو سلمــــ\nعلى نبينا\nمحمـــــد',
+    colors: [Color(0xFF1B0E06), Color(0xFF381F0D), Color(0xFF140A04)],
   ),
-  HumamWallpaperPreset(
-    id: 'emerald_peace',
-    title: 'زمردي روحاني',
-    colors: [Color(0xFF062A1A), Color(0xFF0F4A2C), Color(0xFF1E3A2B)],
-    defaultText: 'أَلَا بِذِكْرِ اللَّهِ تَطْمَئِنُّ الْقُلُوبُ',
-    defaultSubText: 'سورة الرعد — آية ٢٨',
-    textColor: Color(0xFFECFDF5),
-    accentColor: Color(0xFF6EE7B7),
+  FathakkirWallpaperItem(
+    id: 'istighfar',
+    title: 'الاستغفار',
+    caption: 'كرر تؤجر "الاستغفار"',
+    badgeText: 'كرر تؤجر',
+    mainText: 'أستغفـــــر\nالله وأتوب\nإليــــــــه',
+    colors: [Color(0xFF1B0E06), Color(0xFF381F0D), Color(0xFF140A04)],
   ),
-  HumamWallpaperPreset(
-    id: 'royal_gold',
-    title: 'نور ذهبي',
-    colors: [Color(0xFF1A140A), Color(0xFF2E2412), Color(0xFF4D3D1E)],
-    defaultText: 'رَبِّ إِنِّي لِمَا أَنْزَلْتَ إِلَيَّ مِنْ خَيْرٍ فَقِيرٌ',
-    defaultSubText: 'سورة القصص — آية ٢٤',
-    textColor: Color(0xFFFFFBEB),
-    accentColor: Color(0xFFFCD34D),
+  FathakkirWallpaperItem(
+    id: 'hawqalah',
+    title: 'الحوقلة',
+    caption: 'كنز من كنوز الجنة "الحوقلة"',
+    badgeText: 'كنز الجنة',
+    mainText: 'لا حـــول\nولا قـــوة\nإلا بالله\nالعلي العظيم',
+    colors: [Color(0xFF061A10), Color(0xFF0E3823), Color(0xFF05140C)],
   ),
-  HumamWallpaperPreset(
-    id: 'deep_purple',
-    title: 'سكينة المساء',
-    colors: [Color(0xFF1E102F), Color(0xFF3B1E54), Color(0xFF533B6D)],
-    defaultText: 'حَسْبُنَا اللَّهُ وَنِعْمَ الْوَكِيلُ',
-    defaultSubText: 'سورة آل عمران — آية ١٧٣',
-    textColor: Color(0xFFFAF5FF),
-    accentColor: Color(0xFFD8B4FE),
+  FathakkirWallpaperItem(
+    id: 'tasbih',
+    title: 'التسبيح',
+    caption: 'كرر تؤجر "التسبيح والتحميد"',
+    badgeText: 'كرر تؤجر',
+    mainText: 'سبحان الله\nوبحمــــده\nسبحان الله\nالعظيــــم',
+    colors: [Color(0xFF111113), Color(0xFF22201C), Color(0xFF0C0C0D)],
   ),
-  HumamWallpaperPreset(
-    id: 'ocean_depth',
-    title: 'رحاب الأفق',
-    colors: [Color(0xFF0A192F), Color(0xFF172A45), Color(0xFF203A43)],
-    defaultText: 'لَا إِلَهَ إِلَّا أَنْتَ سُبْحَانَكَ إِنِّي كُنْتُ مِنَ الظَّالِمِينَ',
-    defaultSubText: 'دعاء ذي النون عليه السلام',
-    textColor: Color(0xFFF0FDF4),
-    accentColor: Color(0xFF5EEAD4),
+  FathakkirWallpaperItem(
+    id: 'tawakkul',
+    title: 'التوكل',
+    caption: 'سورة الفرقان — آية ٥٨',
+    badgeText: 'آية وسكينة',
+    mainText: 'وَتَوَكَّلْ\nعَلَى الْحَيِّ\nالَّذِي\nلَا يَمُوتُ',
+    colors: [Color(0xFF081224), Color(0xFF122347), Color(0xFF050B16)],
   ),
-  HumamWallpaperPreset(
-    id: 'desert_dusk',
-    title: 'أصيل مذهب',
-    colors: [Color(0xFF2B1810), Color(0xFF4A2810), Color(0xFF6E3B16)],
-    defaultText: 'وَقُلْ رَبِّ زِدْنِي عِلْمًا',
-    defaultSubText: 'سورة طه — آية ١١٤',
-    textColor: Color(0xFFFFF7ED),
-    accentColor: Color(0xFFFDBA74),
+  FathakkirWallpaperItem(
+    id: 'itmeenan',
+    title: 'طمأنينة القلب',
+    caption: 'سورة الرعد — آية ٢٨',
+    badgeText: 'آية وتدبر',
+    mainText: 'أَلَا بِذِكْرِ\nاللَّهِ تَطْمَئِنُّ\nالْقُلُــــوبُ',
+    colors: [Color(0xFF1B0E06), Color(0xFF381F0D), Color(0xFF140A04)],
   ),
-  HumamWallpaperPreset(
-    id: 'pure_dark',
-    title: 'سكون الليل',
-    colors: [Color(0xFF0F0F10), Color(0xFF1A1A1E), Color(0xFF27272E)],
-    defaultText: 'فَاذْكُرُونِي أَذْكُرْكُمْ وَاشْكُرُوا لِي وَلَا تَكْفُرُونِ',
-    defaultSubText: 'سورة البقرة — آية ١٥٢',
-    textColor: Color(0xFFF8FAFC),
-    accentColor: Color(0xFFCBD5E1),
+  FathakkirWallpaperItem(
+    id: 'faraj',
+    title: 'دعاء الكرب والفرج',
+    caption: 'دعاء ذي النون عليه السلام',
+    badgeText: 'دعاء الفرج',
+    mainText: 'لَا إِلَهَ إِلَّا أَنْتَ\nسُبْحَانَكَ إِنِّي\nكُنْتُ مِنَ\nالظَّالِمِينَ',
+    colors: [Color(0xFF1F0814), Color(0xFF3B1228), Color(0xFF16050E)],
+  ),
+  FathakkirWallpaperItem(
+    id: 'hasbi',
+    title: 'الحسبلة',
+    caption: 'سورة آل عمران — آية ١٧٣',
+    badgeText: 'أمان الخائفين',
+    mainText: 'حَسْبُنَا اللَّهُ\nوَنِعْمَ\nالْوَكِيــــلُ',
+    colors: [Color(0xFF081224), Color(0xFF122347), Color(0xFF050B16)],
+  ),
+  FathakkirWallpaperItem(
+    id: 'ilm',
+    title: 'طلب العلم',
+    caption: 'سورة طه — آية ١١٤',
+    badgeText: 'دعاء قرآني',
+    mainText: 'وَقُلْ رَبِّ\nزِدْنِي\nعِلْمًـــــا',
+    colors: [Color(0xFF1B0E06), Color(0xFF381F0D), Color(0xFF140A04)],
+  ),
+  FathakkirWallpaperItem(
+    id: 'shukr',
+    title: 'ذكر وشكر',
+    caption: 'سورة البقرة — آية ١٥٢',
+    badgeText: 'عهد ووعد',
+    mainText: 'فَاذْكُرُونِي\nأَذْكُرْكُـــمْ\nوَاشْكُرُوا لِي\nوَلَا تَكْفُرُونِ',
+    colors: [Color(0xFF111113), Color(0xFF22201C), Color(0xFF0C0C0D)],
   ),
 ];
 
+/// شاشة خلفيات فذكّر بتصميم أنيق ومطابق للصورة
 class WallpapersScreen extends StatefulWidget {
   const WallpapersScreen({super.key});
 
@@ -107,39 +142,127 @@ class WallpapersScreen extends StatefulWidget {
 }
 
 class _WallpapersScreenState extends State<WallpapersScreen> {
-  int _selectedPresetIndex = 0;
-  late TextEditingController _textController;
-  late TextEditingController _subTextController;
-  final double _fontSize = 22.0;
-  final bool _showBranding = true;
-  bool _isSaving = false;
-  final GlobalKey _wallpaperPreviewKey = GlobalKey();
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldBg = isDark ? const Color(0xFF121214) : const Color(0xFFFAF7F0);
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: scaffoldBg,
+        appBar: AppBar(
+          title: const Text(
+            'خلفيات هُمَام',
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            ),
+          ),
+          centerTitle: true,
+          backgroundColor: scaffoldBg,
+          elevation: 0,
+        ),
+        body: GridView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 14,
+            mainAxisSpacing: 18,
+            childAspectRatio: 0.52,
+          ),
+          itemCount: kFathakkirWallpapers.length,
+          itemBuilder: (context, index) {
+            final item = kFathakkirWallpapers[index];
+            return InkWell(
+              onTap: () => _openWallpaperDetail(context, item),
+              borderRadius: BorderRadius.circular(22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // بطاقة المعاينة المصغرة الفاخرة
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: FittedBox(
+                        fit: BoxFit.cover,
+                        child: IslamicLuxuryCard(
+                          mainText: item.mainText,
+                          badgeText: item.badgeText,
+                          topTitle: item.topTitle,
+                          footerText: item.footerText,
+                          gradientColors: item.colors,
+                          fontSize: 26,
+                          width: 260,
+                          height: 480,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // التعليق أسفل البطاقة كالصورة تماماً
+                  Text(
+                    item.caption,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white70 : const Color(0xFF2C2416),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  void _openWallpaperDetail(BuildContext context, FathakkirWallpaperItem initialItem) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => _WallpaperDetailViewer(item: initialItem),
+      ),
+    );
+  }
+}
+
+/// عارض ومحرر الخلفية الفاخر بملء الشاشة مع التصدير بجودة فائقة
+class _WallpaperDetailViewer extends StatefulWidget {
+  final FathakkirWallpaperItem item;
+
+  const _WallpaperDetailViewer({required this.item});
+
+  @override
+  State<_WallpaperDetailViewer> createState() => _WallpaperDetailViewerState();
+}
+
+class _WallpaperDetailViewerState extends State<_WallpaperDetailViewer> {
+  final GlobalKey _cardBoundaryKey = GlobalKey();
+  late String _mainText;
+  late String _badgeText;
+  late String _topTitle;
+  late String _footerText;
+  late List<Color> _colors;
+  bool _isExporting = false;
 
   @override
   void initState() {
     super.initState();
-    final initial = kHumamWallpapers.first;
-    _textController = TextEditingController(text: initial.defaultText);
-    _subTextController = TextEditingController(text: initial.defaultSubText);
-  }
-
-  @override
-  void dispose() {
-    _textController.dispose();
-    _subTextController.dispose();
-    super.dispose();
-  }
-
-  void _selectPreset(int index) {
-    setState(() {
-      _selectedPresetIndex = index;
-      _textController.text = kHumamWallpapers[index].defaultText;
-      _subTextController.text = kHumamWallpapers[index].defaultSubText;
-    });
+    _mainText = widget.item.mainText;
+    _badgeText = widget.item.badgeText;
+    _topTitle = widget.item.topTitle;
+    _footerText = widget.item.footerText;
+    _colors = widget.item.colors;
   }
 
   Future<Uint8List?> _captureImageBytes() async {
-    final boundary = _wallpaperPreviewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+    final boundary = _cardBoundaryKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
     if (boundary == null) return null;
     final image = await boundary.toImage(pixelRatio: 4.0); // UHD
     final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
@@ -147,19 +270,21 @@ class _WallpapersScreenState extends State<WallpapersScreen> {
   }
 
   Future<void> _saveToGallery() async {
-    setState(() => _isSaving = true);
+    setState(() => _isExporting = true);
     try {
       final bytes = await _captureImageBytes();
       if (bytes == null) return;
-      final filename = 'humam_wallpaper_${DateTime.now().millisecondsSinceEpoch}.png';
+      final filename = 'fathakkir_wallpaper_${DateTime.now().millisecondsSinceEpoch}.png';
       final res = await savePngToGallery(bytes, displayName: filename);
       if (!mounted) return;
 
       final message = (res.saved && res.inGallery)
-          ? 'تم حفظ خلفية هُمَام في المعرض بنجاح 🖼️✨'
+          ? 'تم حفظ خلفية فذكّر في المعرض بنجاح 🖼️✨'
           : 'تم حفظ الخلفية بنجاح';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           content: Text(message),
           backgroundColor: const Color(0xFF2E7D32),
         ),
@@ -171,24 +296,24 @@ class _WallpapersScreenState extends State<WallpapersScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => _isSaving = false);
+      if (mounted) setState(() => _isExporting = false);
     }
   }
 
   Future<void> _shareWallpaper() async {
-    setState(() => _isSaving = true);
+    setState(() => _isExporting = true);
     try {
       final bytes = await _captureImageBytes();
       if (bytes == null) return;
       final tempDir = await getTemporaryDirectory();
-      final filePath = '${tempDir.path}/humam_wallpaper_${DateTime.now().millisecondsSinceEpoch}.png';
+      final filePath = '${tempDir.path}/fathakkir_wallpaper_${DateTime.now().millisecondsSinceEpoch}.png';
       final file = File(filePath);
       await file.writeAsBytes(bytes);
 
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile(filePath)],
-          text: '${_textController.text}\n\nخلفيات تطبيق هُمَام 🌸',
+          text: 'خلفية إسلامية من تطبيق هُمَام ✨\n$_mainText',
         ),
       );
     } catch (e) {
@@ -198,46 +323,85 @@ class _WallpapersScreenState extends State<WallpapersScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => _isSaving = false);
+      if (mounted) setState(() => _isExporting = false);
     }
   }
 
-  void _showDhikrPickerSheet() {
-    const dhikrPresets = [
-      ('وَتَوَكَّلْ عَلَى الْحَيِّ الَّذِي لَا يَمُوتُ', 'سورة الفرقان — آية ٥٨'),
-      ('أَلَا بِذِكْرِ اللَّهِ تَطْمَئِنُّ الْقُلُوبُ', 'سورة الرعد — آية ٢٨'),
-      ('رَبِّ إِنِّي لِمَا أَنْزَلْتَ إِلَيَّ مِنْ خَيْرٍ فَقِيرٌ', 'سورة القصص — آية ٢٤'),
-      ('حَسْبُنَا اللَّهُ وَنِعْمَ الْوَكِيلُ', 'سورة آل عمران — آية ١٧٣'),
-      ('لَا إِلَهَ إِلَّا أَنْتَ سُبْحَانَكَ إِنِّي كُنْتُ مِنَ الظَّالِمِينَ', 'دعاء ذي النون'),
-      ('سُبْحَانَ اللَّهِ وَبِحَمْدِهِ ، سُبْحَانَ اللَّهِ الْعَظِيمِ', 'كلمتان حبيبتان إلى الرحمن'),
-      ('لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ الْعَلِيِّ الْعَظِيمِ', 'كنز من كنوز الجنة'),
-      ('اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ', 'الصلاة على النبي ﷺ'),
-    ];
+  void _showCustomizeDialog() {
+    final textCtrl = TextEditingController(text: _mainText);
+    final badgeCtrl = TextEditingController(text: _badgeText);
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1E1A16),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        child: ListView.separated(
-          itemCount: dhikrPresets.length,
-          separatorBuilder: (_, __) => const Divider(height: 1),
-          itemBuilder: (ctx, i) {
-            final item = dhikrPresets[i];
-            return ListTile(
-              title: Text(item.$1, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-              subtitle: Text(item.$2, style: const TextStyle(fontSize: 11.5)),
-              onTap: () {
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'تخصيص عبارة الخلفية',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFFE5C378),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: badgeCtrl,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                labelText: 'نص الإطار العلوي (مثل: كرر تؤجر)',
+                labelStyle: const TextStyle(color: Colors.white60),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.06),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: textCtrl,
+              maxLines: 4,
+              style: const TextStyle(color: Colors.white, height: 1.5),
+              decoration: InputDecoration(
+                labelText: 'النص الرئيسي (قسّم الأسطر حسب رغبتك)',
+                labelStyle: const TextStyle(color: Colors.white60),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.06),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
                 setState(() {
-                  _textController.text = item.$1;
-                  _subTextController.text = item.$2;
+                  _badgeText = badgeCtrl.text.trim();
+                  _mainText = textCtrl.text.trim();
                 });
                 Navigator.pop(ctx);
               },
-            );
-          },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD4AF37),
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('تطبيق التعديلات', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
         ),
       ),
     );
@@ -245,284 +409,126 @@ class _WallpapersScreenState extends State<WallpapersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final preset = kHumamWallpapers[_selectedPresetIndex];
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
+        backgroundColor: const Color(0xFF0F0A06),
         appBar: AppBar(
-          title: const Text('خلفيات هُمَام 🖼️'),
-          centerTitle: true,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
           actions: [
             IconButton(
-              icon: const Icon(Icons.format_quote_rounded),
-              tooltip: 'اختر ذكراً جاهزاً',
-              onPressed: _showDhikrPickerSheet,
+              icon: const Icon(Icons.edit_note_rounded, color: Color(0xFFD4AF37)),
+              tooltip: 'تعديل العبارة',
+              onPressed: _showCustomizeDialog,
             ),
           ],
         ),
         body: Column(
           children: [
-            // منطقة المعاينة (شاشة هاتف أنيقة 9:16)
+            // معاينة البطاقة بحجمها الطبيعي الفاخر
             Expanded(
               child: Center(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                   child: RepaintBoundary(
-                    key: _wallpaperPreviewKey,
-                    child: Container(
-                      width: 270,
-                      height: 480,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(28),
-                        gradient: LinearGradient(
-                          colors: preset.colors,
-                          begin: preset.begin,
-                          end: preset.end,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.35),
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                        border: Border.all(
-                          color: preset.accentColor.withValues(alpha: 0.25),
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          // زخرفة خلفية هندسية رقيقة
-                          Positioned(
-                            top: 40,
-                            child: Icon(
-                              Icons.auto_awesome,
-                              size: 24,
-                              color: preset.accentColor.withValues(alpha: 0.3),
-                            ),
-                          ),
-
-                          // النص الرئيسي والفرعي
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 24),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  _textController.text.trim().isEmpty ? 'اذكر الله' : _textController.text,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontFamily: 'AmiriQuran',
-                                    fontSize: _fontSize,
-                                    height: 1.8,
-                                    color: preset.textColor,
-                                    shadows: const [
-                                      Shadow(
-                                        color: Colors.black45,
-                                        blurRadius: 8,
-                                        offset: Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                if (_subTextController.text.trim().isNotEmpty) ...[
-                                  const SizedBox(height: 12),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black.withValues(alpha: 0.25),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: preset.accentColor.withValues(alpha: 0.3),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      _subTextController.text,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: preset.accentColor,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-
-                          // شارة هُمَام بالأسفل
-                          if (_showBranding)
-                            Positioned(
-                              bottom: 24,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.auto_awesome,
-                                    size: 10,
-                                    color: preset.accentColor.withValues(alpha: 0.7),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'خلفيات هُمَام',
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.bold,
-                                      color: preset.textColor.withValues(alpha: 0.65),
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
+                    key: _cardBoundaryKey,
+                    child: IslamicLuxuryCard(
+                      mainText: _mainText,
+                      badgeText: _badgeText,
+                      topTitle: _topTitle,
+                      footerText: _footerText,
+                      gradientColors: _colors,
+                      fontSize: 27,
+                      width: 290,
+                      height: 520,
                     ),
                   ),
                 ),
               ),
             ),
 
-            // لوحة التحكم السفلية بالخلفيات والتعديل
+            // شريط اختيار ألوان الثيم الفاخرة
             Container(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E2836) : Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 10,
-                    offset: const Offset(0, -3),
-                  ),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  for (final themeColors in kLuxuryColorThemes)
+                    GestureDetector(
+                      onTap: () => setState(() => _colors = themeColors),
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 6),
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [themeColors.first, themeColors[1]],
+                          ),
+                          border: Border.all(
+                            color: _colors == themeColors
+                                ? const Color(0xFFD4AF37)
+                                : Colors.white24,
+                            width: _colors == themeColors ? 2.5 : 1,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
-              child: SafeArea(
-                top: false,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+            ),
+
+            // شريط الإجراءات السفلي (حفظ في المعرض + مشاركة)
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+                child: Row(
                   children: [
-                    // شريط اختيار ألوان الخلفيات الدائرية
-                    SizedBox(
-                      height: 48,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: kHumamWallpapers.length,
-                        itemBuilder: (ctx, idx) {
-                          final p = kHumamWallpapers[idx];
-                          final isSelected = idx == _selectedPresetIndex;
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 5),
-                            child: InkWell(
-                              onTap: () => _selectPreset(idx),
-                              borderRadius: BorderRadius.circular(24),
-                              child: Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  gradient: LinearGradient(
-                                    colors: p.colors,
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  border: Border.all(
-                                    color: isSelected ? Colors.white : Colors.white24,
-                                    width: isSelected ? 3 : 1.2,
-                                  ),
-                                  boxShadow: isSelected
-                                      ? [
-                                          BoxShadow(
-                                            color: p.accentColor.withValues(alpha: 0.6),
-                                            blurRadius: 8,
-                                            spreadRadius: 1,
-                                          ),
-                                        ]
-                                      : null,
-                                ),
-                                child: isSelected
-                                    ? const Center(
-                                        child: Icon(Icons.check_rounded, color: Colors.white, size: 22),
-                                      )
-                                    : null,
-                              ),
-                            ),
-                          );
-                        },
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton.icon(
+                        icon: _isExporting
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                              )
+                            : const Icon(Icons.download_rounded, size: 20),
+                        label: const Text(
+                          'حفظ في المعرض (UHD)',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                        ),
+                        onPressed: _isExporting ? null : _saveToGallery,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD4AF37),
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          elevation: 4,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 12),
-
-                    // حقل تعديل الذكر/الدعاء
-                    TextField(
-                      controller: _textController,
-                      decoration: InputDecoration(
-                        isDense: true,
-                        hintText: 'اكتب ذكراً أو دعاءً أو آية...',
-                        prefixIcon: const Icon(Icons.edit_outlined, size: 18),
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.format_quote_rounded, size: 18),
-                          tooltip: 'أذكار مقترحة',
-                          onPressed: _showDhikrPickerSheet,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.share_outlined, size: 18),
+                        label: const Text(
+                          'مشاركة',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                         ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                        onPressed: _isExporting ? null : _shareWallpaper,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFE5C378),
+                          side: const BorderSide(color: Color(0xFFD4AF37), width: 1.2),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       ),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // أزرار الحفظ والمشاركة
-                    Row(
-                      children: [
-                        // حفظ بالمعرض
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF6D4C41),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                              elevation: 2,
-                            ),
-                            icon: _isSaving
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                  )
-                                : const Icon(Icons.download_rounded, size: 20),
-                            label: Text(
-                              _isSaving ? 'جارٍ الحفظ...' : 'حفظ كخلفية',
-                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                            ),
-                            onPressed: _isSaving ? null : _saveToGallery,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-
-                        // مشاركة
-                        OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: isDark ? Colors.white : const Color(0xFF4A3B2C),
-                            side: BorderSide(
-                              color: isDark ? Colors.white38 : const Color(0xFF8D6E63),
-                              width: 1.5,
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          ),
-                          icon: const Icon(Icons.share_rounded, size: 18),
-                          label: const Text('مشاركة', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                          onPressed: _isSaving ? null : _shareWallpaper,
-                        ),
-                      ],
                     ),
                   ],
                 ),

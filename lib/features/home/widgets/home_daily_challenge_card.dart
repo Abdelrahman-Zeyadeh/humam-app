@@ -25,9 +25,32 @@ class DailyChallengeCard extends ConsumerWidget {
     final done = userPrefs.dailyChallengeCompletedToday;
     final text = dailyChallengeTextFor(DateTime.now());
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accentColor = done ? AppColors.tealDeep : const Color(0xFFC5A059);
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: AppCard(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.centerRight,
+            end: Alignment.centerLeft,
+            colors: isDark
+                ? [
+                    accentColor.withValues(alpha: 0.16),
+                    AppColors.surfaceDark,
+                  ]
+                : done
+                    ? const [Color(0xFFEEF8F5), Color(0xFFE3F2EE)]
+                    : const [Color(0xFFFFFCF5), Color(0xFFF6ECDA)],
+          ),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: accentColor.withValues(alpha: isDark ? 0.35 : 0.3),
+            width: 1.1,
+          ),
+        ),
         child: Row(
           children: [
             IconBadge(
@@ -40,11 +63,13 @@ class DailyChallengeCard extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'تحدي اليوم',
+                    'تحدي اليوم ✨',
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: homeTextSoft(context),
+                      fontWeight: FontWeight.w800,
+                      color: isDark
+                          ? const Color(0xFFD4AF67)
+                          : const Color(0xFF8C6D3F),
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -64,7 +89,12 @@ class DailyChallengeCard extends ConsumerWidget {
             if (!done)
               FilledButton.tonal(
                 style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  backgroundColor:
+                      const Color(0xFF135B4C).withValues(alpha: isDark ? 0.3 : 0.14),
+                  foregroundColor:
+                      isDark ? const Color(0xFF64B5A5) : const Color(0xFF135B4C),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
@@ -72,7 +102,10 @@ class DailyChallengeCard extends ConsumerWidget {
                   await userPrefs.markDailyChallengeCompletedToday();
                   ref.read(categoryStreakVersionProvider.notifier).bump();
                 },
-                child: const Text('تمّ ✓', style: TextStyle(fontSize: 11.5)),
+                child: const Text(
+                  'تمّ ✓',
+                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
+                ),
               ),
           ],
         ),

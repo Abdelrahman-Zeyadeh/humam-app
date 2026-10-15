@@ -4,5 +4,6 @@
          (AppColors.navy) — يمنع "ومضة" شاشة بيضاء قبل رسم أول فريم لفلاتر
          (كانت الخلفية الافتراضية @android:color/white، فيظهر أبيض للحظة ثم
          يتبدّل فجأة لكحلي، وهو ما يعطي انطباع "بطء تحميل"). -->
-    <color name="launch_background_navy">#0B2545</color>
+    <color name="launch_background_navy">#0E4D40</color>
+	<color name="ic_launcher_background">#0E4D40</color>
 </resources>

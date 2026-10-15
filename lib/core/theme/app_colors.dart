@@ -19,7 +19,7 @@ abstract final class AppColors {
 
   // الخلفيات
   static const paper = Color(0xFFF6EEDA); // خلفية صفحة المصحف الورقية
-  static const cream = Color(0xFFFBF6EC); // خلفية شاشات التطبيق العامة
+  static const cream = Color(0xFFF8F5EE); // خلفية شاشات التطبيق العامة بنمط منار (أبيض على بيج)
 
   // النصوص
   static const ink = Color(0xFF1C2B3A);
@@ -42,7 +42,7 @@ abstract final class AppColors {
   /// مشترك بينها — خطر واضح لانحراف اللون لو تغيّر بمكان ونُسي غيره.
   static const infoBlue = Color(0xFF386892);
 
-  static const line = Color(0x1A0B2545); // navy بشفافية 10%
+  static const line = Color(0xFFEBE4D6); // خط إطار ناعم بيج/رملي هادئ
 
   // الوضع الليلي — دافئة لا سوداء صريحة، بنفس الهوية
   static const paperDark = Color(0xFF221D16); // خلفية صفحة المصحف الليلية

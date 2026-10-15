@@ -5,7 +5,6 @@ import 'dart:ui' as ui;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -13,26 +12,88 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/data/quran/quran_database.dart';
 import '../../../core/data/quran/quran_providers.dart';
 import '../../../core/platform/gallery_saver.dart';
-import '../../../core/theme/app_card.dart';
-import '../../../core/theme/app_colors.dart';
 import '../models/story_content.dart';
-import '../models/story_theme.dart';
-import 'widgets/ayah_end_circle.dart';
-import 'widgets/story_panel_controls.dart';
+import 'widgets/islamic_luxury_card.dart';
 
-// مقاسان فقط (بدل ٣) — بطلب صريح "خليها حجمين لانها في مكرر": المقاس
-// الثالث (١٦:٩ "بانر") كان متكرراً فعلياً بلا فائدة تصميمية مختلفة عن
-// المربّع (١:١) لبطاقة نصية رأسية المحتوى أصلاً — يُترك فقط القصة الرأسية
-// (٩:١٦) الأنسب لستوري إنستغرام/واتساب، والمربّع (١:١) الأنسب لمنشور عادي.
+final _ayahByIdProvider = FutureProvider.family<Ayah, int>((ref, id) {
+  return ref.watch(quranRepositoryProvider).ayahById(id);
+});
+
+final _surahByIdProvider = FutureProvider.family<Surah, int>((ref, id) {
+  return ref.watch(quranRepositoryProvider).surahById(id);
+});
+
 enum StoryRatio { story, square }
 
+enum StoryTab { content, theme, typography, layout }
+
+class _InspiringPreset {
+  final String title;
+  final String badge;
+  final String mainText;
+  String get topTitle => 'فَذَكِّرْ';
+  String get footer => 'ذكّر غيرك';
+
+  const _InspiringPreset({
+    required this.title,
+    required this.badge,
+    required this.mainText,
+  });
+}
+
+const List<_InspiringPreset> _kPresets = [
+  _InspiringPreset(
+    title: 'آية الكرسي',
+    badge: 'سورة البقرة — آية ٢٥٥',
+    mainText:
+        'اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ۚ لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ ۚ لَهُ مَا فِي السَّمَاوَاتِ وَمَا فِي الْأَرْضِ',
+  ),
+  _InspiringPreset(
+    title: 'فاذكروني',
+    badge: 'سورة البقرة — آية ١٥٢',
+    mainText: 'فَاذْكُرُونِي أَذْكُرْكُمْ وَاشْكُرُوا لِي وَلَا تَكْفُرُونِ',
+  ),
+  _InspiringPreset(
+    title: 'مع العسر يسراً',
+    badge: 'سورة الشرح — آية ٦',
+    mainText: 'إِنَّ مَعَ الْعُسْرِ يُسْرًا',
+  ),
+  _InspiringPreset(
+    title: 'وتوكل على الحي',
+    badge: 'سورة الفرقان — آية ٥٨',
+    mainText: 'وَتَوَكَّلْ عَلَى الْحَيِّ الَّذِي لَا يَمُوتُ وَسَبِّحْ بِحَمْدِهِ',
+  ),
+  _InspiringPreset(
+    title: 'ألا بذكر الله',
+    badge: 'سورة الرعد — آية ٢٨',
+    mainText: 'أَلَا بِذِكْرِ اللَّهِ تَطْمَئِنُّ الْقُلُوبُ',
+  ),
+  _InspiringPreset(
+    title: 'الصلاة على النبي',
+    badge: 'كرر تؤجر',
+    mainText: 'اللَّهُمَّ صَلِّ وَسَلِّمْ وَبَارِكْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
+  ),
+  _InspiringPreset(
+    title: 'سيد الاستغفار',
+    badge: 'دعاء مأثور',
+    mainText:
+        'اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ، وَأَنَا عَلَى عَهْدِكَ وَوَعْدِكَ مَا اسْتَطَعْتُ',
+  ),
+  _InspiringPreset(
+    title: 'كنز الجنة',
+    badge: 'الباقيات الصالحات',
+    mainText: 'لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ الْعَلِيِّ الْعَظِيمِ',
+  ),
+];
+
+/// صانع بطاقات «فَذَكِّرْ» الإسلامية الفاخرة بتصميم منظم وعصري
 class AyahStoryMakerScreen extends ConsumerStatefulWidget {
   final int initialAyahId;
   final StoryContent? initialContent;
 
   const AyahStoryMakerScreen({
     super.key,
-    this.initialAyahId = 255, // آية الكرسي افتراضياً
+    this.initialAyahId = 255,
     this.initialContent,
   });
 
@@ -44,100 +105,79 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
   final GlobalKey _previewKey = GlobalKey();
 
   late int _selectedAyahId;
-  // نطاق آيات اختياري ("من — إلى") — null يعني آية واحدة فقط
-  // (`_selectedAyahId`). لو محدَّد، يمثّل معرّف صف آخر آية بالنطاق (شامل)،
-  // وتُجلَب كل الآيات بينهما عبر `ayahsInIdRange`.
-  int? _selectedAyahIdTo;
-  StoryTheme _selectedTheme = StoryTheme.presets.first;
-  StoryRatio _selectedRatio = StoryRatio.story;
-  String? _customImagePath;
-  double _overlayOpacity = 0.55;
-  double _fontSize = 22.0;
-  bool _isMushafMode = false;
-  bool _showBasmalah = false;
-  bool _showTafsir = false;
-  String _selectedTafsirEdition = 'muyassar';
-  bool _showReference = true;
-  bool _showBranding = true;
+  StoryRatio _ratio = StoryRatio.story;
+  StoryTab _activeTab = StoryTab.theme;
+  String _fontFamily = 'AmiriQuran';
+  double _fontSize = 24.0;
   bool _isExporting = false;
-  // خاص بوضع المحتوى غير القرآني (اسم من أسماء الله / حديث) — إظهار
-  // النص الفرعي (المعنى/الشرح) تحت النص الرئيسي. راجع `_buildNonAyahScaffold`.
-  bool _showSubText = true;
+  bool _showFrame = true;
 
-  String _tafsirName(String key) {
-    switch (key) {
-      case 'muyassar':
-        return 'الميسر';
-      case 'saadi':
-        return 'السعدي';
-      case 'jalalayn':
-        return 'الجلالين';
-      case 'mukhtasar':
-        return 'المختصر';
-      default:
-        return 'الميسر';
-    }
-  }
+  // سمات الألوان الملكية
+  List<Color> _gradientColors = const [
+    Color(0xFF1B0E06),
+    Color(0xFF381F0D),
+    Color(0xFF140A04),
+  ];
 
-  void _showTafsirEditionPicker(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'اختر كتاب التفسير',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            for (final entry in [
-              ('muyassar', 'التفسير الميسر', 'موجز وواضح ومناسب للبطاقات'),
-              ('saadi', 'تفسير السعدي', 'إيماني وتربوي رائع'),
-              ('jalalayn', 'تفسير الجلالين', 'مختصر لغوي دقيق'),
-              ('mukhtasar', 'المختصر في التفسير', 'مركّز وسلس العبارة'),
-            ])
-              ListTile(
-                title: Text(entry.$2, style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text(entry.$3, style: const TextStyle(fontSize: 11)),
-                selected: _selectedTafsirEdition == entry.$1,
-                trailing: _selectedTafsirEdition == entry.$1
-                    ? const Icon(Icons.check_circle_rounded, color: AppColors.goldDeep)
-                    : null,
-                onTap: () {
-                  setState(() {
-                    _selectedTafsirEdition = entry.$1;
-                    _showTafsir = true;
-                  });
-                  Navigator.pop(ctx);
-                },
-              ),
-          ],
-        ),
-      ),
-    );
-  }
+  String? _customMainText;
+  String? _customBadgeText;
+  String? _customSubText;
+  String _topTitle = 'فَذَكِّرْ';
+  String _footerText = 'ذكّر غيرك';
+  String? _customBgPath;
+
+  static const List<({String name, List<Color> colors})> _kThemes = [
+    (
+      name: 'العنبر الملكي',
+      colors: [Color(0xFF1B0E06), Color(0xFF381F0D), Color(0xFF140A04)],
+    ),
+    (
+      name: 'الزمرد النبوي',
+      colors: [Color(0xFF061A10), Color(0xFF0E3823), Color(0xFF05140C)],
+    ),
+    (
+      name: 'الكحلي الفاخر',
+      colors: [Color(0xFF081224), Color(0xFF122347), Color(0xFF050B16)],
+    ),
+    (
+      name: 'الأسود المذهب',
+      colors: [Color(0xFF111113), Color(0xFF22201C), Color(0xFF0C0C0D)],
+    ),
+    (
+      name: 'عنابي وقار',
+      colors: [Color(0xFF1F0814), Color(0xFF3B1228), Color(0xFF16050E)],
+    ),
+    (
+      name: 'تركواز إسلامي',
+      colors: [Color(0xFF092227), Color(0xFF11424C), Color(0xFF06181C)],
+    ),
+  ];
 
   @override
   void initState() {
     super.initState();
     _selectedAyahId = widget.initialAyahId;
+
+    if (widget.initialContent != null) {
+      final c = widget.initialContent!;
+      _customMainText = c.mainText;
+      _customSubText = c.subText.isNotEmpty ? c.subText : null;
+      _customBadgeText = c.sourceReference.isNotEmpty ? c.sourceReference : 'كرر تؤجر';
+    }
   }
 
-  Future<void> _pickCustomImage() async {
+  Future<void> _pickCustomBackground() async {
     try {
-      final res = await FilePicker.pickFile(type: FileType.image);
-      if (res != null && res.path != null) {
-        setState(() {
-          _customImagePath = res.path;
-          _isMushafMode = false;
-        });
+      final picked = await FilePicker.pickFile(type: FileType.image);
+      final path = picked?.path;
+      if (path != null && mounted) {
+        setState(() => _customBgPath = path);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم تطبيق صورتك كخلفية للبطاقة 🖼️✨'),
+            backgroundColor: Color(0xFF2E7D32),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -151,38 +191,9 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
   Future<Uint8List?> _captureImageBytes() async {
     final boundary = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
     if (boundary == null) return null;
-    final image = await boundary.toImage(pixelRatio: 4.5); // دقة فائقة UHD 4.5x
+    final image = await boundary.toImage(pixelRatio: 4.0);
     final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
     return byteData?.buffer.asUint8List();
-  }
-
-  Future<void> _exportAndShare(List<Ayah> ayahs, Surah surah) async {
-    setState(() => _isExporting = true);
-    try {
-      final buffer = await _captureImageBytes();
-      if (buffer == null) return;
-
-      final tempDir = await getTemporaryDirectory();
-      final filePath = '${tempDir.path}/humam_ayah_story_${DateTime.now().millisecondsSinceEpoch}.png';
-      final file = File(filePath);
-      await file.writeAsBytes(buffer);
-
-      final versesText = ayahs.map((a) => a.textUthmani).join(' ');
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(filePath)],
-          text: '﴿$versesText﴾\n${surah.nameAr} — ${_referenceSuffix(ayahs)}',
-        ),
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('تعذّر تصدير الصورة: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isExporting = false);
-    }
   }
 
   Future<void> _saveToGallery() async {
@@ -190,34 +201,25 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
     try {
       final bytes = await _captureImageBytes();
       if (bytes == null) return;
-
-      // بلا اعتماد على `_selectedAyahId` — هاي الدالة تُستدعى من مسار
-      // الآية ومن مسار المحتوى غير القرآني (اسم/حديث) معاً.
-      final filename = 'humam_story_${DateTime.now().millisecondsSinceEpoch}.png';
-      // الحفظ عبر MediaStore (أندرويد 10+) بدل كتابة مسار صريح كان يفشل
-      // بالتخزين المقصّى Scoped Storage. النتيجة تعكس أين حُفظت فعلاً.
+      final filename = 'fathakkir_${DateTime.now().millisecondsSinceEpoch}.png';
       final res = await savePngToGallery(bytes, displayName: filename);
       if (!mounted) return;
 
-      final String message;
-      final Color? backgroundColor;
-      if (res.saved && res.inGallery) {
-        message = 'تم حفظ الصورة بنجاح في مجلد الصور (Pictures/Humam) 📷✨';
-        backgroundColor = const Color(0xFF2E7D32);
-      } else if (res.saved) {
-        message = 'حُفظت الصورة بمجلد خاص بالتطبيق (هذا الجهاز يمنع الكتابة المباشرة للمعرض)';
-        backgroundColor = const Color(0xFFF57C00);
-      } else {
-        message = 'تعذّر حفظ الصورة على هذا الجهاز — شاركها من زر المشاركة بدلاً من ذلك';
-        backgroundColor = const Color(0xFFB3261E);
-      }
+      final message = (res.saved && res.inGallery)
+          ? 'تم حفظ البطاقة في ألبوم الصور بجودة فائقة 🖼️✨'
+          : 'تم حفظ البطاقة بنجاح';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: backgroundColor),
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          content: Text(message),
+          backgroundColor: const Color(0xFF2E7D32),
+        ),
       );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('تعذّر حفظ الصورة: $e')),
+          SnackBar(content: Text('تعذّر حفظ البطاقة: $e')),
         );
       }
     } finally {
@@ -225,231 +227,144 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
     }
   }
 
-  Future<void> _copyText(List<Ayah> ayahs, Surah surah) async {
-    final versesText = ayahs.map((a) => '﴿${a.textUthmani}﴾').join(' ');
-    final fullText = '$versesText\n[${surah.nameAr} - ${_referenceSuffix(ayahs)}]\nعبر تطبيق هُمَام';
-    await Clipboard.setData(ClipboardData(text: fullText));
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تم نسخ النص القرآني بنجاح 📋✨'),
-          backgroundColor: Color(0xFF2E7D32),
-          duration: Duration(seconds: 2),
+  Future<void> _shareCard(String textShare) async {
+    setState(() => _isExporting = true);
+    try {
+      final bytes = await _captureImageBytes();
+      if (bytes == null) return;
+      final tempDir = await getTemporaryDirectory();
+      final filePath = '${tempDir.path}/fathakkir_${DateTime.now().millisecondsSinceEpoch}.png';
+      final file = File(filePath);
+      await file.writeAsBytes(bytes);
+
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(filePath)],
+          text: '$textShare\n\n﴿وَذَكِّرْ فَإِنَّ الذِّكْرَىٰ تَنفَعُ الْمُؤْمِنِينَ﴾ — عبر تطبيق هُمَام 🌸',
         ),
       );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تعذّر مشاركة البطاقة: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
     }
   }
 
-  Future<void> _copyGenericText(StoryContent content) async {
-    final fullText = '${content.mainText}\n${content.subText}\n[${content.sourceReference}]\nعبر تطبيق هُمَام';
-    await Clipboard.setData(ClipboardData(text: fullText));
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تم نسخ النص بنجاح 📋✨'),
-          backgroundColor: Color(0xFF2E7D32),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
-  }
-
-  /// الآية المختارة، أو نطاق الآيات كاملاً لو حُدِّد طرف "إلى".
-  Future<List<Ayah>> _fetchSelectedAyahs() {
-    final repo = ref.read(quranRepositoryProvider);
-    final toId = _selectedAyahIdTo;
-    if (toId == null || toId == _selectedAyahId) {
-      return repo.ayahById(_selectedAyahId).then((a) => [a]);
-    }
-    return repo.ayahsInIdRange(_selectedAyahId, toId);
-  }
-
-  void _showAyahPicker(BuildContext context) {
-    final surahsAsync = ref.read(allSurahsProvider);
-    surahsAsync.whenData((surahs) {
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        builder: (ctx) => DraggableScrollableSheet(
-          initialChildSize: 0.7,
-          minChildSize: 0.4,
-          maxChildSize: 0.92,
-          expand: false,
-          builder: (ctx, scrollCtrl) => Column(
-            children: [
-              const SizedBox(height: 12),
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'اختر سورة وآية لتصميمها',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Expanded(
-                child: ListView.builder(
-                  controller: scrollCtrl,
-                  itemCount: surahs.length,
-                  itemBuilder: (ctx, i) {
-                    final s = surahs[i];
-                    return ListTile(
-                      title: Text(s.nameAr, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text('${s.ayahCount} آية • ${s.revelationPlace == 'makkah' ? 'مكية' : 'مدنية'}'),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 14),
-                      onTap: () async {
-                        Navigator.pop(ctx);
-                        final ayahs = await ref.read(quranRepositoryProvider).ayahsForSurah(s.id);
-                        if (!context.mounted || ayahs.isEmpty) return;
-                        _showAyahNumberPicker(context, s, ayahs);
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    });
-  }
-
-  /// اختيار آية واحدة، أو نطاق آيات ("من — إلى") ضمن نفس السورة — تبديل
-  /// عبر `SegmentedButton` أعلى اللوح، والنطاق يُطبَّق بزر صريح بدل تحديد
-  /// تلقائي عند كل تغيير (يمنع رجفة الشاشة أثناء تجربة الأطراف).
-  void _showAyahNumberPicker(BuildContext context, Surah surah, List<Ayah> ayahs) {
-    var fromIndex = ayahs.indexWhere((a) => a.id == _selectedAyahId);
-    if (fromIndex < 0) fromIndex = 0;
-    final toId = _selectedAyahIdTo;
-    var toIndex = toId == null ? fromIndex : ayahs.indexWhere((a) => a.id == toId);
-    if (toIndex < fromIndex) toIndex = fromIndex;
-    var isRangeMode = toId != null && toIndex != fromIndex;
+  void _showTextEditorSheet(String currentMain, String currentBadge) {
+    final textCtrl = TextEditingController(text: currentMain);
+    final badgeCtrl = TextEditingController(text: currentBadge);
+    final titleCtrl = TextEditingController(text: _topTitle);
+    final footerCtrl = TextEditingController(text: _footerText);
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: const Color(0xFF1E1A16),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => DraggableScrollableSheet(
-          initialChildSize: 0.7,
-          expand: false,
-          builder: (ctx, scrollCtrl) => Column(
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 12),
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
+              const Text(
+                'تعديل نصوص البطاقة',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFE5C378),
                 ),
               ),
               const SizedBox(height: 16),
-              Text(
-                'اختر آية من ${surah.nameAr}',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: SegmentedButton<bool>(
-                    segments: const [
-                      ButtonSegment(value: false, label: Text('آية واحدة')),
-                      ButtonSegment(value: true, label: Text('نطاق (من — إلى)')),
-                    ],
-                    selected: {isRangeMode},
-                    onSelectionChanged: (set) => setSheetState(() => isRangeMode = set.first),
-                    style: SegmentedButton.styleFrom(visualDensity: VisualDensity.compact),
-                  ),
+              TextField(
+                controller: textCtrl,
+                maxLines: 4,
+                style: const TextStyle(color: Colors.white, height: 1.5),
+                decoration: InputDecoration(
+                  labelText: 'النص القرآني أو الدعاء الرئيسي',
+                  labelStyle: const TextStyle(color: Colors.white60),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.06),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
-              const SizedBox(height: 10),
-              if (isRangeMode) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: AyahNumberDropdown(
-                          label: 'من الآية',
-                          ayahs: ayahs,
-                          value: fromIndex,
-                          onChanged: (v) => setSheetState(() {
-                            fromIndex = v;
-                            if (toIndex < fromIndex) toIndex = fromIndex;
-                          }),
-                        ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: badgeCtrl,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: 'الشارة أو المرجع (مثل: سورة الكهف أو كرر تؤجر)',
+                  labelStyle: const TextStyle(color: Colors.white60),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.06),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: titleCtrl,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'الترويسة (فَذَكِّرْ)',
+                        labelStyle: const TextStyle(color: Colors.white60),
+                        filled: true,
+                        fillColor: Colors.white.withValues(alpha: 0.06),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: AyahNumberDropdown(
-                          label: 'إلى الآية',
-                          ayahs: ayahs,
-                          value: toIndex,
-                          minIndex: fromIndex,
-                          onChanged: (v) => setSheetState(() => toIndex = v),
-                        ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: footerCtrl,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'التذييل (ذكّر غيرك)',
+                        labelStyle: const TextStyle(color: Colors.white60),
+                        filled: true,
+                        fillColor: Colors.white.withValues(alpha: 0.06),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                    ],
+                    ),
                   ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              FilledButton(
+                onPressed: () {
+                  setState(() {
+                    _customMainText = textCtrl.text.trim();
+                    _customBadgeText = badgeCtrl.text.trim();
+                    _topTitle = titleCtrl.text.trim();
+                    _footerText = footerCtrl.text.trim();
+                  });
+                  Navigator.pop(ctx);
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFD4AF37),
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                const SizedBox(height: 16),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: AppPrimaryButton(
-                    label: 'تطبيق',
-                    expanded: true,
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      setState(() {
-                        _selectedAyahId = ayahs[fromIndex].id;
-                        _selectedAyahIdTo = fromIndex == toIndex ? null : ayahs[toIndex].id;
-                      });
-                    },
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ] else
-                Expanded(
-                  child: ListView.builder(
-                    controller: scrollCtrl,
-                    itemCount: ayahs.length,
-                    itemBuilder: (ctx, i) {
-                      final a = ayahs[i];
-                      return ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: themeAccent(context).withValues(alpha: 0.15),
-                          child: Text('${a.ayah}', style: TextStyle(color: themeAccent(context), fontWeight: FontWeight.bold)),
-                        ),
-                        title: Text(
-                          a.textUthmani,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontFamily: 'AmiriQuran', fontSize: 16),
-                        ),
-                        onTap: () {
-                          Navigator.pop(ctx);
-                          setState(() {
-                            _selectedAyahId = a.id;
-                            _selectedAyahIdTo = null;
-                          });
-                        },
-                      );
-                    },
-                  ),
-                ),
+                child: const Text('تطبيق التعديلات', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
             ],
           ),
         ),
@@ -459,1093 +374,184 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // محتوى غير قرآني (اسم من أسماء الله / حديث) — مسار عرض مستقل بالكامل
-    // عن مسار الآية (لا يحتاج جلب آية/سورة من القاعدة، ولا خيارات خاصة
-    // بالمصحف/التفسير). راجع تعليق `StoryContent` بأعلى الملف لسبب الفصل.
-    final fixedContent = widget.initialContent;
-    if (fixedContent != null && fixedContent.type != StoryContentType.ayah) {
-      return _buildNonAyahScaffold(fixedContent);
-    }
+    final ayahAsync = ref.watch(_ayahByIdProvider(_selectedAyahId));
 
-    final ayahsFuture = _fetchSelectedAyahs();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('استوديو بطاقات الآيات 🎨'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.menu_book_outlined),
-            tooltip: 'تغيير الآية',
-            onPressed: () => _showAyahPicker(context),
-          ),
-        ],
+    return ayahAsync.when(
+      loading: () => const Scaffold(
+        backgroundColor: Color(0xFF0F0A06),
+        body: Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37))),
       ),
-      body: FutureBuilder<List<Ayah>>(
-        future: ayahsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(child: Text('تعذّر تحميل الآية: ${snapshot.error}'));
-          }
-
-          final ayahs = snapshot.data!;
-          return FutureBuilder<Surah?>(
-            future: ref.read(quranRepositoryProvider).surahById(ayahs.first.surah),
-            builder: (context, surahSnap) {
-              final surah = surahSnap.data ??
-                  const Surah(
-                    id: 1,
-                    nameAr: 'سورة',
-                    nameEn: 'Surah',
-                    nameArPlain: 'سورة',
-                    revelationPlace: 'makkah',
-                    ayahCount: 7,
-                    startPage: 1,
-                    bismillahPre: 1,
-                  );
-
-              return Column(
-                children: [
-                  // معاينة البطاقة / الستوري
-                  Expanded(
-                    child: Center(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        child: _buildCardPreview(ayahs, surah),
-                      ),
-                    ),
-                  ),
-
-                  // شريط التحكم بالخيارات
-                  _buildControlsPanel(context, ayahs, surah, isDark),
-                ],
-              );
-            },
-          );
-        },
+      error: (e, _) => Scaffold(
+        backgroundColor: const Color(0xFF0F0A06),
+        body: Center(child: Text('تعذّر تحميل الآية: $e', style: const TextStyle(color: Colors.white))),
       ),
-    );
-  }
+      data: (ayah) {
+        final surahAsync = ref.watch(_surahByIdProvider(ayah.surah));
+        final surahName = surahAsync.value?.nameAr ?? '';
 
-  /// "آية ٢٥٥" لآية واحدة، أو "الآيات ٢٥٥-٢٦٠" لنطاق مختار — بلا اسم سورة.
-  String _referenceSuffix(List<Ayah> ayahs) {
-    final first = ayahs.first;
-    final last = ayahs.last;
-    return first.id == last.id ? 'آية ${first.ayah}' : 'الآيات ${first.ayah}-${last.ayah}';
-  }
+        final defaultMainText = ayah.textUthmani;
+        final defaultBadgeText = 'سورة $surahName — آية ${ayah.ayah}';
+        final mainText = _customMainText ?? defaultMainText;
+        final badgeText = _customBadgeText ?? defaultBadgeText;
+        final subText = _customSubText;
 
-  /// نص شارة المصدر — "سورة • آية ٢٥٥" لآية واحدة، أو "سورة • الآيات ٢٥٥-٢٦٠"
-  /// لنطاق مختار.
-  String _referenceLabel(List<Ayah> ayahs, Surah surah) => '${surah.nameAr} • ${_referenceSuffix(ayahs)}';
+        final isStory = _ratio == StoryRatio.story;
+        final cardWidth = isStory ? 290.0 : 310.0;
+        final cardHeight = isStory ? 510.0 : 330.0;
 
-  /// بناء محتوى نص الآية (أو نطاق الآيات) مع علامة نهاية كل آية الدائرية.
-  List<InlineSpan> _ayahRichSpans(List<Ayah> ayahs, {required double markerSize}) {
-    final spans = <InlineSpan>[];
-    for (final a in ayahs) {
-      spans.add(TextSpan(text: '${a.textUthmani} '));
-      spans.add(WidgetSpan(
-        alignment: PlaceholderAlignment.middle,
-        child: AyahEndCircle(
-          ayahId: a.id,
-          ayahNumber: a.ayah,
-          pageNumber: a.page,
-          size: markerSize,
-        ),
-      ));
-      if (a.id != ayahs.last.id) spans.add(const TextSpan(text: ' '));
-    }
-    return spans;
-  }
-
-  Widget _buildCardPreview(List<Ayah> ayahs, Surah surah) {
-    final isStory = _selectedRatio == StoryRatio.story;
-    final double width;
-    final double height;
-    switch (_selectedRatio) {
-      case StoryRatio.story:
-        width = 280.0;
-        height = 490.0;
-        break;
-      case StoryRatio.square:
-        width = 310.0;
-        height = 310.0;
-        break;
-    }
-
-    if (_isMushafMode) {
-      return _buildMushafStylePreview(ayahs, surah, width, height, isStory);
-    }
-
-    return RepaintBoundary(
-      key: _previewKey,
-      child: Container(
-        width: width,
-        height: height,
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          gradient: _customImagePath == null
-              ? LinearGradient(
-                  colors: _selectedTheme.backgroundColors,
-                  begin: _selectedTheme.beginAlignment,
-                  end: _selectedTheme.endAlignment,
-                )
-              : null,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.35),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            // إذا اختار صورة خاصة من المعرض
-            if (_customImagePath != null) ...[
-              Positioned.fill(
-                child: Image.file(
-                  File(_customImagePath!),
-                  fit: BoxFit.cover,
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            backgroundColor: const Color(0xFF100C08),
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              centerTitle: true,
+              title: const Text(
+                '«فَذَكِّرْ» — صانع البطاقات',
+                style: TextStyle(
+                  fontFamily: 'AmiriQuran',
+                  fontWeight: FontWeight.bold,
+                  fontSize: 19,
+                  color: Color(0xFFE5C378),
                 ),
               ),
-              Positioned.fill(
-                child: Container(
-                  color: Colors.black.withValues(alpha: _overlayOpacity),
-                ),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
               ),
-            ],
-
-            // إطار زخرفي هادئ
-            Positioned.fill(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: _customImagePath != null ? Colors.white24 : _selectedTheme.frameColor,
-                      width: 1.2,
-                    ),
+              actions: [
+                // زر التبديل السريع للمقاس ستوري / مربع
+                IconButton(
+                  icon: Icon(
+                    isStory ? Icons.crop_portrait_rounded : Icons.crop_square_rounded,
+                    color: const Color(0xFFD4AF37),
                   ),
+                  tooltip: isStory ? 'التحويل لمقاس مربع (1:1)' : 'التحويل لمقاس ستوري (9:16)',
+                  onPressed: () {
+                    setState(() {
+                      _ratio = isStory ? StoryRatio.square : StoryRatio.story;
+                    });
+                  },
                 ),
-              ),
-            ),
-
-            // محتوى الآية
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // رأس البطاقة (البسملة أو شارة السورة)
-                  Column(
-                    children: [
-                      if (_showBasmalah) ...[
-                        Text(
-                          'بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ',
-                          style: TextStyle(
-                            fontFamily: 'AmiriQuran',
-                            fontSize: 16,
-                            color: (_customImagePath != null ? Colors.white : _selectedTheme.textColor)
-                                .withValues(alpha: 0.9),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-                      if (_showReference)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: _customImagePath != null
-                                ? Colors.black45
-                                : _selectedTheme.badgeBackgroundColor,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: _customImagePath != null
-                                  ? AppColors.gold.withValues(alpha: 0.4)
-                                  : _selectedTheme.accentColor.withValues(alpha: 0.3),
-                              width: 0.8,
-                            ),
-                          ),
-                          child: Text(
-                            _referenceLabel(ayahs, surah),
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.bold,
-                              color: _customImagePath != null
-                                  ? const Color(0xFFFFE082)
-                                  : _selectedTheme.badgeTextColor,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-
-                  // نص الآية الكريمة مع علامة نهاية الآية الدائرية
-                  Expanded(
-                    child: Center(
-                      child: SingleChildScrollView(
-                        child: Text.rich(
-                          TextSpan(
-                            children: _ayahRichSpans(ayahs, markerSize: 24),
-                          ),
-                          textAlign: TextAlign.center,
-                          textDirection: TextDirection.rtl,
-                          style: TextStyle(
-                            fontFamily: 'AmiriQuran',
-                            fontSize: _fontSize,
-                            height: 2.3,
-                            leadingDistribution: TextLeadingDistribution.even,
-                            color: _customImagePath != null ? Colors.white : _selectedTheme.textColor,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // أسفل البطاقة: التفسير أو التوقيع
-                  Column(
-                    children: [
-                      if (_showTafsir) ...[
-                        FutureBuilder<Tafsir?>(
-                          future: ref.read(quranRepositoryProvider).tafsirForAyah(ayahs.first.id, edition: _selectedTafsirEdition),
-                          builder: (context, snap) {
-                            final tafsirText = snap.data?.content ?? '';
-                            if (tafsirText.isEmpty) {
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 6),
-                                child: Text(
-                                  'تفسير الآية (${_tafsirName(_selectedTafsirEdition)})',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: (_customImagePath != null ? Colors.white70 : _selectedTheme.textColor).withValues(alpha: 0.6),
-                                  ),
-                                ),
-                              );
-                            }
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: _customImagePath != null ? Colors.black45 : _selectedTheme.badgeBackgroundColor,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                tafsirText,
-                                maxLines: isStory ? 3 : 2,
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  height: 1.4,
-                                  color: (_customImagePath != null
-                                          ? Colors.white
-                                          : _selectedTheme.textColor)
-                                      .withValues(alpha: 0.88),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                      if (_showBranding)
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.auto_awesome,
-                              size: 10,
-                              color: _customImagePath != null
-                                  ? AppColors.gold
-                                  : _selectedTheme.accentColor,
-                            ),
-                            const SizedBox(width: 4),
-                              Text(
-                                'تطبيق هُمَام',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: (_customImagePath != null
-                                          ? Colors.white
-                                          : _selectedTheme.textColor)
-                                      .withValues(alpha: 0.6),
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                      ],
-                    ),
-                  ],
+                // زر تعديل النصوص المباشر
+                IconButton(
+                  icon: const Icon(Icons.edit_note_rounded, color: Color(0xFFD4AF37)),
+                  tooltip: 'تعديل النصوص',
+                  onPressed: () => _showTextEditorSheet(mainText, badgeText),
                 ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-  String _cleanSurahName(Surah surah) {
-    return surah.nameAr.replaceFirst('سورة ', '').replaceFirst('سُورَةُ ', '').trim();
-  }
-
-  /// مظهر المصحف الشريف الأصيل (إطار سورة مزخرف وترقيم مصحفي)
-  Widget _buildMushafStylePreview(List<Ayah> ayahs, Surah surah, double width, double height, bool isStory) {
-    final cleanName = _cleanSurahName(surah);
-    final firstAyah = ayahs.first;
-    final lastAyah = ayahs.last;
-
-    return RepaintBoundary(
-      key: _previewKey,
-      child: Container(
-        width: width,
-        height: height,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF7F4EA),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: const Color(0xFFC5A059), width: 3.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.25),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
+              ],
             ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Container(
-            decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.5), width: 1.2),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            body: Column(
               children: [
-                // لافتة اسم السورة المزخرفة (مطابقة لترويسة المصحف)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFECE3D0),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFF8D7344), width: 1.5),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'آيَاتُهَا ${_toArabicDigits(surah.ayahCount)}',
-                        style: const TextStyle(fontFamily: 'AmiriQuran', fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF5D4037)),
-                      ),
-                      Text(
-                        'سُورَةُ $cleanName',
-                        style: const TextStyle(
-                          fontFamily: 'AmiriQuran',
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF2C2416),
-                        ),
-                      ),
-                      Text(
-                        surah.revelationPlace == 'makkah' ? 'مَكِّيَّة' : 'مَدَنِيَّة',
-                        style: const TextStyle(fontFamily: 'AmiriQuran', fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF5D4037)),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 6),
-
-                // البسملة الشريفة
-                if (_showBasmalah || firstAyah.ayah == 1)
-                  const Text(
-                    'بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ',
-                    style: TextStyle(
-                      fontFamily: 'AmiriQuran',
-                      fontSize: 15,
-                      color: Color(0xFF4A3B2C),
-                    ),
-                  ),
-
-                // نص الآية مع علامة نهاية الآية الدائرية المطابقة للمصحف
+                // 1. مساحة العرض والمعاينة المباشرة للبطاقة
                 Expanded(
                   child: Center(
                     child: SingleChildScrollView(
-                      child: Text.rich(
-                        TextSpan(
-                          children: _ayahRichSpans(ayahs, markerSize: 26),
-                        ),
-                        textAlign: TextAlign.center,
-                        textDirection: TextDirection.rtl,
-                        style: TextStyle(
-                          fontFamily: 'AmiriQuran',
-                          fontSize: _fontSize,
-                          height: 2.3,
-                          leadingDistribution: TextLeadingDistribution.even,
-                          color: const Color(0xFF1E1912),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                // أسفل صفحة المصحف
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'تطبيق هُمَام',
-                      style: TextStyle(fontSize: 9.5, color: Color(0xFF8D7344), fontWeight: FontWeight.bold),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE8DECA),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'الجزء ${lastAyah.juz} • الحزب ${lastAyah.hizb}',
-                        style: const TextStyle(fontSize: 9.5, color: Color(0xFF5D4037), fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _toArabicDigits(int num) {
-    const arabicDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-    return num.toString().split('').map((d) => arabicDigits[int.parse(d)]).join();
-  }
-
-  Widget _buildControlsPanel(BuildContext context, List<Ayah> ayahs, Surah surah, bool isDark) {
-    final accent = themeAccent(context);
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1B232E) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 10,
-            offset: const Offset(0, -3),
-          ),
-        ],
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // الآية المختارة — عرض مباشر + اختصار لتغييرها (نفس شاشة
-            // "من — إلى" بزر شريط العنوان)، بدل الاكتفاء بأيقونة AppBar
-            // بعيدة عن بقية عناصر التحكم.
-            PanelLabel('الآية المختارة'),
-            InkWell(
-              onTap: () => _showAyahPicker(context),
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: accent.withValues(alpha: 0.3)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.menu_book_outlined, size: 16, color: accent),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _referenceLabel(ayahs, surah),
-                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    Text('تغيير', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: accent)),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            // محدد عدد الآيات المعروضة (Screenshot 4)
-            PanelLabel('نطاق الآيات'),
-            Row(
-              children: [
-                for (int count = 1; count <= 4; count++) ...[
-                  Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.only(left: count < 4 ? 6.0 : 0.0),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(10),
-                        onTap: () {
-                          setState(() {
-                            if (count == 1) {
-                              _selectedAyahIdTo = null;
-                            } else {
-                              // إذا كان السقف يتجاوز عدد آيات السورة، يتم تصحيحه
-                              final maxPossible = (_selectedAyahId + (count - 1)).clamp(_selectedAyahId, 6236);
-                              _selectedAyahIdTo = maxPossible;
-                            }
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: ((count == 1 && _selectedAyahIdTo == null) ||
-                                    (_selectedAyahIdTo != null && (_selectedAyahIdTo! - _selectedAyahId + 1) == count))
-                                ? accent
-                                : (isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.05)),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            count == 1 ? 'آية' : (count == 2 ? 'آيتان' : '$count آيات'),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: ((count == 1 && _selectedAyahIdTo == null) ||
-                                      (_selectedAyahIdTo != null && (_selectedAyahIdTo! - _selectedAyahId + 1) == count))
-                                  ? Colors.white
-                                  : (isDark ? Colors.white70 : Colors.black87),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 10),
-
-            // النمط (بطاقة فنية / مظهر المصحف) والمقاس
-            Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: SegmentedButton<bool>(
-                    segments: const [
-                      ButtonSegment(value: false, label: Text('بطاقة 🎨', style: TextStyle(fontSize: 11.5))),
-                      ButtonSegment(value: true, label: Text('مصحف 📖', style: TextStyle(fontSize: 11.5))),
-                    ],
-                    selected: {_isMushafMode},
-                    onSelectionChanged: (set) => setState(() {
-                      _isMushafMode = set.first;
-                      if (_isMushafMode) _customImagePath = null;
-                    }),
-                    style: SegmentedButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 4,
-                  child: SegmentedButton<StoryRatio>(
-                    segments: const [
-                      ButtonSegment(value: StoryRatio.story, label: Text('9:16', style: TextStyle(fontSize: 11.5))),
-                      ButtonSegment(value: StoryRatio.square, label: Text('1:1', style: TextStyle(fontSize: 11.5))),
-                    ],
-                    selected: {_selectedRatio},
-                    onSelectionChanged: (set) => setState(() => _selectedRatio = set.first),
-                    style: SegmentedButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-
-            // شريط اختيار ألوان الثيمات الدائرية والصورة المخصصة (Screenshot 4)
-            if (!_isMushafMode) ...[
-              PanelLabel('ألوان وثيمات التصميم'),
-              SizedBox(
-                height: 48,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: [
-                    // زر اختيار صورة من المعرض
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: InkWell(
-                        onTap: _pickCustomImage,
-                        borderRadius: BorderRadius.circular(24),
-                        child: Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: _customImagePath != null ? accent.withValues(alpha: 0.2) : (isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.05)),
-                            border: Border.all(
-                              color: _customImagePath != null ? accent : Colors.grey.withValues(alpha: 0.35),
-                              width: 2,
-                            ),
-                          ),
-                          child: Icon(
-                            Icons.photo_library_outlined,
-                            size: 20,
-                            color: _customImagePath != null ? accent : (isDark ? Colors.white70 : Colors.black54),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // دوائر الثيمات الجمالية
-                    for (final t in StoryTheme.presets) ...[
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: InkWell(
-                          onTap: () => setState(() {
-                            _selectedTheme = t;
-                            _customImagePath = null;
-                          }),
-                          borderRadius: BorderRadius.circular(24),
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: LinearGradient(
-                                colors: t.backgroundColors,
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              border: Border.all(
-                                color: (_selectedTheme.id == t.id && _customImagePath == null)
-                                    ? Colors.white
-                                    : Colors.white24,
-                                width: (_selectedTheme.id == t.id && _customImagePath == null) ? 3 : 1.2,
-                              ),
-                              boxShadow: (_selectedTheme.id == t.id && _customImagePath == null)
-                                  ? [
-                                      BoxShadow(
-                                        color: t.accentColor.withValues(alpha: 0.5),
-                                        blurRadius: 8,
-                                        spreadRadius: 1,
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                            child: (_selectedTheme.id == t.id && _customImagePath == null)
-                                ? const Center(
-                                    child: Icon(Icons.check_rounded, color: Colors.white, size: 22),
-                                  )
-                                : null,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-            ],
-
-            // حجم خط الآية — بطلب صريح "عشان النص يظهر كله مش جزء منه بس":
-            // نص البطاقة يُعرَض داخل `SingleChildScrollView` بارتفاع بطاقة
-            // ثابت (راجع `_buildCardPreview`)، فالآيات الطويلة بحجم الخط
-            // الافتراضي تحتاج تمريراً يدوياً لرؤيتها كاملة — والتصدير
-            // (`RepaintBoundary.toImage`) يلتقط الجزء الظاهر فقط بلحظة
-            // الضغط، فقد تخرج الصورة النهائية بنص مبتور بلا أي تنبيه.
-            // تصغير الخط هون يحل المشكلة فعلياً: النص كامل بلا تمرير.
-            Row(
-              children: [
-                const Icon(Icons.format_size_rounded, size: 16),
-                const SizedBox(width: 6),
-                const Text('حجم الخط:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                Expanded(
-                  child: Slider(
-                    value: _fontSize,
-                    min: 14,
-                    max: 30,
-                    divisions: 16,
-                    label: _fontSize.round().toString(),
-                    activeColor: accent,
-                    onChanged: (val) => setState(() => _fontSize = val),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-
-            // خيارات الصورة الخاصة إن وُجدت
-            if (_customImagePath != null) ...[
-              Row(
-                children: [
-                  const Icon(Icons.brightness_6_rounded, size: 16),
-                  const SizedBox(width: 6),
-                  const Text('تعتيم الصورة:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                  Expanded(
-                    child: Slider(
-                      value: _overlayOpacity,
-                      min: 0.15,
-                      max: 0.85,
-                      divisions: 7,
-                      label: '${(_overlayOpacity * 100).round()}%',
-                      activeColor: accent,
-                      onChanged: (val) => setState(() => _overlayOpacity = val),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-            ],
-
-            // خيارات البسملة والتفسير بحجم مقتضب
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                FilterChip(
-                  label: const Text('البسملة', style: TextStyle(fontSize: 11)),
-                  selected: _showBasmalah,
-                  onSelected: (val) => setState(() => _showBasmalah = val),
-                  visualDensity: VisualDensity.compact,
-                ),
-                FilterChip(
-                  label: Text(_showTafsir ? 'تفسير ${_tafsirName(_selectedTafsirEdition)}' : 'التفسير', style: const TextStyle(fontSize: 11)),
-                  selected: _showTafsir,
-                  onSelected: (val) {
-                    if (_showTafsir) {
-                      _showTafsirEditionPicker(context);
-                    } else {
-                      setState(() => _showTafsir = true);
-                    }
-                  },
-                  visualDensity: VisualDensity.compact,
-                ),
-                FilterChip(
-                  label: const Text('المصدر', style: TextStyle(fontSize: 11)),
-                  selected: _showReference,
-                  onSelected: (val) => setState(() => _showReference = val),
-                  visualDensity: VisualDensity.compact,
-                ),
-                FilterChip(
-                  label: const Text('الشعار', style: TextStyle(fontSize: 11)),
-                  selected: _showBranding,
-                  onSelected: (val) => setState(() => _showBranding = val),
-                  visualDensity: VisualDensity.compact,
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // أزرار الحفظ المباشر والنسخ والمشاركة (مطابقة للصورة 4)
-            Row(
-              children: [
-                // زر الحفظ (Save)
-                Expanded(
-                  flex: 3,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF6D4C41),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      elevation: 2,
-                    ),
-                    icon: _isExporting
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Icon(Icons.download_rounded, size: 20),
-                    label: Text(
-                      _isExporting ? 'جارٍ الحفظ...' : 'حفظ',
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                    ),
-                    onPressed: _isExporting ? null : _saveToGallery,
-                  ),
-                ),
-                const SizedBox(width: 8),
-
-                // زر النسخ (Copy)
-                Expanded(
-                  flex: 3,
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: isDark ? Colors.white : const Color(0xFF4A3B2C),
-                      side: BorderSide(
-                        color: isDark ? Colors.white38 : const Color(0xFF8D6E63),
-                        width: 1.5,
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    icon: const Icon(Icons.copy_rounded, size: 18),
-                    label: const Text('نسخ', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                    onPressed: () => _copyText(ayahs, surah),
-                  ),
-                ),
-                const SizedBox(width: 8),
-
-                // زر مشاركة سريع
-                Material(
-                  color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(14),
-                  child: IconButton(
-                    tooltip: 'مشاركة الستوري',
-                    icon: Icon(Icons.share_rounded, color: accent),
-                    onPressed: _isExporting ? null : () => _exportAndShare(ayahs, surah),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // مسار المحتوى غير القرآني (اسم من أسماء الله الحسنى / حديث شريف) — بديل
-  // كامل لمسار الآية أعلاه، بلا أي استعلام قاعدة بيانات ولا خيارات خاصة
-  // بالمصحف/التفسير (لا معنى لهما هون). أُضيف بطلب صريح بعد شكوى أن زر
-  // "تصميم بطاقة ستوري" باسم من أسماء الله كان يفتح الاستوديو على آية
-  // الكرسي الافتراضية بدل اسم الله نفسه (الشاشة أصلاً ما كانت تستخدم
-  // `initialContent` إطلاقاً).
-  // ===========================================================================
-
-  Future<void> _exportAndShareGeneric(StoryContent content) async {
-    setState(() => _isExporting = true);
-    try {
-      final buffer = await _captureImageBytes();
-      if (buffer == null) return;
-
-      final tempDir = await getTemporaryDirectory();
-      final filePath = '${tempDir.path}/humam_story_${DateTime.now().millisecondsSinceEpoch}.png';
-      final file = File(filePath);
-      await file.writeAsBytes(buffer);
-
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(filePath)],
-          text: '${content.mainText}\n\n${content.sourceReference}\n\nتطبيق هُمَام',
-        ),
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('تعذّر تصدير الصورة: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isExporting = false);
-    }
-  }
-
-  String _titleForContent(StoryContent content) {
-    switch (content.type) {
-      case StoryContentType.nameOfAllah:
-        return 'استوديو تصميم أسماء الله الحسنى 🎨';
-      case StoryContentType.hadith:
-        return 'استوديو تصميم بطاقات الحديث 🎨';
-      case StoryContentType.dhikr:
-        return 'استوديو تصميم بطاقات الذكر 🎨';
-      case StoryContentType.custom:
-      case StoryContentType.ayah:
-        return 'استوديو تصميم البطاقات 🎨';
-    }
-  }
-
-  Widget _buildNonAyahScaffold(StoryContent content) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Scaffold(
-      appBar: AppBar(title: Text(_titleForContent(content)), centerTitle: true),
-      body: Column(
-        children: [
-          Expanded(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                child: _buildGenericCardPreview(content),
-              ),
-            ),
-          ),
-          _buildGenericControlsPanel(context, content, isDark),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGenericCardPreview(StoryContent content) {
-    final double width;
-    final double height;
-    switch (_selectedRatio) {
-      case StoryRatio.story:
-        width = 280.0;
-        height = 490.0;
-        break;
-      case StoryRatio.square:
-        width = 310.0;
-        height = 310.0;
-        break;
-    }
-
-    final textColor = _customImagePath != null ? Colors.white : _selectedTheme.textColor;
-
-    return RepaintBoundary(
-      key: _previewKey,
-      child: Container(
-        width: width,
-        height: height,
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          gradient: _customImagePath == null
-              ? LinearGradient(
-                  colors: _selectedTheme.backgroundColors,
-                  begin: _selectedTheme.beginAlignment,
-                  end: _selectedTheme.endAlignment,
-                )
-              : null,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.35),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            if (_customImagePath != null) ...[
-              Positioned.fill(
-                child: Image.file(File(_customImagePath!), fit: BoxFit.cover),
-              ),
-              Positioned.fill(
-                child: Container(color: Colors.black.withValues(alpha: _overlayOpacity)),
-              ),
-            ],
-            Positioned.fill(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: _customImagePath != null ? Colors.white24 : _selectedTheme.frameColor,
-                      width: 1.2,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  if (_showReference)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: _customImagePath != null ? Colors.black45 : _selectedTheme.badgeBackgroundColor,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: _customImagePath != null
-                              ? AppColors.gold.withValues(alpha: 0.4)
-                              : _selectedTheme.accentColor.withValues(alpha: 0.3),
-                          width: 0.8,
-                        ),
-                      ),
-                      child: Text(
-                        content.sourceReference,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.bold,
-                          color: _customImagePath != null ? const Color(0xFFFFE082) : _selectedTheme.badgeTextColor,
-                        ),
-                      )
-                    )
-                  else
-                    const SizedBox.shrink(),
-
-                  Expanded(
-                    child: Center(
-                      child: SingleChildScrollView(
-                        child: Text(
-                          content.mainText,
-                          textAlign: TextAlign.center,
-                          textDirection: TextDirection.rtl,
-                          style: TextStyle(
-                            fontFamily: content.type == StoryContentType.nameOfAllah ? 'AmiriQuran' : null,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      child: GestureDetector(
+                        onTap: () => _showTextEditorSheet(mainText, badgeText),
+                        child: RepaintBoundary(
+                          key: _previewKey,
+                          child: IslamicLuxuryCard(
+                            mainText: mainText,
+                            badgeText: badgeText,
+                            topTitle: _topTitle,
+                            footerText: _footerText,
+                            gradientColors: _gradientColors,
                             fontSize: _fontSize,
-                            fontWeight: FontWeight.bold,
-                            height: 1.7,
-                            color: textColor,
+                            width: cardWidth,
+                            height: cardHeight,
+                            fontFamily: _fontFamily,
+                            subText: subText,
+                            customImagePath: _customBgPath,
+                            showDecorativeFrame: _showFrame,
                           ),
                         ),
                       ),
                     ),
                   ),
+                ),
 
-                  Column(
-                    children: [
-                      if (_showSubText && content.subText.isNotEmpty) ...[
-                        Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: _customImagePath != null ? Colors.black45 : _selectedTheme.badgeBackgroundColor,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            content.subText,
-                            maxLines: 4,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 11,
-                              height: 1.5,
-                              color: (_customImagePath != null ? Colors.white : _selectedTheme.textColor).withValues(alpha: 0.88),
-                            ),
-                          ),
-                        ),
-                      ],
-                      if (_showBranding)
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.auto_awesome,
-                              size: 10,
-                              color: _customImagePath != null ? AppColors.gold : _selectedTheme.accentColor,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'تطبيق هُمَام',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: (_customImagePath != null ? Colors.white : _selectedTheme.textColor).withValues(alpha: 0.6),
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
-                ],
+                // 2. الشريط التفاعلي المنظم للتحكم
+                _buildControlDock(mainText, badgeText),
+
+                // 3. شريط الحفظ والمشاركة الفوري
+                _buildExportBar(mainText),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// شريط التحكم المقسم لتبويبات واضحة وأنيقة
+  Widget _buildControlDock(String mainText, String badgeText) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF16120D),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        border: Border(top: BorderSide(color: const Color(0xFFD4AF37).withValues(alpha: 0.25))),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // شريط اختيار التبويب
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _tabButton(StoryTab.theme, Icons.palette_outlined, 'السمات'),
+                _tabButton(StoryTab.typography, Icons.text_fields_rounded, 'الخط والتنسيق'),
+                _tabButton(StoryTab.content, Icons.auto_stories_outlined, 'نماذج ملهمة'),
+                _tabButton(StoryTab.layout, Icons.aspect_ratio_rounded, 'القياس والإطار'),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: Colors.white12),
+
+          // محتوى التبويب النشط
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: switch (_activeTab) {
+              StoryTab.theme => _buildThemeControls(),
+              StoryTab.typography => _buildTypographyControls(mainText, badgeText),
+              StoryTab.content => _buildPresetControls(),
+              StoryTab.layout => _buildLayoutControls(),
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tabButton(StoryTab tab, IconData icon, String label) {
+    final active = _activeTab == tab;
+    return InkWell(
+      onTap: () => setState(() => _activeTab = tab),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? const Color(0xFFD4AF37).withValues(alpha: 0.15) : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: active ? const Color(0xFFD4AF37) : Colors.transparent,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: active ? const Color(0xFFD4AF37) : Colors.white60),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: active ? FontWeight.bold : FontWeight.normal,
+                color: active ? const Color(0xFFE5C378) : Colors.white70,
               ),
             ),
           ],
@@ -1554,235 +560,261 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
     );
   }
 
-  Widget _buildGenericControlsPanel(BuildContext context, StoryContent content, bool isDark) {
-    final accent = themeAccent(context);
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1B232E) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, -3)),
-        ],
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            PanelLabel('المقاس'),
-            SizedBox(
-              width: double.infinity,
-              child: SegmentedButton<StoryRatio>(
-                segments: const [
-                  ButtonSegment(value: StoryRatio.story, label: Text('9:16')),
-                  ButtonSegment(value: StoryRatio.square, label: Text('1:1')),
-                ],
-                selected: {_selectedRatio},
-                onSelectionChanged: (set) => setState(() => _selectedRatio = set.first),
-                style: SegmentedButton.styleFrom(visualDensity: VisualDensity.compact),
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            PanelLabel('ألوان وثيمات التصميم'),
-            SizedBox(
-              height: 48,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: InkWell(
-                      onTap: _pickCustomImage,
-                      borderRadius: BorderRadius.circular(24),
+  Widget _buildThemeControls() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        // دوائر الألوان
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final theme in _kThemes)
+                  GestureDetector(
+                    onTap: () => setState(() {
+                      _customBgPath = null;
+                      _gradientColors = theme.colors;
+                    }),
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _customBgPath == null && _gradientColors == theme.colors
+                              ? const Color(0xFFD4AF37)
+                              : Colors.transparent,
+                          width: 2,
+                        ),
+                      ),
                       child: Container(
-                        width: 44,
-                        height: 44,
+                        width: 28,
+                        height: 28,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: _customImagePath != null ? accent.withValues(alpha: 0.2) : (isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.05)),
-                          border: Border.all(
-                            color: _customImagePath != null ? accent : Colors.grey.withValues(alpha: 0.35),
-                            width: 2,
+                          gradient: LinearGradient(
+                            colors: [theme.colors.first, theme.colors[1]],
                           ),
                         ),
-                        child: Icon(
-                          Icons.photo_library_outlined,
-                          size: 20,
-                          color: _customImagePath != null ? accent : (isDark ? Colors.white70 : Colors.black54),
-                        ),
                       ),
                     ),
                   ),
-                  for (final t in StoryTheme.presets) ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: InkWell(
-                        onTap: () => setState(() {
-                          _selectedTheme = t;
-                          _customImagePath = null;
-                        }),
-                        borderRadius: BorderRadius.circular(24),
-                        child: Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              colors: t.backgroundColors,
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            border: Border.all(
-                              color: (_selectedTheme.id == t.id && _customImagePath == null) ? Colors.white : Colors.white24,
-                              width: (_selectedTheme.id == t.id && _customImagePath == null) ? 3 : 1.2,
-                            ),
-                            boxShadow: (_selectedTheme.id == t.id && _customImagePath == null)
-                                ? [
-                                    BoxShadow(
-                                      color: t.accentColor.withValues(alpha: 0.5),
-                                      blurRadius: 8,
-                                      spreadRadius: 1,
-                                    ),
-                                  ]
-                                : null,
-                          ),
-                          child: (_selectedTheme.id == t.id && _customImagePath == null)
-                              ? const Center(child: Icon(Icons.check_rounded, color: Colors.white, size: 22))
-                              : null,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(width: 10),
+        // زر اختيار صورة مخصصة
+        OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            side: const BorderSide(color: Color(0xFFD4AF37), width: 1.2),
+            foregroundColor: const Color(0xFFE5C378),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          icon: Icon(
+            _customBgPath != null ? Icons.photo_library : Icons.add_photo_alternate_outlined,
+            size: 16,
+          ),
+          label: Text(
+            _customBgPath != null ? 'تغيير صورتك' : 'خلفية من جهازي',
+            style: const TextStyle(fontSize: 11),
+          ),
+          onPressed: _pickCustomBackground,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTypographyControls(String mainText, String badgeText) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        // اختيار نوع الخط
+        Row(
+          children: [
+            _fontChoiceChip('الأميري', 'AmiriQuran'),
+            const SizedBox(width: 6),
+            _fontChoiceChip('القاهرة', 'Cairo'),
+          ],
+        ),
+
+        // تكبير وتصغير الخط
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.remove_circle_outline, color: Color(0xFFD4AF37), size: 22),
+              tooltip: 'تصغير الخط',
+              onPressed: () {
+                if (_fontSize > 16) setState(() => _fontSize -= 2);
+              },
+            ),
+            Text(
+              '${_fontSize.round()}',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline, color: Color(0xFFD4AF37), size: 22),
+              tooltip: 'تكبير الخط',
+              onPressed: () {
+                if (_fontSize < 36) setState(() => _fontSize += 2);
+              },
+            ),
+          ],
+        ),
+
+        // زر فتح محرر النصوص
+        TextButton.icon(
+          style: TextButton.styleFrom(
+            foregroundColor: const Color(0xFFD4AF37),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+          ),
+          icon: const Icon(Icons.edit, size: 15),
+          label: const Text('تحرير النص', style: TextStyle(fontSize: 11.5)),
+          onPressed: () => _showTextEditorSheet(mainText, badgeText),
+        ),
+      ],
+    );
+  }
+
+  Widget _fontChoiceChip(String label, String family) {
+    final selected = _fontFamily == family;
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      selectedColor: const Color(0xFFD4AF37),
+      backgroundColor: Colors.white10,
+      labelStyle: TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.bold,
+        color: selected ? Colors.black : Colors.white70,
+      ),
+      onSelected: (_) => setState(() => _fontFamily = family),
+    );
+  }
+
+  Widget _buildPresetControls() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (final preset in _kPresets)
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: ActionChip(
+                avatar: const Icon(Icons.auto_awesome, size: 14, color: Color(0xFFD4AF37)),
+                label: Text(preset.title),
+                backgroundColor: Colors.white.withValues(alpha: 0.08),
+                side: const BorderSide(color: Color(0x55D4AF37)),
+                labelStyle: const TextStyle(fontSize: 11, color: Colors.white),
+                onPressed: () {
+                  setState(() {
+                    _customMainText = preset.mainText;
+                    _customBadgeText = preset.badge;
+                    _topTitle = preset.topTitle;
+                    _footerText = preset.footer;
+                  });
+                },
               ),
             ),
-            const SizedBox(height: 10),
+        ],
+      ),
+    );
+  }
 
-            // حجم الخط — راجع نفس التعليق بـ_buildCardPreview أعلاه.
-            Row(
-              children: [
-                const Icon(Icons.format_size_rounded, size: 16),
-                const SizedBox(width: 6),
-                const Text('حجم الخط:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                Expanded(
-                  child: Slider(
-                    value: _fontSize,
-                    min: 14,
-                    max: 30,
-                    divisions: 16,
-                    label: _fontSize.round().toString(),
-                    onChanged: (val) => setState(() => _fontSize = val),
-                  ),
+  Widget _buildLayoutControls() {
+    final isStory = _ratio == StoryRatio.story;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
+      children: [
+        ChoiceChip(
+          avatar: Icon(Icons.crop_portrait, size: 16, color: isStory ? Colors.black : Colors.white70),
+          label: const Text('ستوري (9:16)'),
+          selected: isStory,
+          selectedColor: const Color(0xFFD4AF37),
+          backgroundColor: Colors.white10,
+          labelStyle: TextStyle(
+            fontSize: 11,
+            color: isStory ? Colors.black : Colors.white70,
+          ),
+          onSelected: (_) => setState(() => _ratio = StoryRatio.story),
+        ),
+        ChoiceChip(
+          avatar: Icon(Icons.crop_square, size: 16, color: !isStory ? Colors.black : Colors.white70),
+          label: const Text('مربع (1:1)'),
+          selected: !isStory,
+          selectedColor: const Color(0xFFD4AF37),
+          backgroundColor: Colors.white10,
+          labelStyle: TextStyle(
+            fontSize: 11,
+            color: !isStory ? Colors.black : Colors.white70,
+          ),
+          onSelected: (_) => setState(() => _ratio = StoryRatio.square),
+        ),
+        FilterChip(
+          label: const Text('الإطار الزخرفي'),
+          selected: _showFrame,
+          selectedColor: const Color(0xFFD4AF37),
+          backgroundColor: Colors.white10,
+          labelStyle: TextStyle(
+            fontSize: 11,
+            color: _showFrame ? Colors.black : Colors.white70,
+          ),
+          onSelected: (v) => setState(() => _showFrame = v),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildExportBar(String mainText) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 3,
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFD4AF37),
+                  foregroundColor: const Color(0xFF1B0E06),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 2,
                 ),
-              ],
-            ),
-            const SizedBox(height: 6),
-
-            if (_customImagePath != null) ...[
-              Row(
-                children: [
-                  const Icon(Icons.brightness_6_rounded, size: 16),
-                  const SizedBox(width: 6),
-                  const Text('تعتيم الصورة:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                  Expanded(
-                    child: Slider(
-                      value: _overlayOpacity,
-                      min: 0.15,
-                      max: 0.85,
-                      divisions: 7,
-                      label: '${(_overlayOpacity * 100).round()}%',
-                      activeColor: accent,
-                      onChanged: (val) => setState(() => _overlayOpacity = val),
-                    ),
-                  ),
-                ],
+                icon: _isExporting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                      )
+                    : const Icon(Icons.download_rounded, size: 20),
+                label: const Text(
+                  'حفظ في المعرض',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                onPressed: _isExporting ? null : _saveToGallery,
               ),
-              const SizedBox(height: 6),
-            ],
-
-            PanelLabel('عناصر إضافية'),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                if (content.subText.isNotEmpty)
-                  FilterChip(
-                    label: const Text('المعنى/الشرح', style: TextStyle(fontSize: 11)),
-                    selected: _showSubText,
-                    onSelected: (val) => setState(() => _showSubText = val),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                FilterChip(
-                  label: const Text('المصدر', style: TextStyle(fontSize: 11)),
-                  selected: _showReference,
-                  onSelected: (val) => setState(() => _showReference = val),
-                  visualDensity: VisualDensity.compact,
-                ),
-                FilterChip(
-                  label: const Text('الشعار', style: TextStyle(fontSize: 11)),
-                  selected: _showBranding,
-                  onSelected: (val) => setState(() => _showBranding = val),
-                  visualDensity: VisualDensity.compact,
-                ),
-              ],
             ),
-            const SizedBox(height: 12),
-
-            Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF6D4C41),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      elevation: 2,
-                    ),
-                    icon: _isExporting
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Icon(Icons.download_rounded, size: 20),
-                    label: Text(_isExporting ? 'جارٍ الحفظ...' : 'حفظ', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                    onPressed: _isExporting ? null : _saveToGallery,
-                  ),
+            const SizedBox(width: 10),
+            Expanded(
+              flex: 2,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFFD4AF37), width: 1.5),
+                  foregroundColor: const Color(0xFFE5C378),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 3,
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: isDark ? Colors.white : const Color(0xFF4A3B2C),
-                      side: BorderSide(
-                        color: isDark ? Colors.white38 : const Color(0xFF8D6E63),
-                        width: 1.5,
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    icon: const Icon(Icons.copy_rounded, size: 18),
-                    label: const Text('نسخ', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                    onPressed: () => _copyGenericText(content),
-                  ),
+                icon: const Icon(Icons.share_rounded, size: 18),
+                label: const Text(
+                  'مشاركة',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
-                const SizedBox(width: 8),
-                Material(
-                  color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(14),
-                  child: IconButton(
-                    tooltip: 'مشاركة',
-                    icon: Icon(Icons.share_rounded, color: accent),
-                    onPressed: _isExporting ? null : () => _exportAndShareGeneric(content),
-                  ),
-                ),
-              ],
+                onPressed: _isExporting ? null : () => _shareCard(mainText),
+              ),
             ),
           ],
         ),
@@ -1790,8 +822,3 @@ class _AyahStoryMakerScreenState extends ConsumerState<AyahStoryMakerScreen> {
     );
   }
 }
-
-// راجع lib/features/story_maker/ui/widgets/story_panel_controls.dart
-// (PanelLabel، AyahNumberDropdown) وwidgets/ayah_end_circle.dart
-// (AyahEndCircle والرسّام الزخرفي) — استُخرجت من هون أثناء تفكيك الملف
-// بلا أي تغيير سلوكي.

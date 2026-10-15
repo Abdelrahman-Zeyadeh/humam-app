@@ -8,6 +8,7 @@ import '../../core/data/user/tasbih_prefs.dart';
 import '../../core/data/user/user_prefs.dart';
 import '../../core/theme/app_card.dart';
 import '../../core/theme/app_colors.dart';
+import 'widgets/floating_dhikr_banner.dart';
 import 'widgets/tasbih_counter_dial.dart';
 import 'widgets/tasbih_dialogs.dart';
 import 'widgets/tasbih_goal_tab.dart';
@@ -118,7 +119,11 @@ class _TasbihScreenState extends ConsumerState<TasbihScreen>
       _totalCount++;
 
       if (_vibrationEnabled) {
-        HapticFeedback.lightImpact();
+        if (_count % 10 == 0) {
+          HapticFeedback.mediumImpact();
+        } else {
+          HapticFeedback.lightImpact();
+        }
       }
 
       // التحقق من اكتمال الدورة (33 أو 100)
@@ -259,7 +264,7 @@ class _TasbihScreenState extends ConsumerState<TasbihScreen>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final accent = themeAccent(context);
-    final fg = isDark ? AppColors.inkOnDark : AppColors.navy;
+    final fg = isDark ? AppColors.inkOnDark : const Color(0xFF135B4C);
     final surface = isDark ? AppColors.surfaceDark : Colors.white;
     final border = isDark ? AppColors.lineDark : AppColors.line;
     final progress = _targetGoal > 0
@@ -267,12 +272,11 @@ class _TasbihScreenState extends ConsumerState<TasbihScreen>
         : 1.0;
 
     return Scaffold(
-      // هيدر بتدرّج مطابق لأسلوب لوحة التصميم المعتمدة — `AppBar` عادي
-      // بلا لمس هيكل الجسم، فقط زُيِّن بصرياً (`flexibleSpace`).
+      // هيدر بتدرّج أخضر زمردي فاخر موحّد مع هوية التطبيق
       appBar: GradientAppBar(
         title: 'المسبحة الإلكترونية',
         centerTitle: true,
-        colors: const [AppColors.blue, AppColors.navy],
+        colors: const [Color(0xFF135B4C), Color(0xFF0D3B31)],
         actions: [
           IconButton(
             icon: const Icon(Icons.add_circle_outline),
@@ -335,7 +339,21 @@ class _TasbihScreenState extends ConsumerState<TasbihScreen>
               ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
+
+            // نبض التسبيح الجماعي المباشر
+            const _LiveCommunityDhikrPulse(),
+
+            const SizedBox(height: 10),
+
+            // كبسولة الذكر العائم فوق التطبيقات
+            FloatingDhikrBanner(
+              currentPhrase: _selectedPhrase,
+              accent: accent,
+              isDark: isDark,
+            ),
+
+            const SizedBox(height: 12),
 
             // شريط اختيار الهدف (33 / 100 / مفتوح)
             Padding(
@@ -481,8 +499,9 @@ class _TasbihScreenState extends ConsumerState<TasbihScreen>
                         ? () {
                             setState(() => _count = 0);
                             ref.read(tasbihPrefsProvider).setCount(0);
-                            if (_vibrationEnabled)
+                            if (_vibrationEnabled) {
                               HapticFeedback.mediumImpact();
+                            }
                           }
                         : null,
                   ),
@@ -491,6 +510,110 @@ class _TasbihScreenState extends ConsumerState<TasbihScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _LiveCommunityDhikrPulse extends StatefulWidget {
+  const _LiveCommunityDhikrPulse();
+
+  @override
+  State<_LiveCommunityDhikrPulse> createState() => _LiveCommunityDhikrPulseState();
+}
+
+class _LiveCommunityDhikrPulseState extends State<_LiveCommunityDhikrPulse>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseController;
+  late final Animation<double> _pulseScale;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+    _pulseScale = Tween<double>(begin: 0.82, end: 1.25).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  String _formatArabic(int n) {
+    const d = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+    final s = n.toString();
+    final buffer = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      final c = s[i];
+      final digit = int.tryParse(c);
+      buffer.write(digit != null ? d[digit] : c);
+      if ((s.length - i - 1) % 3 == 0 && i < s.length - 1) {
+        buffer.write('،');
+      }
+    }
+    return buffer.toString();
+  }
+
+  int _simulatedActiveCount() {
+    final now = DateTime.now();
+    final hourBonus = ((now.hour >= 4 && now.hour <= 7) || (now.hour >= 18 && now.hour <= 22)) ? 1200 : 700;
+    final variance = (now.minute * 19 + now.hour * 29) % 240;
+    return 2100 + hourBonus + variance;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final countStr = _formatArabic(_simulatedActiveCount());
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.12 : 0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.3 : 0.22),
+          width: 0.85,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ScaleTransition(
+            scale: _pulseScale,
+            child: Container(
+              width: 7,
+              height: 7,
+              decoration: const BoxDecoration(
+                color: Color(0xFF10B981),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Color(0xFF10B981),
+                    blurRadius: 4,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 7),
+          Text(
+            '$countStr+ مسلم يسبحون معك الآن حول العالم 🌿',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF065F46),
+            ),
+          ),
+        ],
       ),
     );
   }

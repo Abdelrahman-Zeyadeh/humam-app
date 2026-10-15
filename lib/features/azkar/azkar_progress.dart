@@ -29,6 +29,31 @@ class AzkarProgressNotifier extends Notifier<Map<AzkarProgressKey, int>> {
     state = {...state, key: current - 1};
   }
 
+  /// إتمام الذكر بالكامل دفعة واحدة بضغطة زر "تمّ"
+  void complete(AzkarPeriod period, int order) {
+    final key = (period, order);
+    HapticFeedback.mediumImpact();
+    state = {...state, key: 0};
+  }
+
+  /// إتمام جميع أذكار الفترة دفعة واحدة
+  void completePeriod(AzkarPeriod period, List<int> orders) {
+    HapticFeedback.heavyImpact();
+    final updated = Map<AzkarProgressKey, int>.from(state);
+    for (final order in orders) {
+      updated[(period, order)] = 0;
+    }
+    state = updated;
+  }
+
+  /// إعادة ضبط ذكر واحد فقط
+  void resetSingle(AzkarPeriod period, int order) {
+    final key = (period, order);
+    final copy = Map<AzkarProgressKey, int>.from(state);
+    copy.remove(key);
+    state = copy;
+  }
+
   /// إعادة ضبط **فترة واحدة فقط** (زر التصفير بشاشة الصباح لا يلمس تقدّم
   /// المساء، والعكس) — بخلاف السلوك القديم اللي كان يصفّر كل شي معاً.
   void resetPeriod(AzkarPeriod period) {

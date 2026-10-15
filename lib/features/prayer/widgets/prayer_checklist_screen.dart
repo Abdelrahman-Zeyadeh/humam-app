@@ -306,6 +306,7 @@ class _PrayerChecklistScreenState extends ConsumerState<PrayerChecklistScreen>
                     icon: item.icon,
                     promptAzkar: true,
                     prayerShortKey: item.moment.name,
+                    moment: item.moment,
                     locked: !hasMomentArrivedToday(
                       lat: loc.lat,
                       lon: loc.lon,
@@ -339,11 +340,13 @@ class _PrayerChecklistScreenState extends ConsumerState<PrayerChecklistScreen>
                     label: item.label,
                     icon: Icons.auto_awesome_outlined,
                     tag: item.confirmed ? null : 'سنة مهجورة',
+                    moment: item.moment,
                     locked: !hasMomentArrivedToday(
                       lat: loc.lat,
                       lon: loc.lon,
                       methodKey: loc.calculationMethod,
                       moment: item.moment,
+                      isDuha: item.category == UserCategories.sunnahDuha,
                     ),
                   ),
               ],
@@ -412,6 +415,7 @@ class _PrayerCheckRow extends ConsumerWidget {
     this.promptAzkar = false,
     this.locked = false,
     this.prayerShortKey,
+    this.moment,
   });
   final String category;
   final String label;
@@ -419,6 +423,7 @@ class _PrayerCheckRow extends ConsumerWidget {
   final String? tag;
   final bool locked;
   final bool promptAzkar;
+  final PrayerMoment? moment;
   /// `PrayerMoment.name` — فقط للفرائض الخمس (راجع `_savePrayerPerformance`)،
   /// `null` للسنن الرواتب (لا خيار جماعة/منفرد/قضاء لها أصلاً).
   final String? prayerShortKey;
@@ -580,13 +585,49 @@ class _PrayerCheckRow extends ConsumerWidget {
             done
                 ? _buildPerfBadge(context, ref)
                 : locked
-                ? Tooltip(
-                    message: 'لسا ما جا وقتها',
-                    child: Text(
-                      'مقفل',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: onSurface.withValues(alpha: 0.4),
+                ? InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () {
+                      final momentName = moment != null ? 'صلاة ${moment!.nameAr}' : 'وقتها';
+                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Row(
+                            children: [
+                              const Icon(Icons.lock_clock_outlined, color: Colors.white, size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text('لم يحن وقت $label بعد — تفتح مع دخول وقت $momentName'),
+                              ),
+                            ],
+                          ),
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: onSurface.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: onSurface.withValues(alpha: 0.15)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.lock_outline, size: 13, color: onSurface.withValues(alpha: 0.45)),
+                          const SizedBox(width: 4),
+                          Text(
+                            'مقفل',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.bold,
+                              color: onSurface.withValues(alpha: 0.45),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   )

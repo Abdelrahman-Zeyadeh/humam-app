@@ -11,6 +11,9 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.SystemClock
 import android.widget.RemoteViews
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import es.antonborri.home_widget.HomeWidgetLaunchIntent
 import es.antonborri.home_widget.HomeWidgetProvider
 
@@ -64,20 +67,33 @@ class PrayerBarWidgetProvider : HomeWidgetProvider() {
     val timeMaghrib = widgetData.getString("time_maghrib", "7:13") ?: "7:13"
     val timeIsha = widgetData.getString("time_isha", "8:38") ?: "8:38"
 
-    val fajrMs = widgetData.getLong("time_fajr_ms", 0L)
-    val sunriseMs = widgetData.getLong("time_sunrise_ms", 0L)
-    val dhuhrMs = widgetData.getLong("time_dhuhr_ms", 0L)
-    val asrMs = widgetData.getLong("time_asr_ms", 0L)
-    val maghribMs = widgetData.getLong("time_maghrib_ms", 0L)
-    val ishaMs = widgetData.getLong("time_isha_ms", 0L)
-    val tomorrowFajrMs = widgetData.getLong("time_tomorrow_fajr_ms", 0L)
+    val fajrMs = getLongOrInt(widgetData, "time_fajr_ms", 0L)
+    val sunriseMs = getLongOrInt(widgetData, "time_sunrise_ms", 0L)
+    val dhuhrMs = getLongOrInt(widgetData, "time_dhuhr_ms", 0L)
+    val asrMs = getLongOrInt(widgetData, "time_asr_ms", 0L)
+    val maghribMs = getLongOrInt(widgetData, "time_maghrib_ms", 0L)
+    val ishaMs = getLongOrInt(widgetData, "time_isha_ms", 0L)
+    val tomorrowFajrMs = getLongOrInt(widgetData, "time_tomorrow_fajr_ms", 0L)
+
+    val iqamahFajrMin = getLongOrInt(widgetData, "iqamah_fajr_min", 20L).toInt()
+    val iqamahDhuhrMin = getLongOrInt(widgetData, "iqamah_dhuhr_min", 15L).toInt()
+    val iqamahAsrMin = getLongOrInt(widgetData, "iqamah_asr_min", 15L).toInt()
+    val iqamahMaghribMin = getLongOrInt(widgetData, "iqamah_maghrib_min", 10L).toInt()
+    val iqamahIshaMin = getLongOrInt(widgetData, "iqamah_isha_min", 15L).toInt()
+
+    val fajrIqamahMs = if (fajrMs > 0 && iqamahFajrMin > 0) fajrMs + iqamahFajrMin * 60_000L else 0L
+    val dhuhrIqamahMs = if (dhuhrMs > 0 && iqamahDhuhrMin > 0) dhuhrMs + iqamahDhuhrMin * 60_000L else 0L
+    val asrIqamahMs = if (asrMs > 0 && iqamahAsrMin > 0) asrMs + iqamahAsrMin * 60_000L else 0L
+    val maghribIqamahMs = if (maghribMs > 0 && iqamahMaghribMin > 0) maghribMs + iqamahMaghribMin * 60_000L else 0L
+    val ishaIqamahMs = if (ishaMs > 0 && iqamahIshaMin > 0) ishaMs + iqamahIshaMin * 60_000L else 0L
 
     val now = System.currentTimeMillis()
 
     var prayerName = widgetData.getString("next_prayer_name", "الفجر") ?: "الفجر"
     var prayerTime = widgetData.getString("next_prayer_time", timeFajr) ?: timeFajr
     var activeMoment = widgetData.getString("active_moment", "fajr") ?: "fajr"
-    var nextTargetEpochMs = widgetData.getLong("next_prayer_target_epoch", 0L)
+    var nextTargetEpochMs = getLongOrInt(widgetData, "next_prayer_target_epoch", 0L)
+    var isInIqamah = widgetData.getBoolean("is_in_iqamah", false)
 
     if (fajrMs > 0 && sunriseMs > 0 && dhuhrMs > 0 && asrMs > 0 && maghribMs > 0 && ishaMs > 0) {
       if (now < fajrMs) {
@@ -85,41 +101,82 @@ class PrayerBarWidgetProvider : HomeWidgetProvider() {
         prayerTime = timeFajr
         activeMoment = "fajr"
         nextTargetEpochMs = fajrMs
+        isInIqamah = false
+      } else if (fajrIqamahMs > fajrMs && now < fajrIqamahMs) {
+        prayerName = "إقامة الفجر"
+        prayerTime = formatClockTime(fajrIqamahMs).ifEmpty { timeFajr }
+        activeMoment = "fajr"
+        nextTargetEpochMs = fajrIqamahMs
+        isInIqamah = true
       } else if (now < sunriseMs) {
         prayerName = "الشروق"
         prayerTime = timeSunrise
         activeMoment = "fajr"
         nextTargetEpochMs = sunriseMs
+        isInIqamah = false
       } else if (now < dhuhrMs) {
         prayerName = "الظهر"
         prayerTime = timeDhuhr
         activeMoment = "sunrise"
         nextTargetEpochMs = dhuhrMs
+        isInIqamah = false
+      } else if (dhuhrIqamahMs > dhuhrMs && now < dhuhrIqamahMs) {
+        prayerName = "إقامة الظهر"
+        prayerTime = formatClockTime(dhuhrIqamahMs).ifEmpty { timeDhuhr }
+        activeMoment = "dhuhr"
+        nextTargetEpochMs = dhuhrIqamahMs
+        isInIqamah = true
       } else if (now < asrMs) {
         prayerName = "العصر"
         prayerTime = timeAsr
         activeMoment = "dhuhr"
         nextTargetEpochMs = asrMs
+        isInIqamah = false
+      } else if (asrIqamahMs > asrMs && now < asrIqamahMs) {
+        prayerName = "إقامة العصر"
+        prayerTime = formatClockTime(asrIqamahMs).ifEmpty { timeAsr }
+        activeMoment = "asr"
+        nextTargetEpochMs = asrIqamahMs
+        isInIqamah = true
       } else if (now < maghribMs) {
         prayerName = "المغرب"
         prayerTime = timeMaghrib
         activeMoment = "asr"
         nextTargetEpochMs = maghribMs
+        isInIqamah = false
+      } else if (maghribIqamahMs > maghribMs && now < maghribIqamahMs) {
+        prayerName = "إقامة المغرب"
+        prayerTime = formatClockTime(maghribIqamahMs).ifEmpty { timeMaghrib }
+        activeMoment = "maghrib"
+        nextTargetEpochMs = maghribIqamahMs
+        isInIqamah = true
       } else if (now < ishaMs) {
         prayerName = "العشاء"
         prayerTime = timeIsha
         activeMoment = "maghrib"
         nextTargetEpochMs = ishaMs
+        isInIqamah = false
+      } else if (ishaIqamahMs > ishaMs && now < ishaIqamahMs) {
+        prayerName = "إقامة العشاء"
+        prayerTime = formatClockTime(ishaIqamahMs).ifEmpty { timeIsha }
+        activeMoment = "isha"
+        nextTargetEpochMs = ishaIqamahMs
+        isInIqamah = true
       } else {
         prayerName = "الفجر"
         prayerTime = timeFajr
         activeMoment = "isha"
         nextTargetEpochMs = if (tomorrowFajrMs > now) tomorrowFajrMs else (fajrMs + 24 * 3600 * 1000L)
+        isInIqamah = false
       }
     }
 
-    val activeColor = Color.parseColor("#E7D2A0")
-    val inactiveColor = Color.parseColor("#80FFFFFF")
+    val activeNameColor = Color.parseColor("#F5D78E")
+    val activeTimeColor = Color.parseColor("#FFFFFF")
+    val inactiveNameColor = Color.parseColor("#B3FFFFFF")
+    val inactiveTimeColor = Color.parseColor("#CCFFFFFF")
+    val activeBoxRes = R.drawable.humam_widget_prayer_active
+    val inactiveBoxRes = R.drawable.humam_widget_prayer_inactive
     val backgroundRes = WidgetAccentColors.backgroundRes(widgetData.getString("accent_id", null))
 
     appWidgetIds.forEach { widgetId ->
@@ -132,7 +189,8 @@ class PrayerBarWidgetProvider : HomeWidgetProvider() {
         val remainingMs = nextTargetEpochMs - now
         if (remainingMs > 0) {
           val base = SystemClock.elapsedRealtime() + remainingMs
-          setChronometer(R.id.prayer_bar_countdown, base, "%s", true)
+          val formatStr = if (isInIqamah) "للإقامة %s" else "متبقي %s"
+          setChronometer(R.id.prayer_bar_countdown, base, formatStr, true)
           setChronometerCountDown(R.id.prayer_bar_countdown, true)
         } else {
           setChronometer(R.id.prayer_bar_countdown, SystemClock.elapsedRealtime(), "حان الآن", false)
@@ -146,24 +204,30 @@ class PrayerBarWidgetProvider : HomeWidgetProvider() {
         setTextViewText(R.id.pb_time_maghrib, timeMaghrib)
         setTextViewText(R.id.pb_time_isha, timeIsha)
 
-        // تلوين الصلاة النشطة
-        setTextColor(R.id.pb_name_fajr, if (activeMoment == "fajr") activeColor else inactiveColor)
-        setTextColor(R.id.pb_time_fajr, if (activeMoment == "fajr") activeColor else inactiveColor)
+        // تلوين وتمييز الصلاة النشطة ككبسولة مضيئة
+        setInt(R.id.pb_box_fajr, "setBackgroundResource", if (activeMoment == "fajr") activeBoxRes else inactiveBoxRes)
+        setTextColor(R.id.pb_name_fajr, if (activeMoment == "fajr") activeNameColor else inactiveNameColor)
+        setTextColor(R.id.pb_time_fajr, if (activeMoment == "fajr") activeTimeColor else inactiveTimeColor)
 
-        setTextColor(R.id.pb_name_sunrise, if (activeMoment == "sunrise") activeColor else inactiveColor)
-        setTextColor(R.id.pb_time_sunrise, if (activeMoment == "sunrise") activeColor else inactiveColor)
+        setInt(R.id.pb_box_sunrise, "setBackgroundResource", if (activeMoment == "sunrise") activeBoxRes else inactiveBoxRes)
+        setTextColor(R.id.pb_name_sunrise, if (activeMoment == "sunrise") activeNameColor else inactiveNameColor)
+        setTextColor(R.id.pb_time_sunrise, if (activeMoment == "sunrise") activeTimeColor else inactiveTimeColor)
 
-        setTextColor(R.id.pb_name_dhuhr, if (activeMoment == "dhuhr") activeColor else inactiveColor)
-        setTextColor(R.id.pb_time_dhuhr, if (activeMoment == "dhuhr") activeColor else inactiveColor)
+        setInt(R.id.pb_box_dhuhr, "setBackgroundResource", if (activeMoment == "dhuhr") activeBoxRes else inactiveBoxRes)
+        setTextColor(R.id.pb_name_dhuhr, if (activeMoment == "dhuhr") activeNameColor else inactiveNameColor)
+        setTextColor(R.id.pb_time_dhuhr, if (activeMoment == "dhuhr") activeTimeColor else inactiveTimeColor)
 
-        setTextColor(R.id.pb_name_asr, if (activeMoment == "asr") activeColor else inactiveColor)
-        setTextColor(R.id.pb_time_asr, if (activeMoment == "asr") activeColor else inactiveColor)
+        setInt(R.id.pb_box_asr, "setBackgroundResource", if (activeMoment == "asr") activeBoxRes else inactiveBoxRes)
+        setTextColor(R.id.pb_name_asr, if (activeMoment == "asr") activeNameColor else inactiveNameColor)
+        setTextColor(R.id.pb_time_asr, if (activeMoment == "asr") activeTimeColor else inactiveTimeColor)
 
-        setTextColor(R.id.pb_name_maghrib, if (activeMoment == "maghrib") activeColor else inactiveColor)
-        setTextColor(R.id.pb_time_maghrib, if (activeMoment == "maghrib") activeColor else inactiveColor)
+        setInt(R.id.pb_box_maghrib, "setBackgroundResource", if (activeMoment == "maghrib") activeBoxRes else inactiveBoxRes)
+        setTextColor(R.id.pb_name_maghrib, if (activeMoment == "maghrib") activeNameColor else inactiveNameColor)
+        setTextColor(R.id.pb_time_maghrib, if (activeMoment == "maghrib") activeTimeColor else inactiveTimeColor)
 
-        setTextColor(R.id.pb_name_isha, if (activeMoment == "isha") activeColor else inactiveColor)
-        setTextColor(R.id.pb_time_isha, if (activeMoment == "isha") activeColor else inactiveColor)
+        setInt(R.id.pb_box_isha, "setBackgroundResource", if (activeMoment == "isha") activeBoxRes else inactiveBoxRes)
+        setTextColor(R.id.pb_name_isha, if (activeMoment == "isha") activeNameColor else inactiveNameColor)
+        setTextColor(R.id.pb_time_isha, if (activeMoment == "isha") activeTimeColor else inactiveTimeColor)
 
         val pendingIntent = HomeWidgetLaunchIntent.getActivity(
             context,
@@ -194,6 +258,28 @@ class PrayerBarWidgetProvider : HomeWidgetProvider() {
       alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, targetMs, pendingIntent)
     } catch (e: Exception) {
       android.util.Log.e("PrayerBarWidget", "scheduleNextAlarm failed", e)
+    }
+  }
+
+  private fun getLongOrInt(prefs: SharedPreferences, key: String, defaultVal: Long): Long {
+    return try {
+      prefs.getLong(key, defaultVal)
+    } catch (e: Exception) {
+      try {
+        prefs.getInt(key, defaultVal.toInt()).toLong()
+      } catch (e2: Exception) {
+        defaultVal
+      }
+    }
+  }
+
+  private fun formatClockTime(epochMs: Long): String {
+    if (epochMs <= 0L) return ""
+    return try {
+      val sdf = SimpleDateFormat("h:mm", Locale.US)
+      sdf.format(Date(epochMs))
+    } catch (e: Exception) {
+      ""
     }
   }
 }
