@@ -105,3 +105,4 @@ devtools_options.yaml
 firebase.json
 firestore.indexes.json
 firestore.rules
+analysis_options.yaml
