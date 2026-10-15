@@ -94,3 +94,7 @@ test/**/failures/
 # الغلطة بأي من المكانين.
 /oracleJdk-26/
 /android/app/oracleJdk-26/
+
+.claude/
+.idea/
+.widget_preview/
